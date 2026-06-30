@@ -20,8 +20,14 @@ const featureGroups = [
   {
     title: 'Judging, escalation, and repair',
     tags: ['oracle', 'arena', 'CI', 'artifacts'],
-    text: 'Capability-aware fast/oracle model routing, best-of-N agent judging, self-healing CI loops, and reviewable artifacts for diffs, test runs, plans, and feedback.',
-    commands: ['ur escalate', 'ur arena', 'ur ci-loop', 'ur artifacts'],
+    text: 'Capability-aware fast/oracle model routing, best-of-N agent judging, test-first execution loops, self-healing CI loops, and reviewable artifacts for diffs, test runs, plans, and feedback.',
+    commands: ['ur escalate', 'ur arena', 'ur test-first', 'ur ci-loop', 'ur artifacts'],
+  },
+  {
+    title: 'Reliable repo editing',
+    tags: ['index', 'AST', 'preview', 'rollback'],
+    text: 'File and symbol indexing, indexed search, AST-aware JavaScript/TypeScript identifier rename plans, patch previews before writes, and rollback-safe multi-file apply.',
+    commands: ['ur repo-edit index', 'ur repo-edit search', 'ur repo-edit preview rename', 'ur repo-edit apply rename --check'],
   },
   {
     title: 'Automation and triggers',
@@ -38,8 +44,8 @@ const featureGroups = [
   {
     title: 'Evaluation and verification',
     tags: ['evals', 'review', 'QA'],
-    text: 'Replayable eval suites, self-review PR gate, browser QA fixtures, verifier reminders, trace inspection, reviewable artifacts, and subagent timelines.',
-    commands: ['ur eval', 'ur agent-task', 'ur browser-qa', 'ur artifacts', '/verify', '/trace'],
+    text: 'Replayable eval suites, self-review PR gate, browser QA fixtures, verifier reminders, test-first traces, trace inspection, reviewable artifacts, and subagent timelines.',
+    commands: ['ur eval', 'ur test-first', 'ur agent-task', 'ur browser-qa', 'ur artifacts', '/verify', '/trace'],
   },
   {
     title: 'Interoperability',
@@ -162,6 +168,13 @@ const commands = [
     examples: ['ur ci-loop --command "bun test" --dry-run', 'ur ci-loop --command "bun test" --max-attempts 3', 'ur ci-loop --from-log failure.log --dry-run', 'ur ci-loop --command "bun test" --commit'],
   },
   {
+    name: 'test-first',
+    category: 'Verification',
+    aliases: ['quality-loop', 'tf-loop'],
+    summary: 'Detect the project stack, run compile/test/lint commands, store failure traces, and install edit-time verify gates.',
+    examples: ['ur test-first detect', 'ur test-first --dry-run', 'ur test-first --max-attempts 3', 'ur test-first install'],
+  },
+  {
     name: 'claim-ledger',
     category: 'Evidence',
     aliases: ['claims'],
@@ -260,6 +273,13 @@ const commands = [
     examples: ['ur plugin list', 'ur plugin install hello@ur-plugins-official', 'ur plugin update <plugin>', 'ur plugin disable <plugin>'],
   },
   {
+    name: 'repo-edit',
+    category: 'Delivery',
+    aliases: ['repoedit', 'reliable-edit'],
+    summary: 'Reliable repo editing with a local file/symbol index, AST-aware JS/TS rename plans, patch previews, and rollback-safe multi-file apply.',
+    examples: ['ur repo-edit index', 'ur repo-edit search checkoutTotal', 'ur repo-edit plan rename oldName --to newName', 'ur repo-edit preview rename oldName --to newName', 'ur repo-edit apply rename oldName --to newName --check "bun test"'],
+  },
+  {
     name: 'role-mode',
     category: 'Agent Platform',
     aliases: ['roles'],
@@ -332,7 +352,7 @@ const slashGroups = [
   },
   {
     title: 'Editing and delivery',
-    items: ['/diff', '/commit', '/commit-push-pr', '/review', '/verify', '/trace', '/agent-task', '/artifacts'],
+    items: ['/diff', '/repo-edit', '/commit', '/commit-push-pr', '/review', '/verify', '/trace', '/agent-task', '/artifacts'],
     text: 'Review changes, create commits, prepare PRs, inspect the trace, and run verification.',
   },
   {
@@ -434,6 +454,16 @@ const projectFiles = [
     example: 'ur artifacts capture-diff',
   },
   {
+    title: '.ur/repo-edit/',
+    text: 'Reliable repo-edit index data with file metadata, tokens, and JavaScript/TypeScript symbols.',
+    example: 'ur repo-edit index',
+  },
+  {
+    title: '.ur/test-first/',
+    text: 'Failure traces from stack-aware compile/test/lint loops.',
+    example: 'ur test-first --max-attempts 1',
+  },
+  {
     title: '.ur/browser-qa/',
     text: 'Browser replay fixtures and smoke-test targets.',
     example: 'ur browser-qa validate',
@@ -472,6 +502,11 @@ const examples = [
     code: 'ur arena "implement a debounce helper" --agents 2 --dry-run\nur arena "fix the parser" --agents 3 --apply',
   },
   {
+    title: 'Reliable repo rename',
+    text: 'Preview an AST-aware identifier rename, then apply it with rollback on validation failure.',
+    code: 'ur repo-edit index\nur repo-edit preview rename oldName --to newName\nur repo-edit apply rename oldName --to newName --check "bun test"',
+  },
+  {
     title: 'Model escalation',
     text: 'Plan a fast/oracle route or force the oracle path for hard work.',
     code: 'ur escalate plan "debug the scheduler race"\nur escalate run "refactor the cache layer" --force-oracle --dry-run',
@@ -480,6 +515,11 @@ const examples = [
     title: 'Self-healing CI',
     text: 'Run a test command, summarize failures, attempt a bounded fix loop, and rerun.',
     code: 'ur ci-loop --command "bun test" --dry-run\nur ci-loop --command "bun test" --max-attempts 3',
+  },
+  {
+    title: 'Test-first command evidence',
+    text: 'Detect compile/test/lint commands, preview the loop, and install edit-time gates.',
+    code: 'ur test-first detect\nur test-first --dry-run\nur test-first install',
   },
   {
     title: 'Reviewable artifacts',

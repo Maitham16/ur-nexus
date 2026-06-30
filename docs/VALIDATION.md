@@ -18,10 +18,55 @@ You need:
 
 ```sh
 ur --version
-# expected: 1.16.0 (Ur)
+# expected: 1.18.0 (Ur)
 ```
 
-## 0.1 Network Ollama discovery (1.16.0)
+## 0.1 Test-first execution loop (1.18.0)
+
+In a project checkout:
+
+```sh
+ur test-first detect
+ur test-first --dry-run
+ur test-first install
+```
+
+Expected:
+
+- `detect` prints the detected language/package manager and compile/test/lint
+  commands.
+- `--dry-run` prints the planned command evidence without executing commands.
+- `install` merges the detected commands into `.ur/verify.json`.
+
+To verify failure traces without breaking the checkout, run this in a temporary
+project whose `package.json` contains a failing script:
+
+```sh
+ur test-first --max-attempts 1
+```
+
+Expected: a non-zero command creates a log under
+`.ur/test-first/traces/`, and the command reports `exhausted`, not `passed`.
+
+## 0.2 Reliable repo editing (1.17.0)
+
+In a disposable checkout:
+
+```sh
+ur repo-edit index
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test" --json
+```
+
+Expected:
+
+- `index` writes `.ur/repo-edit/index.json`.
+- `preview` prints a unified patch and does not write files.
+- `apply` changes JavaScript/TypeScript identifier nodes only.
+- If the check command exits non-zero, every touched file is restored and the
+  JSON result reports `"rolledBack": true`.
+
+## 0.3 Network Ollama discovery (1.16.0)
 
 With at least one other Ollama server reachable on your LAN:
 
@@ -213,6 +258,7 @@ ur spec init validation-demo --goal "1. add a helper 2. add a test"
 ur spec run validation-demo --all --dry-run
 ur arena "implement a debounce helper" --agents 2 --dry-run
 ur escalate run "refactor the cache layer" --force-oracle --dry-run
+ur test-first --dry-run
 ur ci-loop --command "bun test" --dry-run
 ur artifacts capture-tests --command "bun test"
 ```
@@ -232,6 +278,6 @@ Expected: no `unknown option` or `too many arguments` parser errors.
 - Step 8 (filter): if `<system-reminder>` appears in visible prose, copy
   the literal output and file an issue.
 - Step 9 (direct commands): run `ur --help` and confirm `spec`, `arena`,
-  `escalate`, `ci-loop`, and `artifacts` appear. If `unknown option` or
+  `escalate`, `test-first`, `ci-loop`, and `artifacts` appear. If `unknown option` or
   `too many arguments` appears, reinstall `ur-agent@latest` and verify the
   npm version with `npm view ur-agent version`.

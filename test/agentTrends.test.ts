@@ -31,6 +31,7 @@ describe('agent trend coverage', () => {
     expect(ids).toContain('browser-computer-use')
     expect(ids).toContain('provenance')
     expect(ids).toContain('evals-observability')
+    expect(ids).toContain('test-first-execution')
     expect(ids).toContain('security')
     expect(ids).toContain('identity-auth')
     expect(ids).toContain('multimodal')

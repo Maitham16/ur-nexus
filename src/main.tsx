@@ -4586,6 +4586,17 @@ async function run(): Promise<CommanderCommand> {
     const args = [opts.command ? `--command ${quoteLocalCommandArg(opts.command)}` : undefined, opts.maxAttempts ? `--max-attempts ${opts.maxAttempts}` : undefined, opts.fromLog ? `--from-log ${quoteLocalCommandArg(opts.fromLog)}` : undefined, opts.commit ? '--commit' : undefined, opts.push ? '--push' : undefined, opts.dryRun ? '--dry-run' : undefined, opts.skipPermissions ? '--skip-permissions' : undefined, opts.maxTurns ? `--max-turns ${opts.maxTurns}` : undefined, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
     await runLocalTextCommand(() => import('./commands/ci-loop/ci-loop.js'), args);
   });
+  program.command('test-first [action]').alias('quality-loop').alias('tf-loop').description('Detect project stack, run compile/test/lint loops, store failure traces, and install edit-time verify gates').option('--max-attempts <n>', 'Maximum fix attempts (default 3)').option('--install-gates', 'Write detected commands to .ur/verify.json afterEdit').option('--dry-run', 'Show detected commands without running').option('--skip-permissions', 'Pass --dangerously-skip-permissions to the fix agent (sandboxes only)').option('--max-turns <n>', 'Max agentic turns for the fix agent').option('--json', 'Output as JSON').action(async (action: string | undefined, opts: {
+    maxAttempts?: string;
+    installGates?: boolean;
+    dryRun?: boolean;
+    skipPermissions?: boolean;
+    maxTurns?: string;
+    json?: boolean;
+  }) => {
+    const args = [action, opts.maxAttempts ? `--max-attempts ${opts.maxAttempts}` : undefined, opts.installGates ? '--install-gates' : undefined, opts.dryRun ? '--dry-run' : undefined, opts.skipPermissions ? '--skip-permissions' : undefined, opts.maxTurns ? `--max-turns ${opts.maxTurns}` : undefined, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
+    await runLocalTextCommand(() => import('./commands/test-first/test-first.js'), args);
+  });
   program.command('artifacts [action] [id]').alias('artifact').description('Reviewable deliverables (plans, diffs, test runs) with approve/reject/feedback under .ur/artifacts').option('--kind <kind>', 'Artifact kind: plan|diff|test-run|screenshot|browser-recording|note').option('--title <text>', 'Artifact title').option('--body <text>', 'Inline artifact body').option('--file <path>', 'Attach an existing file as the artifact body').option('--summary <text>', 'Short summary line').option('--feedback <text>', 'Feedback text for reject/feedback/comment').option('--task <id>', 'Background task id to steer when adding feedback').option('--command <cmd>', 'Command for capture-tests (default "bun test")').option('--json', 'Output as JSON').action(async (action: string | undefined, id: string | undefined, opts: {
     kind?: string;
     title?: string;
@@ -4650,6 +4661,14 @@ async function run(): Promise<CommanderCommand> {
   }) => {
     const args = [action, ...query, opts.graph ? '--graph' : undefined, opts.dryRun ? '--dry-run' : undefined, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
     await runLocalTextCommand(() => import('./commands/code-index/code-index.js'), args);
+  });
+  program.command('repo-edit [action] [rest...]').alias('repoedit').alias('reliable-edit').description('Reliable repo editing: indexed search, AST-aware rename plans, patch previews, and rollback-safe apply').option('--to <identifier>', 'New identifier for rename operations').option('--check <cmd>', 'Validation command to run after apply; failures rollback touched files').option('--json', 'Output as JSON').action(async (action: string | undefined, rest: string[] = [], opts: {
+    to?: string;
+    check?: string;
+    json?: boolean;
+  }) => {
+    const args = [action, ...rest, opts.to ? `--to ${quoteLocalCommandArg(opts.to)}` : undefined, opts.check ? `--check ${quoteLocalCommandArg(opts.check)}` : undefined, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
+    await runLocalTextCommand(() => import('./commands/repo-edit/repo-edit.js'), args);
   });
   program.command('ide [action] [rest...]').description('Manage IDE integrations and inline diff bundles').option('--title <title>', 'Title for captured inline diff bundle').option('--base <ref>', 'Capture branch diff from this base ref').option('--staged', 'Capture staged changes instead of unstaged changes').option('--feedback <text>', 'Comment text for an IDE diff bundle').option('--file <path>', 'File path for an inline diff comment').option('--line <line>', 'Line number for an inline diff comment').option('--json', 'Output as JSON').action(async (action: string | undefined, rest: string[] = [], opts: {
     title?: string;

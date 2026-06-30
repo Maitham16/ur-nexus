@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.18.0
+
+### Added
+- **Test-first execution loop (`ur test-first`).** Added a P0 quality loop that
+  detects the project stack, orders compile/test/lint commands, runs them as
+  command evidence, invokes a bounded fix agent on failure, and refuses a
+  passing status unless the detected commands exit 0.
+- **Failure trace store.** Failed commands write inspectable logs under
+  `.ur/test-first/traces/` with timestamp, phase, command, exit code, stdout,
+  and stderr.
+- **Edit-time gate installer.** `ur test-first install` and
+  `ur test-first --install-gates` merge detected commands into
+  `.ur/verify.json` so the existing verifier can run them after file edits.
+
+### Changed
+- **Typecheck classification.** Project DNA now classifies Node/TypeScript
+  `typecheck` scripts as compile evidence instead of test evidence.
+- **Version bump.** Updated from 1.17.0 to 1.18.0 across `package.json`,
+  `bunfig.toml`, the VS Code extension, and bundled CLI metadata.
+
+### Verified
+- Added focused tests for stack detection, verify-gate installation, failure
+  trace persistence, retry-through-fix behavior, and CLI argument parsing.
+
+## 1.17.0
+
+### Added
+- **Reliable repo editing (`ur repo-edit`).** Added a P0 repo-editing workflow
+  with dependency-free file/symbol indexing, indexed search, AST-aware
+  JavaScript/TypeScript identifier rename planning, explicit patch preview, and
+  transactional multi-file apply.
+- **Rollback-safe refactors.** `ur repo-edit apply rename ...` writes all
+  planned files as one operation, validates syntax, optionally runs
+  `--check <cmd>`, and restores every touched file if validation fails.
+
+### Verified
+- Added focused tests for repo edit indexing/search, AST rename planning that
+  leaves strings and comments untouched, patch preview without writes, and
+  rollback after failed checks.
+
 ## 1.16.0
 
 ### Added

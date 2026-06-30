@@ -217,6 +217,25 @@ const coverage: TrendCoverage[] = [
       'Run the eval harness in CI and track pass-rate per category over time as a published number.',
   },
   {
+    id: 'test-first-execution',
+    name: 'Test-first execution',
+    status: 'covered',
+    summary:
+      'UR can detect a project stack, run compile/test/lint commands as command evidence, store failed command traces, and install the detected command set into edit-time verifier gates.',
+    evidence: [
+      'ur test-first detect',
+      'ur test-first --dry-run / --max-attempts N',
+      'failure traces under .ur/test-first/traces',
+      'ur test-first install merges commands into .ur/verify.json',
+    ],
+    references: [
+      'https://openai.github.io/openai-agents-python/tracing/',
+      'https://openai.github.io/openai-agents-python/guardrails/',
+    ],
+    professionalNextStep:
+      'Add per-package command plans for large monorepos with multiple quality stacks.',
+  },
+  {
     id: 'security',
     name: 'Agent security and prompt-injection resistance',
     status: 'covered',

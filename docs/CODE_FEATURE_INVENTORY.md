@@ -1,7 +1,7 @@
 # UR Agent code feature inventory
 
 This file is a code-derived inventory of what this agent can do in the
-`ur-agent` 1.16.0 source tree. It is meant to cover behavior that is easy to
+`ur-agent` 1.18.0 source tree. It is meant to cover behavior that is easy to
 miss in user-facing documentation.
 
 Sources traced include:
@@ -179,6 +179,8 @@ The CLI registers these top-level command families in `src/main.tsx`:
 - `bg` / `background-agent`: run detached local background agents with durable
   state, logs, optional worktrees, fanout, live steering, and opt-in PRs.
 - `ci-loop` / `heal`: self-healing build/test loop with bounded fix attempts.
+- `test-first` / `quality-loop` / `tf-loop`: stack-aware compile/test/lint
+  loop with failure traces and `.ur/verify.json` gate installation.
 - `artifacts` / `artifact`: create, review, approve, reject, and capture
   deliverables; comments can steer linked background tasks.
 - `trigger` / `mention`: parse webhook payloads and optionally launch a run.
@@ -187,6 +189,9 @@ The CLI registers these top-level command families in `src/main.tsx`:
 - `eval` / `evals`: public agent eval harness.
 - `code-index` / `codeindex`: semantic code index backed by local embeddings,
   including watch mode for auto-reindex.
+- `repo-edit` / `repoedit` / `reliable-edit`: reliable repo editing with a
+  local file/symbol index, AST-aware JavaScript/TypeScript rename plans, patch
+  previews, and rollback-safe multi-file apply.
 - `memory retention`: project-local memory retention controls.
 - `ide diff`: editor-readable inline diff bundles for native review surfaces.
 - `role-mode` / `roles`: built-in role modes such as Architect, Code, Debug,
@@ -230,6 +235,7 @@ Code-visible slash command names include:
 - `btw`
 - `chrome`
 - `ci-loop`
+- `test-first`
 - `cite`
 - `claim-ledger`
 - `clear`
@@ -595,7 +601,8 @@ systems:
 - Project DNA generation under `src/ur/projectDna.ts`:
   - language detection
   - package manager detection
-  - build/test/lint/run command detection
+  - build/test/lint/run command detection, with Node/TypeScript typecheck
+    scripts treated as compile evidence
   - key folders
   - git/readme context
   - `.ur/project_dna.md`
@@ -613,6 +620,12 @@ The verifier service in `src/services/verifier/**` includes:
 - Empty-turn detection.
 - Done-claim detection against actual tool/mutation evidence.
 - Project gates from `.ur/verify.json`.
+- Test-first execution loop under `src/services/agents/testFirstLoop.ts`:
+  - automatic stack and command detection
+  - compile/test/lint command ordering
+  - bounded fix-runner retries
+  - failure traces under `.ur/test-first/traces/`
+  - gate installation into `.ur/verify.json`
 - Loop detection.
 - Rejection cap.
 - Optional L2 verification subagent through env opt-in.

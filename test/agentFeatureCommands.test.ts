@@ -24,7 +24,7 @@ function tempDir(prefix: string): string {
 
 describe('agent feature scaffolds', () => {
   test('tracks the agent feature surfaces', () => {
-    expect(AGENT_FEATURES).toHaveLength(20)
+    expect(AGENT_FEATURES).toHaveLength(21)
     const ids = AGENT_FEATURES.map(feature => feature.id)
     expect(ids).toContain('task-pr')
     expect(ids).toContain('browser-evals')
@@ -37,6 +37,7 @@ describe('agent feature scaffolds', () => {
     expect(ids).toContain('trigger-bridge')
     expect(ids).toContain('goals')
     expect(ids).toContain('sdk')
+    expect(ids).toContain('test-first-loop')
   })
 
   test('installs only requested agent templates', () => {

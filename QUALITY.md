@@ -18,8 +18,23 @@ bun run release:check
 npm pack --dry-run
 ```
 
+For project-specific feature work, `ur test-first detect` shows the detected
+compile/test/lint command set. `ur test-first install` can persist that command
+set into `.ur/verify.json` so future mutating turns run the same gates.
+
 `bun run release:check` is also wired into `prepack`, so stale bundles and
 version drift fail before packaging.
+
+## Documentation Gate
+
+Public feature releases should update the full documentation set:
+
+- root README
+- changelog and upgrade notes
+- `docs/`
+- static site files under `documentation/`
+- examples
+- extension or marketplace docs when affected
 
 ## Runtime Assumptions
 
@@ -38,6 +53,9 @@ version drift fail before packaging.
   from classifier-backed auto mode.
 - The verifier runs deterministic L1 checks for false completion claims,
   repeated tool loops, empty assistant turns, and project gates.
+- `ur test-first` stores failing compile/test/lint traces under
+  `.ur/test-first/traces/` and reports success only from zero-exit command
+  evidence.
 - Deep verification through the verification subagent is manual by default and
   can be enabled with `UR_VERIFIER_AUTO_SUBAGENT=1`.
 - Secrets must stay in environment variables, secure storage, or local ignored

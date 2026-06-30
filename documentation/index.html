@@ -43,7 +43,7 @@
     <main id="content" class="content">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Version 1.14.1</p>
+          <p class="eyebrow">Version 1.18.0</p>
           <h1>UR Agent Documentation</h1>
           <p class="lead">A practical, tutorial-style reference for installing, configuring, automating, extending, and operating UR Agent.</p>
         </div>
@@ -71,6 +71,14 @@
           <article>
             <strong>Agent platform</strong>
             <span>Workflows, patterns, crews, goals, evals, memory, knowledge, A2A, provenance, and templates are first-class commands.</span>
+          </article>
+          <article>
+            <strong>Reliable repo editing</strong>
+            <span><code>ur repo-edit</code> indexes files and symbols, plans AST-aware renames, previews patches, and rolls back failed multi-file applies.</span>
+          </article>
+          <article>
+            <strong>Test-first execution</strong>
+            <span><code>ur test-first</code> detects compile/test/lint commands, stores failure traces, and installs edit-time verifier gates.</span>
           </article>
           <article>
             <strong>Release checks</strong>
@@ -197,6 +205,31 @@ ur workflow validate release
 ur workflow graph release --ascii
 ur workflow run release --dry-run
 ur workflow run release --live --concurrency 2</code></pre>
+          </article>
+
+          <article>
+            <h3>Plan and apply a safe repo rename</h3>
+            <ol>
+              <li>Build a file and symbol index for the repository.</li>
+              <li>Preview the AST-aware JavaScript/TypeScript identifier patch.</li>
+              <li>Apply transactionally with a validation command that triggers rollback on failure.</li>
+            </ol>
+            <pre><code>ur repo-edit index
+ur repo-edit search checkoutTotal
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test"</code></pre>
+          </article>
+
+          <article>
+            <h3>Run test-first command evidence</h3>
+            <ol>
+              <li>Detect the project stack and available quality commands.</li>
+              <li>Preview compile, test, and lint evidence without executing it.</li>
+              <li>Install the same commands as after-edit verifier gates.</li>
+            </ol>
+            <pre><code>ur test-first detect
+ur test-first --dry-run
+ur test-first install</code></pre>
           </article>
 
           <article>
@@ -430,7 +463,7 @@ ur claim-ledger validate</code></pre>
           <article>
             <h3>New agent-platform command is missing</h3>
             <pre><code>ur --version
-ur --help | grep -E "spec|arena|escalate|ci-loop|artifacts"
+ur --help | grep -E "repo-edit|test-first|spec|arena|escalate|ci-loop|artifacts"
 npm install -g ur-agent@latest --registry=https://registry.npmjs.org/
 hash -r</code></pre>
           </article>

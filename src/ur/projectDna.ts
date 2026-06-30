@@ -67,8 +67,8 @@ export function detectProjectDna(cwd: string): ProjectDna {
     const pm = [...packageManagers][0] ?? 'npm'
     const run = (s: string) => (pm === 'npm' ? `npm run ${s}` : `${pm} run ${s}`)
     if (scripts.build) buildCommands.add(run('build'))
+    if (scripts.typecheck) buildCommands.add(run('typecheck'))
     if (scripts.test) testCommands.add(run('test'))
-    if (scripts.typecheck) testCommands.add(run('typecheck'))
     for (const k of Object.keys(scripts)) if (/lint|biome|eslint/.test(k)) lintCommands.add(run(k))
     for (const k of ['start', 'dev', 'serve']) if (scripts[k]) runCommands.add(run(k))
   }

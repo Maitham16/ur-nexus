@@ -18,6 +18,10 @@ ur automation create nightly --schedule "0 9 * * 1-5" --prompt "Review open task
 ur automation run-due
 ur bg run "fix the flaky parser test" --worktree --dry-run
 ur bg fanout "try two parser fixes" --agents 2 --dry-run
+ur repo-edit index
+ur repo-edit search checkoutTotal
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test"
 ur agent-task pr --create --dry-run
 ur a2a serve --dry-run
 ur semantic-memory build
@@ -34,6 +38,9 @@ ur spec run checkout --all --dry-run
 ur escalate plan "debug the scheduler race"
 ur escalate run "refactor the cache layer" --force-oracle --dry-run
 ur arena "implement a debounce helper" --agents 2 --dry-run
+ur test-first detect
+ur test-first --dry-run
+ur test-first install
 ur ci-loop --command "bun test" --dry-run
 ur artifacts capture-diff
 ur artifacts capture-tests --command "bun test"
@@ -59,10 +66,12 @@ Inside an interactive session:
 | Multi-agent orchestration | Covered | built-in planning, exploration, verification, and general-purpose agents; custom agents | Document reusable team patterns and role selection |
 | Long-term memory | Covered | `/remember`, `/forget`, `.ur/memory`, semantic memory, research notes, team memory, consolidation, `ur memory retention` | Tune retention defaults from real long-run telemetry |
 | Semantic codebase retrieval | Covered | local embedding-based code index (`ur code-index`), opt-in `CodeSearch` tool, incremental re-index, auto-reindex watcher, Ollama embeddings | Add richer symbol-aware ranking |
+| Reliable repo editing | Covered | `ur repo-edit` builds a file/symbol index, performs AST-aware JS/TS identifier rename planning, previews patches before writing, and applies multi-file edits transactionally with rollback on syntax or check failure | Extend AST edits beyond identifier rename into import moves and signature-aware refactors |
 | AGENTS.md interoperability | Covered | `AGENTS.md` loaded as runtime project context (before `UR.md`), plus imported at `ur init` | Keep aligned as the AGENTS.md spec evolves |
 | Browser and computer-use workflows | Covered | `/browser`, `/chrome`, Playwright-aware tasks, WebSearch, WebFetch, risky-action approval | Add more release fixtures with screenshots and replay assertions |
 | Provenance and citations | Partial | WebFetch source URLs, `/cite`, `/graph`, `/trace`, evidence ledgers | Add claim-to-source mapping for web/MCP answers |
 | Evals and observability | Covered | verifier gates, `.ur/verify.json`, `/verify`, `/trace`, OpenTelemetry hooks, release checks, eval dashboard, benchmark adapters | Publish benchmark numbers from local reproducible suites |
+| Test-first execution | Covered | `ur test-first` detects compile/test/lint commands, stores failure traces, retries through a fix agent, and installs detected commands into `.ur/verify.json` for edit-time gates | Add per-package command plans for large monorepos |
 | Security and prompt-injection resistance | Covered | allow/ask/deny permissions, shell safety analysis, secret scan, untrusted web-content guidance, OS-level execution sandbox (macOS Seatbelt, Linux bubblewrap) | Continuously test web/MCP injection cases |
 | Agent identity and delegated authorization | Covered | MCP OAuth/XAA helpers, A2A bearer/delegation tokens, local trust boundaries, permission rules | Keep delegated scopes narrow and auditable |
 | Multimodal workflows | Partial | `/image`, `/video`, `/youtube`, `/voice`, browser workflows | Add model-aware multimodal capability reporting for local Ollama setups |
@@ -84,6 +93,7 @@ ur spec init demo --goal "1. add a utils.add function 2. add a test"
 ur spec run demo --all --dry-run
 ur arena "implement a debounce helper" --agents 2 --dry-run
 ur escalate run "refactor the cache layer" --force-oracle --dry-run
+ur test-first --dry-run
 ur ci-loop --command "bun test" --dry-run
 ur artifacts capture-tests --command "bun test"
 ```

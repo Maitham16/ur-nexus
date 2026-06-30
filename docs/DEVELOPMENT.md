@@ -39,6 +39,10 @@ bun run release:check
 npm pack --dry-run
 ```
 
+Use `ur test-first detect` when adding a feature to inspect the repository's
+detected compile/test/lint command set before choosing the final verification
+commands for the change.
+
 The GitHub install path uses the bundled launcher in `dist/cli.js`, so `bun run bundle` must be run before packaging or pushing a release. `bun run release:check` verifies that `package.json`, `bunfig.toml`, the bundle, docs, and `node ./bin/ur.js --version` agree.
 
 ## Build
@@ -48,6 +52,22 @@ bun run bundle
 ```
 
 The build output goes to `dist/cli.js`. The directory is ignored by default, but `dist/cli.js` is intentionally tracked because GitHub installs run the bundled CLI.
+
+## Documentation Maintenance
+
+Public feature patches should update every affected documentation surface, not
+only the root README. Check:
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs/`
+- `documentation/`
+- `examples/`
+- extension and marketplace README files when the feature affects them
+
+For top-level commands, also update the static documentation site command data
+in `documentation/app.js` and any relevant tutorial section in
+`documentation/index.html`.
 
 ## Local Command Link
 

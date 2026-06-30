@@ -22,6 +22,7 @@ export type AgentFeatureId =
   | 'trigger-bridge'
   | 'goals'
   | 'sdk'
+  | 'test-first-loop'
 
 type FeatureStatus = 'command' | 'workflow' | 'scaffold' | 'documented'
 
@@ -220,6 +221,14 @@ export const AGENT_FEATURES: AgentFeature[] = [
     summary:
       'A dependency-free TypeScript SDK (`ur-agent/sdk`: query, queryJSON, UrClient) plus a Python wrapper that drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. `init` scaffolds runnable examples.',
     scaffold: '.ur/sdk/',
+  },
+  {
+    id: 'test-first-loop',
+    name: 'Test-first execution loop',
+    status: 'command',
+    command: 'ur test-first detect|run|install',
+    summary:
+      'Detects project compile/test/lint commands, runs them as command evidence, stores failed traces, and can install the same command set into .ur/verify.json.',
   },
 ]
 

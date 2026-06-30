@@ -1,149 +1,251 @@
 # UR Agent
 
-UR is a Bun/TypeScript terminal coding agent. It starts an interactive session by default, can run once in print mode for scripts, and supports project context, slash commands, MCP servers, plugins, skills, and custom agents.
+<p align="center">
+  <strong>Local-first terminal coding agent for real engineering workflows.</strong>
+</p>
 
-The package installs a global `ur` command from npm or this GitHub repository. The launcher requires Bun and sends all model requests to the local Ollama app.
+<p align="center">
+  <a href="https://www.npmjs.com/package/ur-agent"><img alt="npm package" src="https://img.shields.io/npm/v/ur-agent.svg"></a>
+  <a href="./LICENSE"><img alt="license" src="https://img.shields.io/badge/license-non--commercial-blue.svg"></a>
+  <a href="./QUALITY.md"><img alt="quality gate" src="https://img.shields.io/badge/quality-release%20gated-brightgreen.svg"></a>
+</p>
 
-## Requirements
+UR Agent is a Bun and TypeScript command-line coding agent. It opens a stateful
+interactive terminal session by default, can run one-shot prompts for scripts,
+and includes workflow commands for specification-driven development,
+multi-agent execution, test-first quality loops, CI repair loops, background
+agents, MCP servers, plugins, skills, memory, verification, and local model
+routing.
 
-- Bun. This workspace was verified with Bun 1.3.14.
-- Node.js-compatible shell environment
-- A local Ollama app/server for model requests (default http://localhost:11434/api; LAN hosts supported via `--discover-ollama` or `--ollama-host`)
-- Optional: GitHub CLI, tmux, and IDE integrations for workflows that use them
+UR sends model requests through the configured local Ollama app. That app can
+serve local models or Ollama Cloud-backed models, while UR itself stays out of
+provider API key management.
 
-## Install
+## Why UR
 
-### IMPORTANT
-If you have previous version remove it with:
+UR is built around the work that happens after a prompt: reading a repository,
+editing files, running commands, validating the result, preserving context, and
+handing work off to other tools or agents when needed.
+
+- **Terminal-native agent loop.** Run `ur` for an interactive coding session or
+  `ur -p` for automation-friendly output.
+- **Local model runtime.** Use any model exposed by Ollama, set a specific host
+  with `--ollama-host`, or discover LAN Ollama servers with `--discover-ollama`.
+- **Agent workflows.** Use `ur spec`, `ur arena`, `ur test-first`,
+  `ur ci-loop`, `ur bg`, `ur workflow`, `ur crew`, and `ur automation` for
+  structured work beyond a single chat turn.
+- **Reliable repo editing.** Use `ur repo-edit` for indexed search,
+  AST-aware rename plans, patch previews, and rollback-safe multi-file apply.
+- **Verification and provenance.** Use `ur test-first`, the built-in verifier,
+  `/verify`, `.ur/verify.json`, `ur artifacts`, `ur claim-ledger`, and `/trace`
+  to make results easier to inspect.
+- **Extensible tool surface.** Add MCP servers, plugins, skills, role modes,
+  custom agents, IDE diff bundles, A2A endpoints, and local knowledge indexes.
+
+## Quick Start
+
+### Requirements
+
+- Bun. This repository is configured with `bun@1.3.14`.
+- A Node.js-compatible shell environment.
+- A running Ollama app or server. UR defaults to `http://localhost:11434/api`.
+- Optional tools for specific workflows: GitHub CLI, tmux, and supported IDE
+  integrations.
+
+### Install
+
+Remove old global installs first if needed:
 
 ```sh
 npm uninstall -g ur-agent
 bun remove -g ur-agent
 ```
 
-### Then, install:
+Install the global `ur` command:
 
 ```sh
 npm install -g ur-agent
 ur --version
-ur
 ```
 
-If you prefer installing directly from GitHub, Bun is still required at runtime:
+Install directly from GitHub when you want this repository build:
 
 ```sh
-npm install -g github:Maitham16/UR-mapek
+bun add -g github:Maitham16/UR-mapek
 ur --version
 ```
 
-UR auto-routes to an installed Ollama model when possible. If you want a specific model, choose it explicitly:
-
-```sh
-UR_MODEL=qwen3-coder:480b-cloud ur
-```
-
-The launch wrapper reads `OLLAMA_MODEL` first, then `UR_MODEL`. If neither is set, UR lets its Ollama router choose from the models exposed by your local Ollama app, including Ollama Cloud-backed models. If routing cannot discover a model list, the built-in fallback is `qwen3-coder:480b-cloud`.
-
-## Development From Source
-
-```sh
-bun install
-bun run start
-```
-
-To make the `ur` command available from this checkout during development:
-
-```sh
-bun link
-ur
-```
-
-## Common Usage
-
-Start an interactive session:
+### Start A Session
 
 ```sh
 ur
 ```
 
-Ask one question and print the answer:
+Run one prompt and exit:
 
 ```sh
 ur -p "summarize this repository"
 ```
 
-Use JSON output for automation:
+Return structured output for scripts:
 
 ```sh
-ur -p --output-format json "list the main commands"
+ur -p --output-format json "list the main services in this codebase"
 ```
 
-Resume a recent session:
+Resume previous work:
 
 ```sh
 ur --continue
 ur --resume
 ```
 
-Run with a specific model:
+Choose a model or Ollama host:
 
 ```sh
 ur --model qwen3-coder:480b-cloud
-```
-
-See all CLI options and subcommands:
-
-```sh
-ur --help
-ur mcp --help
-ur plugin --help
-```
-
-Agent platform examples:
-
-```sh
-ur spec init demo --goal "1. add a utils.add function 2. add a test"
-ur spec run demo --all --dry-run
-ur arena "implement a debounce helper" --agents 2 --dry-run
-ur escalate run "refactor the cache layer" --force-oracle --dry-run
-ur ci-loop --command "bun test" --dry-run
-ur artifacts capture-diff
-ur bg run "fix the flaky parser test" --worktree --dry-run
-ur ide diff capture --title "Working tree review"
-ur eval bench list
+ur --ollama-host http://192.168.1.50:11434
 ur --discover-ollama
 ```
 
-## Documentation
+Model selection precedence is `OLLAMA_MODEL`, then `UR_MODEL`, then the model
+router over the configured Ollama host. If model discovery fails, the built-in
+fallback is `qwen3-coder:480b-cloud`.
 
-- [Usage Guide](docs/USAGE.md)
-- [Configuration](docs/CONFIGURATION.md)
-- [Agent Trend Coverage](docs/AGENT_TRENDS.md)
-- [1.16.0 Upgrade Notes](docs/AGENT_UPGRADE_1.16.0.md)
-- [Agent Feature Expansion](docs/AGENT_FEATURES.md)
-- [Development Guide](docs/DEVELOPMENT.md)
-- [Static Documentation Site](documentation/index.html)
+## Command Surface
 
-The `examples/` directory also contains prompt examples for coding, research, browser, image, video, MCP, memory, agent-trend, and agent-feature workflows.
+Run `ur --help` for the complete CLI reference. These commands are implemented
+as first-class subcommands in the shipped CLI.
 
-## License And Responsibility
+| Command | Purpose |
+| --- | --- |
+| `ur` | Start an interactive terminal agent session in the current workspace. |
+| `ur -p` | Run a non-interactive prompt with text, JSON, or stream-JSON output. |
+| `ur spec` | Create requirements, design, and task documents under `.ur/specs/`, then run the task list. |
+| `ur escalate` | Plan or run work with fast and oracle model tiers selected from local model capabilities. |
+| `ur arena` | Run multiple agents on the same task in isolated worktrees and surface the winning diff. |
+| `ur ci-loop` | Run a build or test command, hand failures to a fix agent, and retry with a bounded budget. |
+| `ur test-first` | Detect the project stack, run compile/test/lint commands, store failure traces, and install edit-time verify gates. |
+| `ur bg` | Run and manage detached local background agents with optional worktrees and PR creation. |
+| `ur automation` | Store and run project-local scheduled automation specs under `.ur/automations/`. |
+| `ur workflow` | Define, validate, graph, run, and resume declarative agent workflows. |
+| `ur crew` | Run a lead and worker subagent crew over a shared task board. |
+| `ur goal` | Track long-horizon objectives that persist across sessions. |
+| `ur repo-edit` | Build a repo edit index, plan AST-aware renames, preview patches, and apply with rollback. |
+| `ur code-index` | Build, query, or watch a local semantic code index using Ollama embeddings. |
+| `ur semantic-memory` | Build and search a project-local memory index. |
+| `ur knowledge` | Manage a curated project knowledge base with provenance. |
+| `ur artifacts` | Capture diffs, test runs, notes, and review feedback under `.ur/artifacts/`. |
+| `ur claim-ledger` | Map generated claims to file, web, MCP, tool, or user sources. |
+| `ur browser-qa` | Validate and smoke-run browser QA replay fixtures. |
+| `ur eval bench` | Import local SWE-bench, Terminal-Bench, or Aider Polyglot exports. |
+| `ur model-doctor` | Inspect Ollama models and report likely agent capabilities. |
+| `ur model-route` | Recommend a local model for a task by capability fit. |
+| `ur mcp` | Configure and manage Model Context Protocol servers. |
+| `ur plugin` | Install, update, enable, disable, and validate UR plugins. |
+| `ur role-mode` | Install built-in Architect, Code, Debug, and Ask role modes. |
+| `ur ide diff` | Capture editor-readable inline diff bundles. |
+| `ur a2a card` | Print UR Agent Card metadata for agent interoperability. |
+| `ur a2a serve` | Start an opt-in local A2A task server with bearer or delegation auth. |
+| `ur sdk` | Show programmatic headless usage and scaffold SDK examples. |
 
-UR Agent is released under the [UR Agent Non-Commercial Self-Responsibility License](LICENSE). Commercial use is not allowed without written permission from Maitham Al-rubaye.
+Examples:
 
-The software is provided as-is. Users are responsible for reviewing how they run it, what tools it can access, and any outputs or actions it creates.
-
-## Security
-
-Do not commit secrets, passwords, API keys, OAuth tokens, private keys, `.env` files, local UR memory, generated indexes, logs, or local settings. The package `files` list ships the launcher, bundled CLI, docs, examples, changelog, quality notes, README, and license.
+```sh
+ur spec init checkout --goal "1. add cart 2. add payment 3. add receipt"
+ur spec run checkout --all --dry-run
+ur arena "implement a debounce helper" --agents 2 --dry-run
+ur escalate run "refactor the cache layer" --force-oracle --dry-run
+ur test-first detect
+ur test-first --dry-run
+ur test-first install
+ur ci-loop --command "bun test" --max-attempts 3 --dry-run
+ur bg run "fix the flaky parser test" --worktree --dry-run
+ur automation create nightly --schedule "0 9 * * 1-5" --prompt "Review open tasks"
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test"
+ur code-index search "where is the rate limiter configured"
+ur artifacts capture-tests --command "bun test"
+ur agent-task pr --create --dry-run
+```
 
 ## Project Context
 
-UR reads project instructions from `UR.md` files and can load project assets from `.ur/`. Shared project configuration may be committed, but local files such as `.ur/settings.local.json`, `.ur/memory/`, `.ur/index/`, and `UR.local.md` are ignored by Git.
+UR reads repository instructions and local runtime state from project files:
+
+- `AGENTS.md` and `UR.md` provide shared project instructions.
+- `UR.local.md` is for private local instructions.
+- `.ur/skills/` stores project skills.
+- `.ur/agents/` stores custom agents and role modes.
+- `.ur/specs/`, `.ur/artifacts/`, `.ur/automations/`, `.ur/test-first/`,
+  `.ur/memory/`, and `.ur/index/` hold workflow state, review artifacts,
+  scheduled jobs, failure traces, memory, and indexes.
+
+Commit only shared project assets that are safe for teammates. Keep local
+settings, generated indexes, memory, logs, and secrets out of Git.
+
+## Architecture
+
+- `bin/ur.js` is the global launcher. It reads package metadata, uses the
+  bundled `dist/cli.js` when available, and otherwise starts the TypeScript CLI
+  through Bun.
+- `src/entrypoints/cli.tsx` handles fast startup paths such as `--version`,
+  A2A serving, background sessions, bridge mode, and daemon paths before loading
+  the full CLI.
+- `src/main.tsx` defines the top-level flags and subcommands.
+- `src/commands.ts` and `src/commands/` register slash commands and local CLI
+  command modules.
+- `src/tools/` contains tool implementations for file editing, shell execution,
+  MCP resources, task management, and agent delegation.
+- `src/services/` contains runtime services for MCP, verification, memory,
+  code indexing, model routing, background agents, A2A, analytics, sync, and
+  API integration.
+- `extensions/vscode-ur-inline-diffs/` contains the VS Code inline diff review
+  extension.
+- `marketplace-plugins/` contains bundled example marketplace plugins.
+
+## Safety Model
+
+UR can read files, edit code, execute commands, and call configured tools, so
+the permission boundary matters.
+
+- Sensitive tool actions go through permission checks by default.
+- `--allowed-tools` and `--disallowed-tools` can scope tool access for
+  automation.
+- `--dangerously-skip-permissions` should only be used inside disposable
+  sandboxes.
+- The verifier checks for false completion claims, repeated tool-call loops,
+  empty assistant turns, and project gates.
+- Project gates can be configured in `.ur/verify.json`.
+- `ur test-first install` writes detected compile/test/lint commands into
+  `.ur/verify.json` so mutating turns have command evidence before completion.
+- The deep verification subagent is available through `/verify` and can be
+  auto-enabled with `UR_VERIFIER_AUTO_SUBAGENT=1`.
+- OS-level sandbox support is available on macOS and Linux through UR's
+  sandbox settings.
+- MCP servers can access external services; only enable servers you trust.
+
+See [Configuration](docs/CONFIGURATION.md), [Validation](docs/VALIDATION.md),
+and [Quality Notes](QUALITY.md) for operational guidance.
 
 ## Development
 
+Install dependencies:
+
 ```sh
+bun install
+```
+
+Run from source:
+
+```sh
+bun run start
 bun run dev
+```
+
+Build and verify a release:
+
+```sh
 bun run typecheck
 bun test
 bun run bundle
@@ -153,8 +255,35 @@ bun run release:check
 npm pack --dry-run
 ```
 
-The package is published on npm as `ur-agent` and can also be installed directly from GitHub with `github:Maitham16/UR-mapek`.
+`dist/cli.js` is intentionally tracked because GitHub installs use the bundled
+CLI. Rebuild it after source, version, or macro changes.
 
-## Designed By
+## Documentation
 
-Maitham Al-rubaye
+- [Usage Guide](docs/USAGE.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Agent Feature Expansion](docs/AGENT_FEATURES.md)
+- [Agent Trend Coverage](docs/AGENT_TRENDS.md)
+- [1.18.0 Upgrade Notes](docs/AGENT_UPGRADE_1.18.0.md)
+- [1.17.0 Upgrade Notes](docs/AGENT_UPGRADE_1.17.0.md)
+- [Development Guide](docs/DEVELOPMENT.md)
+- [Validation Runbook](docs/VALIDATION.md)
+- [Static Documentation Site](documentation/index.html)
+
+The `examples/` directory includes prompt and workflow examples for coding,
+research, browser, image, video, MCP, memory, and agent-platform tasks.
+
+## License
+
+UR Agent is released under the
+[UR Agent Non-Commercial Self-Responsibility License](LICENSE).
+
+Personal, educational, research, evaluation, and other non-commercial use is
+permitted. Commercial use requires prior written permission from Maitham
+Al-rubaye.
+
+The software is provided as-is. Users are responsible for how they configure
+UR, what tools it can access, and any outputs, commands, files, network
+requests, integrations, or decisions created with it.
+
+Designed by Maitham Al-rubaye.

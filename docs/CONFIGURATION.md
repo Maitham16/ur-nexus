@@ -135,6 +135,9 @@ Project-specific gates live in `.ur/verify.json`:
 }
 ```
 
+Run `ur test-first install` to detect the current project stack and merge the
+compile/test/lint commands it finds into `afterEdit`.
+
 After a turn that modified files, every `afterEdit` command must exit 0
 before the agent can declare the task complete. A failing command surfaces
 to the model as a structured reminder with the command name and the trimmed

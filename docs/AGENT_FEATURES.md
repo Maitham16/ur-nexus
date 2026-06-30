@@ -22,6 +22,12 @@ ur automation run-due
 ur model-doctor
 ur a2a serve --dry-run
 ur bg run "fix the flaky parser test" --worktree --dry-run
+ur test-first detect
+ur test-first --dry-run
+ur test-first install
+ur repo-edit index
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test"
 ur memory retention show
 ur code-index watch --dry-run
 ur ide diff capture --title "Working tree review"
@@ -35,6 +41,18 @@ ur browser-qa run home-page-smoke --dry-run
 ur --discover-ollama
 ur --ollama-host http://192.168.1.50:11434
 ```
+
+## v1.18.0 Additions
+
+| Addition | Surface | What it adds |
+| --- | --- | --- |
+| Test-first execution loop | `ur test-first [run\|detect\|install]` | Detects the project stack, orders compile/test/lint commands, runs them as command evidence, stores failed command traces under `.ur/test-first/traces/`, invokes a bounded fix agent, and can install the detected commands into `.ur/verify.json` for after-edit gates. |
+
+## v1.17.0 Additions
+
+| Addition | Surface | What it adds |
+| --- | --- | --- |
+| Reliable repo editing | `ur repo-edit index\|search\|plan\|preview\|apply` | Dependency-free repo edit index, indexed symbol/content search, AST-aware JavaScript/TypeScript identifier renames, explicit patch preview, transactional multi-file apply, and rollback when syntax validation or an optional check command fails. |
 
 ## v1.16.0 Additions
 

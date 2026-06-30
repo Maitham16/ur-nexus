@@ -103,11 +103,13 @@ UR includes slash commands and CLI subcommands for common workflows:
 - `ur agent-trends` to inspect coverage for current agent technology trends
 - `ur a2a card` to print UR's Agent Card metadata for A2A discovery
 - `ur bg ...` to run detached local background agents with optional worktrees and PRs
+- `ur repo-edit ...` to index the repo, plan AST-aware renames, preview patches, and apply with rollback
 - `ur code-index watch` to keep the local semantic code index fresh
 - `ur memory retention ...` to prune project-local memory by TTL, max entries, and decay
 - `ur spec ...` to scaffold requirements, design, and tasks, then run a spec task list
 - `ur escalate ...` to plan, run, or ask an oracle model for hard tasks
 - `ur arena ...` to run multiple agents on the same task and select a winner
+- `ur test-first ...` to detect compile/test/lint commands, store failure traces, and install after-edit gates
 - `ur ci-loop ...` to run tests, repair failures, and rerun with a bounded loop
 - `ur artifacts ...` to capture reviewable diffs, test runs, notes, and feedback
 - `ur ide diff ...` to capture editor-readable inline diff bundles
@@ -127,9 +129,16 @@ ur spec init demo --goal "1. add a utils.add function 2. add a test"
 ur spec run demo --all --dry-run
 ur arena "implement a debounce helper" --agents 2 --dry-run
 ur escalate run "refactor the cache layer" --force-oracle --dry-run
+ur test-first detect
+ur test-first --dry-run
+ur test-first install
 ur ci-loop --command "bun test" --dry-run
 ur artifacts capture-diff
 ur bg run "fix the flaky parser test" --worktree --dry-run
+ur repo-edit index
+ur repo-edit plan rename oldName --to newName
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test"
 ur ide diff capture --title "Working tree review"
 ur eval bench list
 ```

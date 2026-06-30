@@ -85,6 +85,7 @@ import guardrails from './commands/guardrails/index.js'
 import devcontainer from './commands/devcontainer/index.js'
 import arena from './commands/arena/index.js'
 import ciLoop from './commands/ci-loop/index.js'
+import testFirst from './commands/test-first/index.js'
 import artifacts from './commands/artifacts/index.js'
 import trigger from './commands/trigger/index.js'
 import sdk from './commands/sdk/index.js'
@@ -97,6 +98,7 @@ import remember from './commands/remember/index.js'
 import memoryRetention from './commands/memory-retention/index.js'
 import semanticMemory from './commands/semantic-memory/index.js'
 import codeIndex from './commands/code-index/index.js'
+import repoEdit from './commands/repo-edit/index.js'
 import forget from './commands/forget/index.js'
 import research from './commands/research/index.js'
 import paper from './commands/paper/index.js'
@@ -414,6 +416,7 @@ const COMMANDS = memoize((): Command[] => [
   devcontainer,
   arena,
   ciLoop,
+  testFirst,
   artifacts,
   trigger,
   sdk,
@@ -426,6 +429,7 @@ const COMMANDS = memoize((): Command[] => [
   memoryRetention,
   semanticMemory,
   codeIndex,
+  repoEdit,
   forget,
   research,
   paper,

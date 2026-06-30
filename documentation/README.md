@@ -16,3 +16,11 @@ required.
 
 When adding a public command, update the `commands` array in `app.js` and add
 examples to the relevant tutorial or workflow section in `index.html`.
+
+For public feature patches, also check the project-wide docs set:
+
+- root `README.md`
+- `docs/`
+- `documentation/`
+- `examples/`
+- extension or marketplace docs when the feature affects them

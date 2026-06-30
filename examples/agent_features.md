@@ -30,6 +30,24 @@ ur agent-task diff
 ur agent-task pr --create --dry-run
 ```
 
+Plan and apply reliable repo edits:
+
+```sh
+ur repo-edit index
+ur repo-edit search checkoutTotal
+ur repo-edit plan rename oldName --to newName
+ur repo-edit preview rename oldName --to newName
+ur repo-edit apply rename oldName --to newName --check "bun test"
+```
+
+Run stack-aware command evidence and install after-edit gates:
+
+```sh
+ur test-first detect
+ur test-first --dry-run
+ur test-first install
+```
+
 Use the local memory, evidence, and browser QA helpers:
 
 ```sh
@@ -49,6 +67,7 @@ ur spec run demo --all --dry-run
 ur escalate plan "debug the scheduler race"
 ur escalate run "refactor the cache layer" --force-oracle --dry-run
 ur arena "implement a debounce helper" --agents 2 --dry-run
+ur test-first --dry-run
 ur ci-loop --command "bun test" --dry-run
 ur artifacts capture-diff
 ur artifacts capture-tests --command "bun test"
