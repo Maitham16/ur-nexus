@@ -30,6 +30,21 @@
   repo file classification, symbol/call/test/doc/config extraction, and index
   round-trips.
 
+## 1.22.5
+
+### Added
+- **Real sandbox core architecture (`ur sandbox`).** New first-class command to inspect sandbox status, run dependency checks, initialize `.ur/safety-policy.json`, and evaluate shell-command approval levels.
+- **Worktree-per-task (`ur task`).** New command surface to start, run, list, and hand off agent tasks in isolated git branches/worktrees: `task start <name> [--worktree]`, `task run <id>`, `task pr <id> [--create]`, `task list`, `task status <id>`.
+- **PR-quality output formatter (`src/services/agents/prSummary.ts`).** Every task/PR result includes summary, changed files, tests to run, risks, rollback command, and remaining TODOs.
+- **Failure memory (`src/services/agents/failureMemory.ts`).** Failed shell commands are recorded in project memory via `BashTool.tsx`, and similar previous failures are surfaced as hints in subsequent errors.
+
+### Changed
+- Registered `sandbox` and `task` commands in `src/commands.ts` and `src/main.tsx`.
+- Failure path in `src/tools/BashTool/BashTool.tsx` now records failures and prepends historical hints.
+
+### Verified
+- `bun run typecheck`, `bun run lint`, `bun run test` (500 pass), `bun run bundle`, and `bun run smoke` all pass.
+
 ## 1.22.4
 
 ### Added

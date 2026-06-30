@@ -91,12 +91,14 @@ import arena from './commands/arena/index.js'
 import ciLoop from './commands/ci-loop/index.js'
 import testFirst from './commands/test-first/index.js'
 import safety from './commands/safety/index.js'
+import sandbox from './commands/sandbox/index.js'
 import contextPack from './commands/context-pack/index.js'
 import artifacts from './commands/artifacts/index.js'
 import trigger from './commands/trigger/index.js'
 import sdk from './commands/sdk/index.js'
 import evalHarness from './commands/eval/index.js'
 import dna from './commands/dna/index.js'
+import task from './commands/task/index.js'
 import osCmd from './commands/os/index.js'
 import workspace from './commands/workspace/index.js'
 import project from './commands/project/index.js'
@@ -428,6 +430,8 @@ const COMMANDS = memoize((): Command[] => [
   ciLoop,
   testFirst,
   safety,
+  sandbox,
+  task,
   contextPack,
   artifacts,
   trigger,

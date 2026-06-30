@@ -49,6 +49,11 @@ import {
   executeOnFailureHooks,
 } from '../../utils/hooks.js';
 import { appendProjectMemory } from '../../services/context/projectContextManifest.js';
+import {
+  findSimilarFailures,
+  formatFailureHints,
+  recordFailure,
+} from '../../services/agents/failureMemory.js';
 import { bashToolHasPermission, commandHasAnyCd, matchWildcardPattern, permissionRuleExtractPrefix } from './bashPermissions.js';
 import { interpretCommandResult } from './commandSemantics.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getSimplePrompt } from './prompt.js';
@@ -768,10 +773,18 @@ export const BashTool = buildTool({
         throw new Error(result.preSpawnError);
       }
       if (interpretationResult.isError && !isInterrupt) {
+        // Record failure in project memory and check for previous similar failures
+        const cwd = getCwd();
+        recordFailure(cwd, {
+          failedCommand: input.command,
+          errorTrace: outputWithSbFailures,
+        });
+        const hints = formatFailureHints(findSimilarFailures(cwd, input.command, outputWithSbFailures));
+
         // stderr is merged into stdout (merged fd); outputWithSbFailures
         // already has the full output. Pass '' for stdout to avoid
         // duplication in getErrorParts() and processBashCommand.
-        throw new ShellError('', outputWithSbFailures, result.code, result.interrupted);
+        throw new ShellError('', outputWithSbFailures + hints, result.code, result.interrupted);
       }
       wasInterrupted = result.interrupted;
     } finally {

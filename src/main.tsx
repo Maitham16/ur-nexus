@@ -4620,6 +4620,40 @@ async function run(): Promise<CommanderCommand> {
     const args = [action, ...rest, opts.command ? `--command ${quoteLocalCommandArg(opts.command)}` : undefined, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
     await runLocalTextCommand(() => import('./commands/safety/safety.js'), args);
   });
+  program.command('sandbox [action] [commandArg...]').alias('sandboxctl').description('Inspect and manage the real sandbox / permission architecture: status, dependency check, policy init, and command approval levels').option('--json', 'Output as JSON').action(async (action: string | undefined, commandArg: string[] = [], opts: {
+    json?: boolean;
+  }) => {
+    const args = [action, ...commandArg, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
+    await runLocalTextCommand(() => import('./commands/sandbox/sandbox.js'), args);
+  });
+  program.command('task [action] [name]').alias('taskctl').description('Start, run, and hand off worktree-per-task sessions. Each task can run in its own git branch/worktree for safe parallel work.').option('--worktree', 'Create a git branch and worktree for this task').option('--base <branch>', 'Base branch for the task worktree').option('--model <model>', 'Model override for the task agent').option('--max-turns <n>', 'Max agentic turns').option('--draft', 'Create PR as draft').option('--create', 'Create the PR from the task worktree').option('--title <text>', 'PR title').option('--body <text>', 'PR body').option('--dry-run', 'Preview PR without creating it').option('--json', 'Output as JSON').action(async (action: string | undefined, name: string | undefined, opts: {
+    worktree?: boolean;
+    base?: string;
+    model?: string;
+    maxTurns?: string;
+    draft?: boolean;
+    create?: boolean;
+    title?: string;
+    body?: string;
+    dryRun?: boolean;
+    json?: boolean;
+  }) => {
+    const args = [
+      action,
+      name,
+      opts.worktree ? '--worktree' : undefined,
+      opts.base ? `--base ${quoteLocalCommandArg(opts.base)}` : undefined,
+      opts.model ? `--model ${quoteLocalCommandArg(opts.model)}` : undefined,
+      opts.maxTurns ? `--max-turns ${opts.maxTurns}` : undefined,
+      opts.draft ? '--draft' : undefined,
+      opts.create ? '--create' : undefined,
+      opts.title ? `--title ${quoteLocalCommandArg(opts.title)}` : undefined,
+      opts.body ? `--body ${quoteLocalCommandArg(opts.body)}` : undefined,
+      opts.dryRun ? '--dry-run' : undefined,
+      opts.json ? '--json' : undefined,
+    ].filter(Boolean).join(' ');
+    await runLocalTextCommand(() => import('./commands/task/task.js'), args);
+  });
   program.command('context-pack [action] [rest...]').alias('project-manifest').alias('ctx-pack').description('Summarize repo architecture, maintain task memory, and compress project context under .ur/').option('--type <kind>', 'Memory kind: decision|constraint|command|diff|note').option('--text <text>', 'Memory text for remember').option('--decision <text>', 'Remember a decision').option('--constraint <text>', 'Remember a constraint').option('--command <cmd>', 'Remember a command').option('--diff <text>', 'Remember a diff summary').option('--note <text>', 'Remember a note').option('--json', 'Output as JSON').action(async (action: string | undefined, rest: string[] = [], opts: {
     type?: string;
     text?: string;
