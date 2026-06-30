@@ -262,8 +262,8 @@ function rememberTask(task: AcpTaskRecord): AcpTaskRecord {
   return task
 }
 
-function startAsynchronousTask(options: AcpServeOptions, prompt: string): AcpTaskRecord {
-  const background = startBackgroundTask({
+async function startAsynchronousTask(options: AcpServeOptions, prompt: string): Promise<AcpTaskRecord> {
+  const background = await startBackgroundTask({
     cwd: options.cwd,
     task: `ACP delegated task: ${prompt}`,
     dryRun: options.dryRun,
@@ -291,7 +291,7 @@ async function handleTasksSend(params: Record<string, unknown> | undefined, opti
     const task = await runSynchronousTask(options, prompt)
     return { task: rememberTask(task) }
   }
-  const task = rememberTask(startAsynchronousTask(options, prompt))
+  const task = rememberTask(await startAsynchronousTask(options, prompt))
   return { task, statusUrl: `/acp/tasks/${encodeURIComponent(task.id)}` }
 }
 

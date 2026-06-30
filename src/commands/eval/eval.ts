@@ -248,9 +248,10 @@ export const call: LocalCommandCall = async (args: string) => {
     const maxTurnsValue = Number(optionValue(tokens, '--max-turns') ?? '20')
     const maxTurns =
       Number.isFinite(maxTurnsValue) && maxTurnsValue > 0 ? maxTurnsValue : 20
+    const model = optionValue(tokens, '--model')
     const runner = dryRun
       ? makeDryEvalRunner()
-      : makeCliEvalRunner({ cwd, maxTurns, skipPermissions })
+      : makeCliEvalRunner({ cwd, maxTurns, skipPermissions, model })
     const judge = dryRun
       ? makeDryJudgeRunner()
       : makeCliJudgeRunner({ cwd, maxTurns, skipPermissions })
@@ -280,6 +281,33 @@ export const call: LocalCommandCall = async (args: string) => {
     if (json) return { type: 'text', value: formatEvalReport(report, true) }
     const header = dryRun ? '(dry run — no model calls; grading exercised offline)\n\n' : ''
     return { type: 'text', value: `${header}${formatEvalReport(report, false)}` }
+  }
+
+  if (command === 'route') {
+    const task = positional.slice(1).join(' ') || name || ''
+    if (!task) {
+      return {
+        type: 'text',
+        value: 'Usage: ur eval route "<task>" [--strategy auto|cheap|strong|default] [--json]',
+      }
+    }
+    const { listModelCapabilities } = await import('../../commands/model-doctor/model-doctor.js')
+    const { resolveModelForTask } = await import('../../services/agents/modelRouter.js')
+    const { loadModelPool } = await import('../../services/agents/modelPool.js')
+    const strategy = (optionValue(tokens, '--strategy') ?? 'auto') as import('../../services/agents/modelRouter.js').RouteStrategy
+    const { models } = await listModelCapabilities()
+    const pool = loadModelPool(cwd)
+    const resolved = resolveModelForTask(task, strategy, pool, models)
+    const result = {
+      task,
+      strategy,
+      resolved: resolved ?? null,
+      pool: { cheap: pool.cheap, strong: pool.strong, default: pool.default },
+    }
+    return {
+      type: 'text',
+      value: json ? JSON.stringify(result, null, 2) : `Task: ${task}\nStrategy: ${strategy}\nResolved model: ${resolved ?? 'none'}`,
+    }
   }
 
   if (command === 'compare') {

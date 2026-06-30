@@ -113,7 +113,7 @@ export async function runAgentSkill(options: AgentSkillOptions): Promise<AgentSk
     prBody ??
     `This change was produced by the /${skill} agent skill running in an isolated UR worktree.`
 
-  const startResult: StartBackgroundTaskResult = startBackgroundTask({
+  const startResult: StartBackgroundTaskResult = await startBackgroundTask({
     cwd,
     task: prompt,
     worktree: true,

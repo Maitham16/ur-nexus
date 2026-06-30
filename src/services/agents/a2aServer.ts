@@ -303,19 +303,19 @@ async function runSynchronousTask(
   })
 }
 
-function startAsynchronousTask(
+async function startAsynchronousTask(
   options: ServeOptions,
   body: TaskRequestBody,
   prompt: string,
   skill?: string,
-): Response {
+): Promise<Response> {
   const maxTurns =
     typeof body.maxTurns === 'number'
       ? body.maxTurns
       : typeof body.maxTurns === 'string'
         ? Number(body.maxTurns)
         : undefined
-  const background = startBackgroundTask({
+  const background = await startBackgroundTask({
     cwd: options.cwd,
     task: `A2A delegated task: ${prompt}`,
     worktree: body.worktree === true,
@@ -381,7 +381,7 @@ export async function handleA2ARequest(
     if (body?.wait === true || body?.mode === 'sync') {
       return await runSynchronousTask(options, prompt, skill)
     }
-    return startAsynchronousTask(options, body ?? {}, prompt, skill)
+    return await startAsynchronousTask(options, body ?? {}, prompt, skill)
   }
   const taskPath = taskIdFromPath(url.pathname)
   if (taskPath) {
