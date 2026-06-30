@@ -59,6 +59,13 @@ ur spec run auth-refactor --all
 ur spec verify auth-refactor
 ```
 
+## v1.22.2 Additions
+
+| Addition | Surface | What it adds |
+| --- | --- | --- |
+| Lifecycle hooks | `.ur/hooks.json`, `UR.md` frontmatter, `src/utils/hooks.ts` | New hook events `BeforeEdit`, `AfterEdit`, `BeforeCommand`, `AfterCommand`, `BeforeCommit`, and `OnFailure`. Fire around file edits, shell commands, git commits, and failures. Advisory by default; can block actions or write project memory. |
+| Persistent project memory | `ur context-pack remember`, `src/services/context/projectContextManifest.ts` | New memory kinds `architecture`, `preference`, `attempt`, `accepted`, and `rejected` with status, rationale, scope, and source metadata. Stored in `.ur/context/task-memory.jsonl` and surfaced in the compressed context summary. |
+
 ## v1.22.0 Additions
 
 | Addition | Surface | What it adds |

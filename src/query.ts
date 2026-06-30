@@ -27,6 +27,7 @@ import {
 import { ImageSizeError } from './utils/imageValidation.js'
 import { ImageResizeError } from './utils/imageResizer.js'
 import { findToolByName, type ToolUseContext } from './Tool.js'
+import { getCwd } from './utils/cwd.js'
 import { asSystemPrompt, type SystemPrompt } from './utils/systemPromptType.js'
 import type {
   AssistantMessage,
@@ -91,7 +92,11 @@ import { ESCALATED_MAX_TOKENS } from './utils/context.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from './services/analytics/growthbook.js'
 import { SLEEP_TOOL_NAME } from './tools/SleepTool/prompt.js'
 import { executePostSamplingHooks } from './utils/hooks/postSamplingHooks.js'
-import { executeStopFailureHooks } from './utils/hooks.js'
+import {
+  executeStopFailureHooks,
+  executeOnFailureHooks,
+} from './utils/hooks.js'
+import { appendProjectMemory } from './services/context/projectContextManifest.js'
 import type { QuerySource } from './constants/querySource.js'
 import { createDumpPromptsFetch } from './services/api/dumpPrompts.js'
 import { Verifier } from './services/verifier/index.js'
@@ -1216,6 +1221,19 @@ async function* queryLoop(
         // → retry → error → … (the hook injects more tokens each cycle).
         yield lastMessage
         void executeStopFailureHooks(lastMessage, toolUseContext)
+        void executeOnFailureHooks(
+          lastMessage.error?.message ?? 'prompt_too_long',
+          'turn',
+          toolUseContext,
+        ).then(({ memory }) => {
+          if (memory) {
+            appendProjectMemory(getCwd(), memory.kind, memory.text, {
+              rationale: memory.rationale,
+              scope: memory.scope,
+              source: 'OnFailure hook',
+            })
+          }
+        })
         return { reason: isWithheldMedia ? 'image_error' : 'prompt_too_long' }
       } else if (feature('CONTEXT_COLLAPSE') && isWithheld413) {
         // reactiveCompact compiled out but contextCollapse withheld and
@@ -1223,6 +1241,19 @@ async function* queryLoop(
         // early-return rationale — don't fall through to stop hooks.
         yield lastMessage
         void executeStopFailureHooks(lastMessage, toolUseContext)
+        void executeOnFailureHooks(
+          lastMessage.error?.message ?? 'context_collapse_413',
+          'turn',
+          toolUseContext,
+        ).then(({ memory }) => {
+          if (memory) {
+            appendProjectMemory(getCwd(), memory.kind, memory.text, {
+              rationale: memory.rationale,
+              scope: memory.scope,
+              source: 'OnFailure hook',
+            })
+          }
+        })
         return { reason: 'prompt_too_long' }
       }
 
@@ -1305,6 +1336,19 @@ async function* queryLoop(
       // error → hook blocking → retry → error → …
       if (lastMessage?.isApiErrorMessage) {
         void executeStopFailureHooks(lastMessage, toolUseContext)
+        void executeOnFailureHooks(
+          lastMessage.error?.message ?? 'api_error',
+          'api',
+          toolUseContext,
+        ).then(({ memory }) => {
+          if (memory) {
+            appendProjectMemory(getCwd(), memory.kind, memory.text, {
+              rationale: memory.rationale,
+              scope: memory.scope,
+              source: 'OnFailure hook',
+            })
+          }
+        })
         return { reason: 'completed' }
       }
 

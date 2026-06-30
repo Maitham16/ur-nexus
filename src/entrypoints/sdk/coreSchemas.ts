@@ -380,6 +380,12 @@ export const HOOK_EVENTS = [
   'InstructionsLoaded',
   'CwdChanged',
   'FileChanged',
+  'BeforeEdit',
+  'AfterEdit',
+  'BeforeCommand',
+  'AfterCommand',
+  'BeforeCommit',
+  'OnFailure',
 ] as const
 
 export const HookEventSchema = lazySchema(() => z.enum(HOOK_EVENTS))
@@ -744,6 +750,86 @@ export const FileChangedHookInputSchema = lazySchema(() =>
   ),
 )
 
+export const BeforeEditHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('BeforeEdit'),
+      file_path: z.string(),
+      old_string: z.string().optional(),
+      new_string: z.string().optional(),
+      replace_all: z.boolean().optional(),
+      tool_use_id: z.string().optional(),
+    }),
+  ),
+)
+
+export const AfterEditHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('AfterEdit'),
+      file_path: z.string(),
+      old_string: z.string().optional(),
+      new_string: z.string().optional(),
+      replace_all: z.boolean().optional(),
+      tool_use_id: z.string().optional(),
+      success: z.boolean().optional(),
+    }),
+  ),
+)
+
+export const BeforeCommandHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('BeforeCommand'),
+      command: z.string(),
+      shell_type: z.string().optional(),
+      cwd: z.string().optional(),
+      timeout_ms: z.number().optional(),
+      sandbox: z.boolean().optional(),
+      tool_use_id: z.string().optional(),
+    }),
+  ),
+)
+
+export const AfterCommandHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('AfterCommand'),
+      command: z.string(),
+      shell_type: z.string().optional(),
+      cwd: z.string().optional(),
+      exit_code: z.number().optional(),
+      stdout: z.string().optional(),
+      stderr: z.string().optional(),
+      tool_use_id: z.string().optional(),
+    }),
+  ),
+)
+
+export const BeforeCommitHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('BeforeCommit'),
+      command: z.string(),
+      message: z.string().optional(),
+      files: z.array(z.string()).optional(),
+      tool_use_id: z.string().optional(),
+    }),
+  ),
+)
+
+export const OnFailureHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('OnFailure'),
+      error: z.string(),
+      stage: z.string().optional(),
+      tool_name: z.string().optional(),
+      tool_use_id: z.string().optional(),
+    }),
+  ),
+)
+
 export const EXIT_REASONS = [
   'clear',
   'resume',
@@ -793,6 +879,12 @@ export const HookInputSchema = lazySchema(() =>
     WorktreeRemoveHookInputSchema(),
     CwdChangedHookInputSchema(),
     FileChangedHookInputSchema(),
+    BeforeEditHookInputSchema(),
+    AfterEditHookInputSchema(),
+    BeforeCommandHookInputSchema(),
+    AfterCommandHookInputSchema(),
+    BeforeCommitHookInputSchema(),
+    OnFailureHookInputSchema(),
   ]),
 )
 
@@ -929,6 +1021,12 @@ export const SyncHookJSONOutputSchema = lazySchema(() =>
         CwdChangedHookSpecificOutputSchema(),
         FileChangedHookSpecificOutputSchema(),
         WorktreeCreateHookSpecificOutputSchema(),
+        BeforeEditHookSpecificOutputSchema(),
+        AfterEditHookSpecificOutputSchema(),
+        BeforeCommandHookSpecificOutputSchema(),
+        AfterCommandHookSpecificOutputSchema(),
+        BeforeCommitHookSpecificOutputSchema(),
+        OnFailureHookSpecificOutputSchema(),
       ])
       .optional(),
   }),
@@ -967,6 +1065,81 @@ export const WorktreeCreateHookSpecificOutputSchema = lazySchema(() =>
     .describe(
       'Hook-specific output for the WorktreeCreate event. Provides the absolute path to the created worktree directory. Command hooks print the path on stdout instead.',
     ),
+)
+
+export const BeforeEditHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('BeforeEdit'),
+    updatedInput: z
+      .object({
+        old_string: z.string().optional(),
+        new_string: z.string().optional(),
+      })
+      .optional(),
+    additionalContext: z.string().optional(),
+  }),
+)
+
+export const AfterEditHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('AfterEdit'),
+    memory: z
+      .object({
+        kind: z.enum([
+          'accepted',
+          'rejected',
+          'attempt',
+          'preference',
+          'architecture',
+          'decision',
+          'constraint',
+          'command',
+          'diff',
+          'note',
+        ]),
+        text: z.string(),
+        rationale: z.string().optional(),
+        scope: z.enum(['project', 'team', 'personal']).optional(),
+      })
+      .optional(),
+    additionalContext: z.string().optional(),
+  }),
+)
+
+export const BeforeCommandHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('BeforeCommand'),
+    additionalContext: z.string().optional(),
+  }),
+)
+
+export const AfterCommandHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('AfterCommand'),
+    additionalContext: z.string().optional(),
+  }),
+)
+
+export const BeforeCommitHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('BeforeCommit'),
+    additionalContext: z.string().optional(),
+  }),
+)
+
+export const OnFailureHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('OnFailure'),
+    memory: z
+      .object({
+        kind: z.enum(['attempt', 'rejected', 'note']),
+        text: z.string(),
+        rationale: z.string().optional(),
+        scope: z.enum(['project', 'team', 'personal']).optional(),
+      })
+      .optional(),
+    additionalContext: z.string().optional(),
+  }),
 )
 
 export const HookJSONOutputSchema = lazySchema(() =>

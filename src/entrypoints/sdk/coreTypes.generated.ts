@@ -225,6 +225,12 @@ export type WorktreeRemoveHookInput = HookInputBase
 export type InstructionsLoadedHookInput = HookInputBase
 export type CwdChangedHookInput = HookInputBase
 export type FileChangedHookInput = HookInputBase
+export type BeforeEditHookInput = HookInputBase
+export type AfterEditHookInput = HookInputBase
+export type BeforeCommandHookInput = HookInputBase
+export type AfterCommandHookInput = HookInputBase
+export type BeforeCommitHookInput = HookInputBase
+export type OnFailureHookInput = HookInputBase
 export type UserPromptSubmitHookInput = HookInputBase
 
 export interface HookJSONOutput {

@@ -100,6 +100,53 @@ ur context-pack remember --decision "Use package scripts before ad hoc commands"
 ur context-pack compress
 ```
 
+## Project memory
+
+`ur context-pack remember` stores durable project memory in `.ur/context/task-memory.jsonl`. Use it to record decisions, constraints, preferred commands, failed attempts, accepted patterns, rejected approaches, and architecture notes. The compressed summary in `.ur/context/compressed.md` is included in agent context.
+
+Memory kinds:
+
+- `decision`, `constraint`, `command`, `diff`, `note` — original task memory categories.
+- `architecture` — architecture decisions and design rationale.
+- `preference` — preferred commands, tools, or workflows.
+- `attempt` — things you tried that did not work out (often written by `OnFailure` hooks).
+- `accepted` — patterns or approaches that worked and should be reused.
+- `rejected` — approaches that should not be repeated, optionally with an `alternative-to`.
+
+```sh
+ur context-pack remember --architecture "Repository pattern for data access" --status accepted --rationale "Testability"
+ur context-pack remember --preference "Use bun test over jest"
+ur context-pack remember --accepted "Use p-map for bounded concurrency" --scope project
+ur context-pack remember --rejected "Switch to esbuild" --alternative-to "Keep bun bundle"
+ur context-pack remember --attempt "Tried Deno runtime" --status superseded
+ur context-pack compress
+```
+
+## Lifecycle hooks
+
+UR supports lifecycle hook events that fire around agent actions. Hooks are configured in `.ur/hooks.json` or `UR.md` frontmatter and receive JSON payloads.
+
+| Event | Fires | Payload |
+| --- | --- | --- |
+| `BeforeEdit` | Before `FileEditTool` writes a file. | `file_path`, `old_string`, `new_string`, `replace_all`, `tool_use_id` |
+| `AfterEdit` | After a file edit succeeds. | Same as `BeforeEdit` plus `success: true`. Can write project memory. |
+| `BeforeCommand` | Before a Bash/PowerShell command runs. | `command`, `shell_type`, `cwd`, `timeout_ms`, `sandbox`, `tool_use_id` |
+| `AfterCommand` | After a command finishes. | `command`, `exit_code`, `stdout`, `stderr`, `tool_use_id` |
+| `BeforeCommit` | After a successful `git commit` command. | `command`, `message`, `files`, `tool_use_id` |
+| `OnFailure` | When a tool, turn, or API call fails. | `error`, `stage`, `tool_name`, `tool_use_id` |
+
+Example `UR.md` frontmatter hook:
+
+```yaml
+---
+hooks:
+  - event: BeforeCommit
+    command: 'echo "Commit detected: $UR_CODE_HOOK_INPUT" >> /tmp/ur-commits.log'
+---
+```
+
+Hooks are advisory by default. A `BeforeEdit`/`BeforeCommand`/`BeforeCommit` hook can block the action by returning `{"decision":"block","reason":"..."}` or exit code 2. `AfterEdit` and `OnFailure` hooks can return `{"hookSpecificOutput":{"hookEventName":"...","memory":{"kind":"accepted","text":"..."}}}` to append project memory automatically.
+
 ## Commands
 
 UR includes slash commands and CLI subcommands for common workflows:
@@ -113,7 +160,7 @@ UR includes slash commands and CLI subcommands for common workflows:
 - `ur bg ...` to run detached local background agents with optional worktrees and PRs
 - `ur repo-edit ...` to index the repo, plan AST-aware renames, preview patches, and apply with rollback
 - `ur safety ...` to inspect project shell safety policy and preview command risk
-- `ur context-pack ...` to summarize architecture and persist task decisions, constraints, commands, and diffs
+- `ur context-pack ...` to summarize architecture and persist project memory (decisions, constraints, commands, diffs, architecture, preferences, attempts, accepted, rejected)
 - `ur code-index watch` to keep the local semantic code index fresh
 - `ur memory retention ...` to prune project-local memory by TTL, max entries, and decay
 - `ur spec ...` to scaffold requirements, design, and tasks, run a spec task list, and verify with strict proof gates
@@ -155,6 +202,7 @@ ur safety status
 ur safety check --command "rm -rf build"
 ur context-pack scan
 ur context-pack remember --constraint "Run command evidence before claiming success"
+ur context-pack remember --accepted "Use p-map for concurrency" --scope project
 ur context-pack compress
 ur acp serve --port 8123
 ur exec "add tests for the parser" --concurrency 4 --json

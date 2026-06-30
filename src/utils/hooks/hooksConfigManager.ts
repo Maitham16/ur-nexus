@@ -262,6 +262,60 @@ export const getHookEventMetadata = memoize(
         description:
           'Input to command is JSON with file_path and event (change, add, unlink).\nUR_ENV_FILE is set — write bash exports there to apply env to subsequent BashTool commands.\nThe matcher field specifies filenames to watch in the current directory (e.g. ".envrc|.env").\nHook output can include hookSpecificOutput.watchPaths (array of absolute paths) to dynamically update the watch list.\nExit code 0 - command completes successfully\nOther exit codes - show stderr to user only',
       },
+      BeforeEdit: {
+        summary: 'Before a file edit is written',
+        description:
+          'Input to command is JSON with file_path, old_string, new_string, replace_all, and tool_use_id.\nAdvisory by default; blocking requires explicit hookSpecificOutput.\nExit code 0 - command completes successfully\nExit code 2 - block the edit and show stderr to model',
+        matcherMetadata: {
+          fieldToMatch: 'file_path',
+          values: [],
+        },
+      },
+      AfterEdit: {
+        summary: 'After a file edit is written',
+        description:
+          'Input to command is JSON with file_path, old_string, new_string, replace_all, tool_use_id, and success.\nAdvisory by default.\nExit code 0 - command completes successfully\nOther exit codes - show stderr to user only',
+        matcherMetadata: {
+          fieldToMatch: 'file_path',
+          values: [],
+        },
+      },
+      BeforeCommand: {
+        summary: 'Before a shell command runs',
+        description:
+          'Input to command is JSON with command, shell_type, cwd, timeout_ms, sandbox, and tool_use_id.\nAdvisory by default.\nExit code 0 - command completes successfully\nExit code 2 - block the command and show stderr to model',
+        matcherMetadata: {
+          fieldToMatch: 'command',
+          values: [],
+        },
+      },
+      AfterCommand: {
+        summary: 'After a shell command finishes',
+        description:
+          'Input to command is JSON with command, shell_type, cwd, exit_code, stdout, stderr, and tool_use_id.\nAdvisory by default.\nExit code 0 - command completes successfully\nOther exit codes - show stderr to user only',
+        matcherMetadata: {
+          fieldToMatch: 'command',
+          values: [],
+        },
+      },
+      BeforeCommit: {
+        summary: 'Before a git commit completes',
+        description:
+          'Input to command is JSON with command, message, files, and tool_use_id.\nAdvisory by default.\nExit code 0 - command completes successfully\nExit code 2 - block the commit and show stderr to model',
+        matcherMetadata: {
+          fieldToMatch: 'command',
+          values: [],
+        },
+      },
+      OnFailure: {
+        summary: 'When a tool or turn fails',
+        description:
+          'Input to command is JSON with error, stage, tool_name, and tool_use_id.\nAdvisory by default.\nExit code 0 - command completes successfully\nOther exit codes - show stderr to user only',
+        matcherMetadata: {
+          fieldToMatch: 'stage',
+          values: ['tool', 'turn', 'api'],
+        },
+      },
     }
   },
   toolNames => toolNames.slice().sort().join(','),
@@ -300,6 +354,12 @@ export function groupHooksByEventAndMatcher(
     InstructionsLoaded: {},
     CwdChanged: {},
     FileChanged: {},
+    BeforeEdit: {},
+    AfterEdit: {},
+    BeforeCommand: {},
+    AfterCommand: {},
+    BeforeCommit: {},
+    OnFailure: {},
   }
 
   const metadata = getHookEventMetadata(toolNames)

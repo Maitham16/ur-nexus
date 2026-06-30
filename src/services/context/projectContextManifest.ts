@@ -10,13 +10,31 @@ import { detectProjectDna, formatDna } from '../../ur/projectDna.js'
 import { safeParseJSON } from '../../utils/json.js'
 import { safetyPolicyPath } from '../safety/projectSafety.js'
 
-export type TaskMemoryKind = 'decision' | 'constraint' | 'command' | 'diff' | 'note'
+export const TASK_MEMORY_KINDS = [
+  'decision',
+  'constraint',
+  'command',
+  'diff',
+  'note',
+  'architecture',
+  'preference',
+  'attempt',
+  'accepted',
+  'rejected',
+] as const
+export type TaskMemoryKind = (typeof TASK_MEMORY_KINDS)[number]
 
 export type TaskMemoryEntry = {
   id: string
   at: string
   kind: TaskMemoryKind
   text: string
+  status?: 'proposed' | 'accepted' | 'rejected' | 'superseded'
+  rationale?: string
+  alternativeTo?: string
+  supersedesId?: string
+  scope?: 'project' | 'team' | 'personal'
+  source?: string
 }
 
 export type ProjectContextManifest = {
@@ -184,16 +202,32 @@ export function appendTaskMemory(
   cwd: string,
   kind: TaskMemoryKind,
   text: string,
+  meta?: Omit<Partial<TaskMemoryEntry>, 'id' | 'at' | 'kind' | 'text'>,
 ): TaskMemoryEntry {
-  const entry = {
+  const entry: TaskMemoryEntry = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     at: new Date().toISOString(),
     kind,
     text,
+    status: meta?.status,
+    rationale: meta?.rationale,
+    alternativeTo: meta?.alternativeTo,
+    supersedesId: meta?.supersedesId,
+    scope: meta?.scope,
+    source: meta?.source,
   }
   mkdirSync(dirname(taskMemoryPath(cwd)), { recursive: true })
   writeFileSync(taskMemoryPath(cwd), `${JSON.stringify(entry)}\n`, { flag: 'a' })
   return entry
+}
+
+export function appendProjectMemory(
+  cwd: string,
+  kind: TaskMemoryKind,
+  text: string,
+  meta?: Omit<Partial<TaskMemoryEntry>, 'id' | 'at' | 'kind' | 'text'>,
+): TaskMemoryEntry {
+  return appendTaskMemory(cwd, kind, text, meta)
 }
 
 export function readTaskMemory(cwd: string): TaskMemoryEntry[] {
@@ -213,10 +247,18 @@ export function readTaskMemory(cwd: string): TaskMemoryEntry[] {
     )
 }
 
+export function readProjectMemoryByKind(
+  cwd: string,
+  kinds: TaskMemoryKind[],
+): TaskMemoryEntry[] {
+  return readTaskMemory(cwd).filter(entry => kinds.includes(entry.kind))
+}
+
 export function compressTaskMemory(cwd: string): string {
   const entries = readTaskMemory(cwd)
+  const allKinds = TASK_MEMORY_KINDS
   const byKind = new Map<TaskMemoryKind, TaskMemoryEntry[]>()
-  for (const kind of ['decision', 'constraint', 'command', 'diff', 'note'] as const) {
+  for (const kind of allKinds) {
     byKind.set(kind, entries.filter(entry => entry.kind === kind))
   }
   const lines = [
@@ -225,7 +267,7 @@ export function compressTaskMemory(cwd: string): string {
     `Entries: ${entries.length}`,
     `Updated: ${new Date().toISOString()}`,
   ]
-  for (const kind of ['decision', 'constraint', 'command', 'diff', 'note'] as const) {
+  for (const kind of allKinds) {
     lines.push('', `## ${kind[0]!.toUpperCase()}${kind.slice(1)}s`)
     const group = byKind.get(kind) ?? []
     if (group.length === 0) {
@@ -233,13 +275,43 @@ export function compressTaskMemory(cwd: string): string {
       continue
     }
     for (const entry of group.slice(-50)) {
-      lines.push(`- ${entry.at}: ${entry.text}`)
+      const meta = [
+        entry.status ? `status=${entry.status}` : '',
+        entry.scope ? `scope=${entry.scope}` : '',
+        entry.source ? `source=${entry.source}` : '',
+        entry.rationale ? `rationale=${entry.rationale}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ')
+      lines.push(`- ${entry.at}: ${entry.text}${meta ? ` (${meta})` : ''}`)
     }
   }
   const body = `${lines.join('\n')}\n`
   mkdirSync(dirname(compressedContextPath(cwd)), { recursive: true })
   writeFileSync(compressedContextPath(cwd), body)
   return body
+}
+
+export function compressProjectMemory(cwd: string): string {
+  return compressTaskMemory(cwd)
+}
+
+export function getProjectMemorySummary(
+  cwd: string,
+  maxPerKind = 10,
+): string {
+  const entries = readTaskMemory(cwd)
+  const lines = ['# Project Memory Summary', '']
+  for (const kind of TASK_MEMORY_KINDS) {
+    const group = entries.filter(e => e.kind === kind).slice(-maxPerKind)
+    if (group.length === 0) continue
+    lines.push(`## ${kind[0]!.toUpperCase()}${kind.slice(1)}s`)
+    for (const entry of group) {
+      lines.push(`- ${entry.text}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n').trim()
 }
 
 export function contextStatus(cwd: string): string {

@@ -38,7 +38,13 @@ handing work off to other tools or agents when needed.
   AST-aware rename plans, patch previews, and rollback-safe multi-file apply.
 - **Permission and context control.** Use `ur safety` and `ur context-pack` to
   inspect command risk, initialize project safety policy, summarize repository
-  architecture, and preserve task decisions, constraints, commands, and diffs.
+  architecture, and preserve task decisions, constraints, commands, diffs,
+  architecture decisions, preferred commands, failed attempts, accepted patterns,
+  and rejected approaches.
+- **Lifecycle hooks.** Configure `BeforeEdit`, `AfterEdit`, `BeforeCommand`,
+  `AfterCommand`, `BeforeCommit`, and `OnFailure` hooks in `.ur/hooks.json` or
+  `UR.md` to run custom commands when the agent edits files, runs shell commands,
+  commits, or hits a failure.
 - **Verification and provenance.** Use `ur test-first`, the built-in verifier,
   `/verify`, `.ur/verify.json`, `ur artifacts`, `ur claim-ledger`, and `/trace`
   to make results easier to inspect.
@@ -130,7 +136,8 @@ as first-class subcommands in the shipped CLI.
 | `ur ci-loop` | Run a build or test command, hand failures to a fix agent, and retry with a bounded budget. |
 | `ur test-first` | Detect the project stack, run compile/test/lint commands, store failure traces, and install edit-time verify gates. |
 | `ur safety` | Inspect or initialize project shell safety policy and evaluate command risk before execution. |
-| `ur context-pack` | Write project architecture context, task memory, and compressed context under `.ur/`. |
+| `ur context-pack` | Write project architecture context, task memory, and compressed context under `.ur/`. Supports memory kinds `decision`, `constraint`, `command`, `diff`, `note`, `architecture`, `preference`, `attempt`, `accepted`, and `rejected`. |
+| `ur hooks` | Configure lifecycle hooks (`BeforeEdit`, `AfterEdit`, `BeforeCommand`, `AfterCommand`, `BeforeCommit`, `OnFailure`) via settings files. |
 | `ur bg` | Run and manage detached local background agents with optional worktrees and PR creation. |
 | `ur worktree` | List, inspect, and clean up UR agent worktrees. |
 | `ur automation` | Store and run project-local scheduled automation specs under `.ur/automations/`. |
@@ -186,6 +193,11 @@ ur test-first install
 ur safety check --command "rm -rf build"
 ur context-pack scan
 ur context-pack remember --decision "Use package scripts before ad hoc commands"
+ur context-pack remember --architecture "Repository pattern for data access" --status accepted --rationale "Testability"
+ur context-pack remember --preference "Use bun test over jest"
+ur context-pack remember --accepted "Use p-map for bounded concurrency" --scope project
+ur context-pack remember --rejected "Switch to esbuild" --alternative-to "Keep bun bundle"
+ur context-pack remember --attempt "Tried Deno runtime" --status superseded
 ur context-pack compress
 ur ci-loop --command "bun test" --max-attempts 3 --dry-run
 ur bg run "fix the flaky parser test" --worktree --dry-run
@@ -214,7 +226,9 @@ UR reads repository instructions and local runtime state from project files:
 - `.ur/safety-policy.json` configures project shell safety rules for read,
   write, execute, and network command classes.
 - `.ur/project-manifest.json` and `.ur/context/` hold architecture summaries,
-  task memory, compressed context, and command/constraint decisions.
+  task memory, compressed context, and project memory including architecture
+  decisions, preferred commands, failed attempts, accepted patterns, and rejected
+  approaches.
 - `.ur/specs/`, `.ur/artifacts/`, `.ur/automations/`, `.ur/test-first/`,
   `.ur/memory/`, and `.ur/index/` hold workflow state, review artifacts,
   scheduled jobs, failure traces, memory, and indexes.

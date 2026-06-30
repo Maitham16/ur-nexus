@@ -106,7 +106,14 @@ import type {
   ExitReason,
   SyncHookJSONOutput,
   AsyncHookJSONOutput,
+  BeforeEditHookInput,
+  AfterEditHookInput,
+  BeforeCommandHookInput,
+  AfterCommandHookInput,
+  BeforeCommitHookInput,
+  OnFailureHookInput,
 } from 'src/entrypoints/agentSdkTypes.js'
+import type { TaskMemoryKind } from '../services/context/projectContextManifest.js'
 import type { StatusLineCommandInput } from '../types/statusLine.js'
 import type { ElicitResult } from '@modelcontextprotocol/sdk/types.js'
 import type { FileSuggestionCommandInput } from '../types/fileSuggestion.js'
@@ -357,6 +364,7 @@ export interface HookResult {
 }
 
 export type AggregatedHookResult = {
+  type?: 'message' | 'hookUpdatedInput' | 'additionalContext' | 'hookPermissionResult' | 'preventContinuation' | 'stopReason' | 'stop'
   message?: HookResultMessage
   blockingError?: HookBlockingError
   preventContinuation?: boolean
@@ -365,6 +373,7 @@ export type AggregatedHookResult = {
   hookSource?: string
   permissionBehavior?: PermissionResult['behavior']
   additionalContexts?: string[]
+  additionalContext?: string
   initialUserMessage?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
@@ -4919,12 +4928,6 @@ export function hasWorktreeCreateHook(): boolean {
   )
 }
 
-/**
- * Execute WorktreeCreate hooks.
- * Returns the worktree path from hook stdout.
- * Throws if hooks fail or produce no output.
- * Callers should check hasWorktreeCreateHook() before calling this.
- */
 export async function executeWorktreeCreateHook(
   name: string,
 ): Promise<{ worktreePath: string }> {
@@ -4955,6 +4958,420 @@ export async function executeWorktreeCreateHook(
 
   const worktreePath = successfulResult.output.trim()
   return { worktreePath }
+}
+
+export async function executeBeforeEditHooks(
+  filePath: string,
+  oldString: string | undefined,
+  newString: string | undefined,
+  replaceAll: boolean,
+  toolUseContext: ToolUseContext,
+  toolUseID: string,
+  signal?: AbortSignal,
+  timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+): Promise<{
+  updatedInput?: { old_string?: string; new_string?: string }
+  additionalContext?: string
+}> {
+  const appState = toolUseContext.getAppState()
+  const sessionId = toolUseContext.agentId ?? getSessionId()
+  if (!hasHookForEvent('BeforeEdit', appState, sessionId)) {
+    return {}
+  }
+  const hookInput: BeforeEditHookInput = {
+    ...createBaseHookInput(undefined, undefined, toolUseContext),
+    hook_event_name: 'BeforeEdit',
+    file_path: filePath,
+    old_string: oldString,
+    new_string: newString,
+    replace_all: replaceAll,
+    tool_use_id: toolUseID,
+  }
+  const results: AggregatedHookResult[] = []
+  for await (const result of executeHooks({
+    hookInput,
+    toolUseID,
+    signal,
+    timeoutMs,
+    toolUseContext,
+  })) {
+    results.push(result)
+  }
+  let updatedInput: { old_string?: string; new_string?: string } | undefined
+  let additionalContext: string | undefined
+  for (const result of results) {
+    if (result.type === 'hookUpdatedInput' && result.updatedInput) {
+      const ui = result.updatedInput
+      updatedInput = {
+        old_string: String(ui.old_string ?? updatedInput?.old_string ?? ''),
+        new_string: String(ui.new_string ?? updatedInput?.new_string ?? ''),
+      }
+    }
+    if (result.type === 'additionalContext' && result.message) {
+      const att = result.message.message.attachment
+      if (
+        att &&
+        typeof att === 'object' &&
+        'additionalContext' in att &&
+        typeof att.additionalContext === 'string'
+      ) {
+        additionalContext = att.additionalContext
+      }
+    }
+  }
+  return { updatedInput, additionalContext }
+}
+
+export async function executeAfterEditHooks(
+  filePath: string,
+  oldString: string | undefined,
+  newString: string | undefined,
+  replaceAll: boolean,
+  toolUseContext: ToolUseContext,
+  toolUseID: string,
+  signal?: AbortSignal,
+  timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+): Promise<{
+  memory?: {
+    kind: TaskMemoryKind
+    text: string
+    rationale?: string
+    scope?: 'project' | 'team' | 'personal'
+  }
+  additionalContext?: string
+}> {
+  const appState = toolUseContext.getAppState()
+  const sessionId = toolUseContext.agentId ?? getSessionId()
+  if (!hasHookForEvent('AfterEdit', appState, sessionId)) {
+    return {}
+  }
+  const hookInput: AfterEditHookInput = {
+    ...createBaseHookInput(undefined, undefined, toolUseContext),
+    hook_event_name: 'AfterEdit',
+    file_path: filePath,
+    old_string: oldString,
+    new_string: newString,
+    replace_all: replaceAll,
+    tool_use_id: toolUseID,
+    success: true,
+  }
+  const results: AggregatedHookResult[] = []
+  for await (const result of executeHooks({
+    hookInput,
+    toolUseID,
+    signal,
+    timeoutMs,
+    toolUseContext,
+  })) {
+    results.push(result)
+  }
+  let memory:
+    | {
+        kind: TaskMemoryKind
+        text: string
+        rationale?: string
+        scope?: 'project' | 'team' | 'personal'
+      }
+    | undefined
+  let additionalContext: string | undefined
+  for (const result of results) {
+    if (result.type === 'additionalContext' && result.message) {
+      const att = result.message.message.attachment
+      if (
+        att &&
+        typeof att === 'object' &&
+        'additionalContext' in att &&
+        typeof att.additionalContext === 'string'
+      ) {
+        additionalContext = att.additionalContext
+      }
+      if (
+        att &&
+        typeof att === 'object' &&
+        'memory' in att &&
+        att.memory &&
+        typeof att.memory === 'object' &&
+        'kind' in att.memory &&
+        'text' in att.memory &&
+        typeof att.memory.text === 'string'
+      ) {
+        memory = {
+          kind: String(att.memory.kind) as TaskMemoryKind,
+          text: att.memory.text,
+          rationale:
+            typeof att.memory.rationale === 'string'
+              ? att.memory.rationale
+              : undefined,
+          scope:
+            typeof att.memory.scope === 'string'
+              ? (att.memory.scope as 'project' | 'team' | 'personal')
+              : undefined,
+        }
+      }
+    }
+  }
+  return { memory, additionalContext }
+}
+
+export async function executeBeforeCommandHooks(
+  command: string,
+  shellType: string,
+  cwd: string,
+  toolUseContext: ToolUseContext,
+  options?: {
+    timeoutMs?: number
+    sandbox?: boolean
+    toolUseID?: string
+    signal?: AbortSignal
+  },
+): Promise<{ additionalContext?: string }> {
+  const appState = toolUseContext.getAppState()
+  const sessionId = toolUseContext.agentId ?? getSessionId()
+  if (!hasHookForEvent('BeforeCommand', appState, sessionId)) {
+    return {}
+  }
+  const hookInput: BeforeCommandHookInput = {
+    ...createBaseHookInput(undefined, undefined, toolUseContext),
+    hook_event_name: 'BeforeCommand',
+    command,
+    shell_type: shellType,
+    cwd,
+    timeout_ms: options?.timeoutMs,
+    sandbox: options?.sandbox ?? false,
+    tool_use_id: options?.toolUseID,
+  }
+  const results: AggregatedHookResult[] = []
+  for await (const result of executeHooks({
+    hookInput,
+    toolUseID: options?.toolUseID ?? randomUUID(),
+    matchQuery: command,
+    signal: options?.signal,
+    timeoutMs: options?.timeoutMs ?? TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+    toolUseContext,
+  })) {
+    results.push(result)
+  }
+  let additionalContext: string | undefined
+  for (const result of results) {
+    if (result.type === 'additionalContext' && result.message) {
+      const att = result.message.message.attachment
+      if (
+        att &&
+        typeof att === 'object' &&
+        'additionalContext' in att &&
+        typeof att.additionalContext === 'string'
+      ) {
+        additionalContext = att.additionalContext
+      }
+    }
+  }
+  return { additionalContext }
+}
+
+export async function executeAfterCommandHooks(
+  command: string,
+  shellType: string,
+  cwd: string,
+  exitCode: number,
+  stdout: string,
+  stderr: string,
+  toolUseContext: ToolUseContext,
+  options?: {
+    timeoutMs?: number
+    toolUseID?: string
+    signal?: AbortSignal
+  },
+): Promise<{ additionalContext?: string }> {
+  const appState = toolUseContext.getAppState()
+  const sessionId = toolUseContext.agentId ?? getSessionId()
+  if (!hasHookForEvent('AfterCommand', appState, sessionId)) {
+    return {}
+  }
+  const hookInput: AfterCommandHookInput = {
+    ...createBaseHookInput(undefined, undefined, toolUseContext),
+    hook_event_name: 'AfterCommand',
+    command,
+    shell_type: shellType,
+    cwd,
+    exit_code: exitCode,
+    stdout: stdout.slice(0, 2000),
+    stderr: stderr.slice(0, 2000),
+    tool_use_id: options?.toolUseID,
+  }
+  const results: AggregatedHookResult[] = []
+  for await (const result of executeHooks({
+    hookInput,
+    toolUseID: options?.toolUseID ?? randomUUID(),
+    matchQuery: command,
+    signal: options?.signal,
+    timeoutMs: options?.timeoutMs ?? TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+    toolUseContext,
+  })) {
+    results.push(result)
+  }
+  let additionalContext: string | undefined
+  for (const result of results) {
+    if (result.type === 'additionalContext' && result.message) {
+      const att = result.message.message.attachment
+      if (
+        att &&
+        typeof att === 'object' &&
+        'additionalContext' in att &&
+        typeof att.additionalContext === 'string'
+      ) {
+        additionalContext = att.additionalContext
+      }
+    }
+  }
+  return { additionalContext }
+}
+
+export async function executeBeforeCommitHooks(
+  command: string,
+  toolUseContext: ToolUseContext,
+  options?: {
+    message?: string
+    files?: string[]
+    timeoutMs?: number
+    toolUseID?: string
+    signal?: AbortSignal
+  },
+): Promise<{ additionalContext?: string; blocked?: boolean }> {
+  const appState = toolUseContext.getAppState()
+  const sessionId = toolUseContext.agentId ?? getSessionId()
+  if (!hasHookForEvent('BeforeCommit', appState, sessionId)) {
+    return {}
+  }
+  const hookInput: BeforeCommitHookInput = {
+    ...createBaseHookInput(undefined, undefined, toolUseContext),
+    hook_event_name: 'BeforeCommit',
+    command,
+    message: options?.message,
+    files: options?.files,
+    tool_use_id: options?.toolUseID,
+  }
+  const results: AggregatedHookResult[] = []
+  for await (const result of executeHooks({
+    hookInput,
+    toolUseID: options?.toolUseID ?? randomUUID(),
+    matchQuery: command,
+    signal: options?.signal,
+    timeoutMs: options?.timeoutMs ?? TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+    toolUseContext,
+  })) {
+    results.push(result)
+  }
+  let additionalContext: string | undefined
+  let blocked = false
+  for (const result of results) {
+    if (result.type === 'additionalContext' && result.message) {
+      const att = result.message.message.attachment
+      if (
+        att &&
+        typeof att === 'object' &&
+        'additionalContext' in att &&
+        typeof att.additionalContext === 'string'
+      ) {
+        additionalContext = att.additionalContext
+      }
+    }
+    if (result.blockingError) {
+      blocked = true
+    }
+  }
+  return { additionalContext, blocked }
+}
+
+export async function executeOnFailureHooks(
+  error: string,
+  stage: string,
+  toolUseContext: ToolUseContext,
+  options?: {
+    toolName?: string
+    toolUseID?: string
+    timeoutMs?: number
+    signal?: AbortSignal
+  },
+): Promise<{
+  memory?: {
+    kind: TaskMemoryKind
+    text: string
+    rationale?: string
+    scope?: 'project' | 'team' | 'personal'
+  }
+  additionalContext?: string
+}>
+ {
+  const appState = toolUseContext.getAppState()
+  const sessionId = toolUseContext.agentId ?? getSessionId()
+  if (!hasHookForEvent('OnFailure', appState, sessionId)) {
+    return {}
+  }
+  const hookInput: OnFailureHookInput = {
+    ...createBaseHookInput(undefined, undefined, toolUseContext),
+    hook_event_name: 'OnFailure',
+    error,
+    stage,
+    tool_name: options?.toolName,
+    tool_use_id: options?.toolUseID,
+  }
+  const results: AggregatedHookResult[] = []
+  for await (const result of executeHooks({
+    hookInput,
+    toolUseID: options?.toolUseID ?? randomUUID(),
+    matchQuery: stage,
+    signal: options?.signal,
+    timeoutMs: options?.timeoutMs ?? TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+    toolUseContext,
+  })) {
+    results.push(result)
+  }
+  let memory:
+    | {
+        kind: TaskMemoryKind
+        text: string
+        rationale?: string
+        scope?: 'project' | 'team' | 'personal'
+      }
+    | undefined
+  let additionalContext: string | undefined
+  for (const result of results) {
+    if (result.type === 'additionalContext' && result.message) {
+      const att = result.message.message.attachment
+      if (
+        att &&
+        typeof att === 'object' &&
+        'additionalContext' in att &&
+        typeof att.additionalContext === 'string'
+      ) {
+        additionalContext = att.additionalContext
+      }
+      if (
+        att &&
+        typeof att === 'object' &&
+        'memory' in att &&
+        att.memory &&
+        typeof att.memory === 'object' &&
+        'kind' in att.memory &&
+        'text' in att.memory &&
+        typeof att.memory.text === 'string'
+      ) {
+        memory = {
+          kind: String(att.memory.kind) as TaskMemoryKind,
+          text: att.memory.text,
+          rationale:
+            typeof att.memory.rationale === 'string'
+              ? att.memory.rationale
+              : undefined,
+          scope:
+            typeof att.memory.scope === 'string'
+              ? (att.memory.scope as 'project' | 'team' | 'personal')
+              : undefined,
+        }
+      }
+    }
+  }
+  return { memory, additionalContext }
 }
 
 /**

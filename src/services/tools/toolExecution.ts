@@ -68,7 +68,11 @@ import {
   ShellError,
   TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
 } from '../../utils/errors.js'
-import { executePermissionDeniedHooks } from '../../utils/hooks.js'
+import {
+  executePermissionDeniedHooks,
+  executeOnFailureHooks,
+} from '../../utils/hooks.js'
+import { appendProjectMemory } from '../../services/context/projectContextManifest.js'
 import { logError } from '../../utils/log.js'
 import {
   CANCEL_MESSAGE,
@@ -472,6 +476,19 @@ export async function* runToolUse(
     const errorMessage = error instanceof Error ? error.message : String(error)
     const toolInfo = tool ? ` (${tool.name})` : ''
     const detailedError = `Error calling tool${toolInfo}: ${errorMessage}`
+
+    void executeOnFailureHooks(detailedError, 'tool', toolUseContext, {
+      toolName: tool?.name,
+      toolUseID: toolUse.id,
+    }).then(({ memory }) => {
+      if (memory) {
+        appendProjectMemory(getCwd(), memory.kind, memory.text, {
+          rationale: memory.rationale,
+          scope: memory.scope,
+          source: 'OnFailure hook',
+        })
+      }
+    })
 
     yield {
       message: createUserMessage({
@@ -1693,6 +1710,20 @@ async function checkPermissionsAndCallTool(
 
     // Determine if this was a user interrupt
     const isInterrupt = error instanceof AbortError
+
+    // Run OnFailure hooks
+    void executeOnFailureHooks(content, 'tool', toolUseContext, {
+      toolName: tool.name,
+      toolUseID,
+    }).then(({ memory }) => {
+      if (memory) {
+        appendProjectMemory(getCwd(), memory.kind, memory.text, {
+          rationale: memory.rationale,
+          scope: memory.scope,
+          source: 'OnFailure hook',
+        })
+      }
+    })
 
     // Run PostToolUseFailure hooks
     const hookMessages: MessageUpdateLazy<

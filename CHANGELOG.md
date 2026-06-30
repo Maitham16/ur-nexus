@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.22.2
+
+### Added
+- **Lifecycle hooks.** Added six new hook events in `src/entrypoints/sdk/coreTypes.ts`
+  and `src/entrypoints/sdk/coreSchemas.ts`: `BeforeEdit`, `AfterEdit`,
+  `BeforeCommand`, `AfterCommand`, `BeforeCommit`, and `OnFailure`. Dispatchers
+  in `src/utils/hooks.ts` run them around file edits, shell commands, git commits,
+  and failure paths. Call sites are wired in `FileEditTool`, `BashTool`,
+  `PowerShellTool`, `toolExecution.ts`, and `query.ts`. Hooks are advisory by
+  default and can block actions or append project memory.
+- **Persistent project memory.** Extended `TaskMemoryKind` in
+  `src/services/context/projectContextManifest.ts` with `architecture`,
+  `preference`, `attempt`, `accepted`, and `rejected`. Entries now support
+  `status`, `rationale`, `alternativeTo`, `supersedesId`, `scope`, and `source`
+  metadata. `ur context-pack remember` accepts the new kinds and metadata flags.
+
+### Changed
+- **Compressed context** now includes sections for all memory kinds, including the
+  new project-memory categories.
+
+### Verified
+- Added `test/lifecycleHooks.test.ts` covering the new `HOOK_EVENTS` literals and
+  Zod schema validation.
+- Added `test/projectMemory.test.ts` covering append/read/compress/summarize for
+  the new memory categories and metadata.
+
 ## 1.22.1
 
 ### Added

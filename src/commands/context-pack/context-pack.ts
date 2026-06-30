@@ -2,30 +2,28 @@ import type { LocalCommandCall } from '../../types/command.js'
 import { parseArguments } from '../../utils/argumentSubstitution.js'
 import { getCwd } from '../../utils/cwd.js'
 import {
-  appendTaskMemory,
+  appendProjectMemory,
   architectureSummaryPath,
-  compressTaskMemory,
+  compressProjectMemory,
   compressedContextPath,
   contextStatus,
+  TASK_MEMORY_KINDS,
   type TaskMemoryKind,
   projectManifestPath,
   writeProjectContextManifest,
 } from '../../services/context/projectContextManifest.js'
 
-const MEMORY_KINDS: TaskMemoryKind[] = [
-  'decision',
-  'constraint',
-  'command',
-  'diff',
-  'note',
-]
+const MEMORY_KINDS: TaskMemoryKind[] = [...TASK_MEMORY_KINDS]
 
 function usage(): string {
   return [
     'Usage:',
     '  ur context-pack scan [--json]',
-    '  ur context-pack remember --type decision --text "Use Bun scripts"',
-    '  ur context-pack remember --decision "Use AST rename for exported symbols"',
+    '  ur context-pack remember --type architecture --text "Use repository-pattern for data access"',
+    '  ur context-pack remember --preference "Prefer bun test over jest"',
+    '  ur context-pack remember --accepted "Use p-map for concurrency" --rationale "Avoids Promise.all OOM"',
+    '  ur context-pack remember --rejected "Switch to esbuild" --alternative-to "Keep bun bundle"',
+    '  ur context-pack remember --attempt "Tried Deno runtime" --status superseded',
     '  ur context-pack compress [--json]',
     '  ur context-pack status',
   ].join('\n')
@@ -40,11 +38,13 @@ function positionals(tokens: string[]): string[] {
   const flagsWithValue = new Set([
     '--type',
     '--text',
-    '--decision',
-    '--constraint',
-    '--command',
-    '--diff',
-    '--note',
+    ...MEMORY_KINDS.map(k => `--${k}`),
+    '--status',
+    '--rationale',
+    '--alternative-to',
+    '--supersedes',
+    '--scope',
+    '--source',
   ])
   const values: string[] = []
   for (let i = 0; i < tokens.length; i++) {
@@ -59,15 +59,54 @@ function positionals(tokens: string[]): string[] {
   return values
 }
 
-function rememberInput(tokens: string[]): { kind: TaskMemoryKind; text: string } | null {
+function rememberInput(
+  tokens: string[],
+): {
+  kind: TaskMemoryKind
+  text: string
+  status?: 'proposed' | 'accepted' | 'rejected' | 'superseded'
+  rationale?: string
+  alternativeTo?: string
+  supersedesId?: string
+  scope?: 'project' | 'team' | 'personal'
+  source?: string
+} | null {
   for (const kind of MEMORY_KINDS) {
     const value = option(tokens, `--${kind}`)
-    if (value) return { kind, text: value }
+    if (value) {
+      const meta = collectMeta(tokens)
+      return { kind, text: value, ...meta }
+    }
   }
   const kind = option(tokens, '--type') as TaskMemoryKind | undefined
   const text = option(tokens, '--text')
   if (!kind || !text || !MEMORY_KINDS.includes(kind)) return null
-  return { kind, text }
+  const meta = collectMeta(tokens)
+  return { kind, text, ...meta }
+}
+
+function collectMeta(tokens: string[]): {
+  status?: 'proposed' | 'accepted' | 'rejected' | 'superseded'
+  rationale?: string
+  alternativeTo?: string
+  supersedesId?: string
+  scope?: 'project' | 'team' | 'personal'
+  source?: string
+} {
+  const status = option(tokens, '--status') as
+    | 'proposed'
+    | 'accepted'
+    | 'rejected'
+    | 'superseded'
+    | undefined
+  return {
+    status,
+    rationale: option(tokens, '--rationale'),
+    alternativeTo: option(tokens, '--alternative-to'),
+    supersedesId: option(tokens, '--supersedes'),
+    scope: option(tokens, '--scope') as 'project' | 'team' | 'personal' | undefined,
+    source: option(tokens, '--source'),
+  }
 }
 
 export const call: LocalCommandCall = async (args: string) => {
@@ -101,7 +140,8 @@ export const call: LocalCommandCall = async (args: string) => {
   if (action === 'remember') {
     const input = rememberInput(tokens)
     if (!input) return { type: 'text', value: usage() }
-    const entry = appendTaskMemory(cwd, input.kind, input.text)
+    const { kind, text, ...meta } = input
+    const entry = appendProjectMemory(cwd, kind, text, meta)
     return {
       type: 'text',
       value: json
@@ -111,7 +151,7 @@ export const call: LocalCommandCall = async (args: string) => {
   }
 
   if (action === 'compress') {
-    const body = compressTaskMemory(cwd)
+    const body = compressProjectMemory(cwd)
     return {
       type: 'text',
       value: json

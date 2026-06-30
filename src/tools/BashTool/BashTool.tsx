@@ -16,6 +16,7 @@ import { backgroundExistingForegroundTask, markTaskNotified, registerForeground,
 import type { AgentId } from '../../types/ids.js';
 import type { AssistantMessage } from '../../types/message.js';
 import { parseForSecurity } from '../../utils/bash/ast.js';
+import { getCwd } from '../../utils/cwd.js';
 import { splitCommand_DEPRECATED, splitCommandWithOperators } from '../../utils/bash/commands.js';
 import { extractURCodeHints } from '../../utils/urCodeHints.js';
 import { detectCodeIndexingFromCommand } from '../../utils/codeIndexing.js';
@@ -41,6 +42,13 @@ import { isOutputLineTruncated } from '../../utils/terminal.js';
 import { buildLargeToolResultMessage, ensureToolResultsDir, generatePreview, getToolResultPath, PREVIEW_SIZE_BYTES } from '../../utils/toolResultStorage.js';
 import { userFacingName as fileEditUserFacingName } from '../FileEditTool/UI.js';
 import { trackGitOperations } from '../shared/gitOperationTracking.js';
+import {
+  executeBeforeCommandHooks,
+  executeAfterCommandHooks,
+  executeBeforeCommitHooks,
+  executeOnFailureHooks,
+} from '../../utils/hooks.js';
+import { appendProjectMemory } from '../../services/context/projectContextManifest.js';
 import { bashToolHasPermission, commandHasAnyCd, matchWildcardPattern, permissionRuleExtractPrefix } from './bashPermissions.js';
 import { interpretCommandResult } from './commandSemantics.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getSimplePrompt } from './prompt.js';
@@ -643,6 +651,22 @@ export const BashTool = buildTool({
     const isMainThread = !toolUseContext.agentId;
     const preventCwdChanges = !isMainThread;
     try {
+      const toolUseID = toolUseContext.toolUseId ?? parentMessage?.uuid ?? '';
+
+      // Lifecycle hook: before command runs
+      await executeBeforeCommandHooks(
+        input.command,
+        'bash',
+        getCwd(),
+        toolUseContext,
+        {
+          timeoutMs,
+          sandbox: shouldUseSandbox(input),
+          toolUseID,
+          signal: abortController.signal,
+        },
+      );
+
       // Use the new async generator version of runShellCommand
       const commandGenerator = runShellCommand({
         input,
@@ -682,6 +706,37 @@ export const BashTool = buildTool({
       // Get the final result from the generator's return value
       result = generatorResult.value;
       trackGitOperations(input.command, result.code, result.stdout);
+
+      // Lifecycle hook: after command finishes
+      await executeAfterCommandHooks(
+        input.command,
+        'bash',
+        getCwd(),
+        result.code,
+        result.stdout || '',
+        '',
+        toolUseContext,
+        {
+          toolUseID,
+          signal: abortController.signal,
+        },
+      );
+
+      // Lifecycle hook: before git commit completes
+      if (result.code === 0 && /\bgit\b.*\bcommit\b/.test(input.command)) {
+        const commitBlocked = await executeBeforeCommitHooks(
+          input.command,
+          toolUseContext,
+          {
+            toolUseID,
+            signal: abortController.signal,
+          },
+        );
+        if (commitBlocked.blocked) {
+          throw new Error('git commit blocked by BeforeCommit hook');
+        }
+      }
+
       const isInterrupt = result.interrupted && abortController.signal.reason === 'interrupt';
 
       // stderr is interleaved in stdout (merged fd) — result.stdout has both

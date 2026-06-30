@@ -13,6 +13,7 @@ import {
   discoverSkillDirsForPaths,
 } from '../../skills/loadSkillsDir.js'
 import type { ToolUseContext } from '../../Tool.js'
+import { appendProjectMemory } from '../../services/context/projectContextManifest.js'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { getCwd } from '../../utils/cwd.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -76,6 +77,10 @@ import {
   getPatchForEdit,
   preserveQuoteStyle,
 } from './utils.js'
+import {
+  executeBeforeEditHooks,
+  executeAfterEditHooks,
+} from '../../utils/hooks.js'
 
 // V8/Bun string length limit is ~2^30 characters (~1 billion). For typical
 // ASCII/Latin-1 files, 1 byte on disk = 1 character, so 1 GiB in stat bytes
@@ -469,17 +474,37 @@ export const FileEditTool = buildTool({
     }
 
     // 3. Use findActualString to handle quote normalization
-    const actualOldString =
+    let actualOldString =
       findActualString(originalFileContents, old_string) || old_string
 
     // Preserve curly quotes in new_string when the file uses them
-    const actualNewString = preserveQuoteStyle(
+    let actualNewString = preserveQuoteStyle(
       old_string,
       actualOldString,
       new_string,
     )
 
-    // 4. Generate patch
+    // 4.5 Lifecycle hooks around file edits
+    const toolUseID = toolUseContext.toolUseId ?? parentMessage.uuid
+    const beforeEdit = await executeBeforeEditHooks(
+      absoluteFilePath,
+      actualOldString,
+      actualNewString,
+      replace_all,
+      toolUseContext,
+      toolUseID,
+      toolUseContext.abortController.signal,
+    )
+    if (beforeEdit.updatedInput) {
+      if (beforeEdit.updatedInput.old_string !== undefined) {
+        actualOldString = beforeEdit.updatedInput.old_string
+      }
+      if (beforeEdit.updatedInput.new_string !== undefined) {
+        actualNewString = beforeEdit.updatedInput.new_string
+      }
+    }
+
+    // 4. Generate patch (after hook may have updated inputs)
     const { patch, updatedFile } = getPatchForEdit({
       filePath: absoluteFilePath,
       fileContents: originalFileContents,
@@ -490,6 +515,24 @@ export const FileEditTool = buildTool({
 
     // 5. Write to disk
     writeTextContent(absoluteFilePath, updatedFile, encoding, endings)
+
+    // 5.5 After-edit hook
+    const afterEdit = await executeAfterEditHooks(
+      absoluteFilePath,
+      actualOldString,
+      actualNewString,
+      replace_all,
+      toolUseContext,
+      toolUseID,
+      toolUseContext.abortController.signal,
+    )
+    if (afterEdit.memory) {
+      appendProjectMemory(getCwd(), afterEdit.memory.kind, afterEdit.memory.text, {
+        rationale: afterEdit.memory.rationale,
+        scope: afterEdit.memory.scope,
+        source: 'AfterEdit hook',
+      })
+    }
 
     // Notify LSP servers about file modification (didChange) and save (didSave)
     const lspManager = getLspServerManager()

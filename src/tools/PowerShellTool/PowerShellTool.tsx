@@ -37,6 +37,12 @@ import { shouldUseSandbox } from '../BashTool/shouldUseSandbox.js';
 import { BackgroundHint } from '../BashTool/UI.js';
 import { buildImageToolResult, isImageOutput, resetCwdIfOutsideProject, resizeShellImageOutput, stdErrAppendShellResetMessage, stripEmptyLines } from '../BashTool/utils.js';
 import { trackGitOperations } from '../shared/gitOperationTracking.js';
+import {
+  executeBeforeCommandHooks,
+  executeAfterCommandHooks,
+  executeBeforeCommitHooks,
+} from '../../utils/hooks.js';
+import { getCwd } from '../../utils/cwd.js';
 import { interpretCommandResult } from './commandSemantics.js';
 import { powershellToolHasPermission } from './powershellPermissions.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getPrompt } from './prompt.js';
@@ -450,7 +456,23 @@ export const PowerShellTool = buildTool({
       setToolJSX
     } = toolUseContext;
     const isMainThread = !toolUseContext.agentId;
+    const toolUseID = toolUseContext.toolUseId ?? _parentMessage?.uuid ?? '';
+    const timeoutMs = input.timeout || getDefaultTimeoutMs();
     let progressCounter = 0;
+
+    await executeBeforeCommandHooks(
+      input.command,
+      'powershell',
+      getCwd(),
+      toolUseContext,
+      {
+        timeoutMs,
+        sandbox: shouldUseSandbox(input),
+        toolUseID,
+        signal: abortController.signal,
+      },
+    );
+
     try {
       const commandGenerator = runPowerShellCommand({
         input,
@@ -502,6 +524,34 @@ export const PowerShellTool = buildTool({
       const isPreFlightSentinel = result.code === 0 && !result.stdout && result.stderr && !result.backgroundTaskId;
       if (!isPreFlightSentinel) {
         trackGitOperations(input.command, result.code, result.stdout);
+      }
+
+      await executeAfterCommandHooks(
+        input.command,
+        'powershell',
+        getCwd(),
+        result.code,
+        result.stdout || '',
+        result.stderr || '',
+        toolUseContext,
+        {
+          toolUseID,
+          signal: abortController.signal,
+        },
+      );
+
+      if (result.code === 0 && /\bgit\b.*\bcommit\b/.test(input.command)) {
+        const commitBlocked = await executeBeforeCommitHooks(
+          input.command,
+          toolUseContext,
+          {
+            toolUseID,
+            signal: abortController.signal,
+          },
+        );
+        if (commitBlocked.blocked) {
+          throw new Error('git commit blocked by BeforeCommit hook');
+        }
       }
 
       // Distinguish user-driven interrupt (new message submitted) from other
