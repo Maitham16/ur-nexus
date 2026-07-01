@@ -140,6 +140,24 @@ test('AskUserQuestion allows up to eight professional clarification options', ()
   expect(parsed.success).toBe(true)
 })
 
+test('AskUserQuestion infers labels from description-only option objects', () => {
+  const parsed = AskUserQuestionTool.inputSchema.safeParse({
+    question: 'References or related work to cite?',
+    options: [
+      { description: 'No citations needed' },
+      { description: 'Use README references' },
+      { description: 'Use docs references' },
+      { description: 'Use academic papers' },
+      { description: 'Use public benchmarks' },
+      { description: 'Ask me for sources' },
+    ],
+  })
+
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(parsed.data.questions[0]?.options[5]?.label).toBe('Ask me for sources')
+})
+
 test('AskUserQuestion rejects unbounded clarification option lists', () => {
   const parsed = AskUserQuestionTool.inputSchema.safeParse({
     question: 'Which option should fail?',

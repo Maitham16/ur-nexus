@@ -250,7 +250,7 @@ viewer mode.
 Example:
 
 ```text
-UR-AGENT v1.25.0 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.24.0 -> 1.25.0 available
+UR-AGENT v1.25.1 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.25.0 -> 1.25.1 available
 ```
 
 If a custom status-line hook is configured, UR-AGENT uses that hook output

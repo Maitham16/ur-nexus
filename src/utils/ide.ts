@@ -1,11 +1,12 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import axios from 'axios'
 import { execa } from 'execa'
+import { writeFileSync } from 'fs'
 import capitalize from 'lodash-es/capitalize.js'
 import memoize from 'lodash-es/memoize.js'
 import { createConnection } from 'net'
 import * as os from 'os'
-import { basename, join, sep as pathSeparator, resolve } from 'path'
+import { basename, dirname, join, sep as pathSeparator, resolve } from 'path'
 import { logEvent } from 'src/services/analytics/index.js'
 import { getIsScrollDraining, getOriginalCwd } from '../bootstrap/state.js'
 import { callIdeRpc } from '../services/mcp/client.js'
@@ -844,10 +845,17 @@ export function hasAccessToIDEExtensionDiffFeature(
   )
 }
 
+const PUBLIC_EXTENSION_ID = 'ur-agent.ur-inline-diffs'
+const INTERNAL_EXTENSION_ID = 'urhq.ur-internal'
+const BUNDLED_EXTENSION_RELATIVE_PATH = join(
+  'extensions',
+  'vscode-ur-inline-diffs',
+)
+
 const EXTENSION_ID =
   process.env.USER_TYPE === 'ant'
-    ? 'urhq.ur-internal'
-    : 'urhq.ur'
+    ? INTERNAL_EXTENSION_ID
+    : PUBLIC_EXTENSION_ID
 
 export async function isIDEExtensionInstalled(
   ideType: IdeType,
@@ -889,16 +897,7 @@ async function installIDEExtension(ideType: IdeType): Promise<string | null> {
       if (!version || lt(version, getURCodeVersion())) {
         // `code` may crash when invoked too quickly in succession
         await sleep(500)
-        const result = await execFileNoThrowWithCwd(
-          command,
-          ['--force', '--install-extension', 'urhq.ur'],
-          {
-            env: getInstallationEnv(),
-          },
-        )
-        if (result.code !== 0) {
-          throw new Error(`${result.code}: ${result.error} ${result.stderr}`)
-        }
+        await installBundledVSCodeExtension(command)
         version = getURCodeVersion()
       }
       return version
@@ -941,11 +940,169 @@ async function getInstalledVSCodeExtensionVersion(
   const lines = stdout?.split('\n') || []
   for (const line of lines) {
     const [extensionId, version] = line.split('@')
-    if (extensionId === 'urhq.ur' && version) {
+    if (extensionId === EXTENSION_ID && version) {
       return version
     }
   }
   return null
+}
+
+export function findBundledVSCodeExtensionDir(
+  invokedPath = process.argv[1] ?? '',
+): string | null {
+  const fs = getFsImplementation()
+  const starts = [
+    invokedPath ? dirname(resolve(invokedPath)) : null,
+    process.cwd(),
+  ].filter((value): value is string => Boolean(value))
+
+  for (const start of starts) {
+    let current = start
+    for (let depth = 0; depth < 12; depth++) {
+      const candidate = join(current, BUNDLED_EXTENSION_RELATIVE_PATH)
+      if (fs.existsSync(join(candidate, 'package.json'))) {
+        return candidate
+      }
+      const parent = dirname(current)
+      if (parent === current) break
+      current = parent
+    }
+  }
+  return null
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+function buildContentTypesXml(): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="json" ContentType="application/json"/>
+  <Default Extension="js" ContentType="application/javascript"/>
+  <Default Extension="svg" ContentType="image/svg+xml"/>
+  <Default Extension="vsixmanifest" ContentType="text/xml"/>
+</Types>
+`
+}
+
+function buildVsixManifest(manifest: {
+  name: string
+  displayName?: string
+  description?: string
+  version: string
+  publisher: string
+  engines?: { vscode?: string }
+  categories?: string[]
+}): string {
+  const categories = manifest.categories?.join(',') || 'Other'
+  const engine = manifest.engines?.vscode || '^1.92.0'
+  return `<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Language="en-US" Id="${escapeXml(manifest.name)}" Version="${escapeXml(manifest.version)}" Publisher="${escapeXml(manifest.publisher)}"/>
+    <DisplayName>${escapeXml(manifest.displayName ?? manifest.name)}</DisplayName>
+    <Description xml:space="preserve">${escapeXml(manifest.description ?? manifest.name)}</Description>
+    <Categories>${escapeXml(categories)}</Categories>
+    <Properties>
+      <Property Id="Microsoft.VisualStudio.Code.Engine" Value="${escapeXml(engine)}"/>
+    </Properties>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Code"/>
+  </Installation>
+  <Dependencies/>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/>
+  </Assets>
+</PackageManifest>
+`
+}
+
+function collectExtensionFiles(
+  dir: string,
+  prefix = '',
+): Record<string, Uint8Array> {
+  const fs = getFsImplementation()
+  const files: Record<string, Uint8Array> = {}
+  for (const entry of fs.readdirSync(dir)) {
+    if (entry.name === 'node_modules' || entry.name === '.git') continue
+    const fullPath = join(dir, entry.name)
+    const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) {
+      Object.assign(files, collectExtensionFiles(fullPath, relativePath))
+    } else if (entry.isFile()) {
+      files[`extension/${relativePath}`] = fs.readFileBytesSync(fullPath)
+    }
+  }
+  return files
+}
+
+export async function createBundledVSCodeExtensionVsix(): Promise<string> {
+  const extensionDir = findBundledVSCodeExtensionDir()
+  if (!extensionDir) {
+    throw new Error(
+      `Bundled VS Code extension not found at ${BUNDLED_EXTENSION_RELATIVE_PATH}.`,
+    )
+  }
+
+  const fs = getFsImplementation()
+  const manifestPath = join(extensionDir, 'package.json')
+  const manifest = jsonParse(
+    fs.readFileSync(manifestPath, { encoding: 'utf8' }),
+  ) as {
+    name: string
+    displayName?: string
+    description?: string
+    version: string
+    publisher: string
+    engines?: { vscode?: string }
+    categories?: string[]
+  }
+  if (!manifest?.name || !manifest.version || !manifest.publisher) {
+    throw new Error(`Invalid VS Code extension manifest at ${manifestPath}.`)
+  }
+
+  const { zipSync } = await import('fflate')
+  const encoder = new TextEncoder()
+  const files = collectExtensionFiles(extensionDir)
+  files['extension.vsixmanifest'] = encoder.encode(buildVsixManifest(manifest))
+  files['[Content_Types].xml'] = encoder.encode(buildContentTypesXml())
+
+  const tempVsixPath = join(
+    os.tmpdir(),
+    `ur-agent-${manifest.name}-${manifest.version}-${Date.now()}.vsix`,
+  )
+  writeFileSync(tempVsixPath, Buffer.from(zipSync(files, { level: 6 })))
+  return tempVsixPath
+}
+
+async function installBundledVSCodeExtension(command: string): Promise<void> {
+  const tempVsixPath = await createBundledVSCodeExtensionVsix()
+  try {
+    await sleep(500)
+    const result = await execFileNoThrowWithCwd(
+      command,
+      ['--force', '--install-extension', tempVsixPath],
+      {
+        env: getInstallationEnv(),
+      },
+    )
+    if (result.code !== 0) {
+      throw new Error(`${result.code}: ${result.error} ${result.stderr}`)
+    }
+  } finally {
+    try {
+      await getFsImplementation().unlink(tempVsixPath)
+    } catch {
+      // Ignore cleanup errors.
+    }
+  }
 }
 
 function getVSCodeIDECommandByParentProcess(): string | null {

@@ -221,7 +221,7 @@ Interactive sessions include a compact bottom status bar when stdout is a real
 terminal:
 
 ```text
-UR-AGENT v1.25.0 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.24.0 -> 1.25.0 available
+UR-AGENT v1.25.1 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.25.0 -> 1.25.1 available
 ```
 
 The bar is not rendered in non-interactive mode, CI, dumb terminals, or

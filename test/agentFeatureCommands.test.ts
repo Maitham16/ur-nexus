@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -297,6 +298,29 @@ describe('agent feature commands', () => {
     expect(commands).toContain('urInlineDiffs.open')
     expect(commands).toContain('urInlineDiffs.comment')
     expect(manifest.contributes.views.ur[0].id).toBe('urInlineDiffs')
+  })
+
+  test('VS Code inline diff extension packages as bundled VSIX', async () => {
+    const { createBundledVSCodeExtensionVsix } = await import('../src/utils/ide.js')
+    const { unzipSync } = await import('fflate')
+    const vsixPath = await createBundledVSCodeExtensionVsix()
+
+    try {
+      expect(existsSync(vsixPath)).toBe(true)
+      const files = unzipSync(new Uint8Array(readFileSync(vsixPath)))
+      expect(files['extension/package.json']).toBeDefined()
+      expect(files['extension/extension.js']).toBeDefined()
+      expect(files['extension.vsixmanifest']).toBeDefined()
+      const manifest = JSON.parse(
+        Buffer.from(files['extension/package.json']!).toString('utf8'),
+      )
+      expect(`${manifest.publisher}.${manifest.name}`).toBe(
+        'ur-agent.ur-inline-diffs',
+      )
+      expect(manifest.version).toBe('1.25.1')
+    } finally {
+      unlinkSync(vsixPath)
+    }
   })
 
   test('eval benchmark adapters import local SWE-bench style records', async () => {

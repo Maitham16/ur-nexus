@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.25.1
+
+- Fix VS Code extension installation to use the bundled UR-AGENT inline-diffs extension instead of the stale unpublished `urhq.ur` marketplace ID.
+- Harden AskUserQuestion normalization for description-only option objects and keep the eight-option schema in the production bundle.
+
 ## 1.25.0
 
 - Add legal multi-provider auth/provider management for subscription CLI, API-key, and local runtime access paths.

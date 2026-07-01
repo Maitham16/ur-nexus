@@ -36,7 +36,7 @@ function normalizeQuestionOptionInput(value: unknown): unknown {
   }
   const option = objectValue(value);
   if (!option) return value;
-  const label = typeof option.label === 'string' && option.label.trim() ? option.label.trim() : typeof option.value === 'string' && option.value.trim() ? option.value.trim() : '';
+  const label = typeof option.label === 'string' && option.label.trim() ? option.label.trim() : typeof option.value === 'string' && option.value.trim() ? option.value.trim() : typeof option.description === 'string' && option.description.trim() ? option.description.trim() : '';
   const description = typeof option.description === 'string' && option.description.trim() ? option.description.trim() : label;
   if (!label || !description) return value;
   return {

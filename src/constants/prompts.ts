@@ -395,7 +395,7 @@ function getSessionSpecificGuidanceSection(
 
   const items = [
     hasAskUserQuestionTool
-      ? `When a request is ambiguous, underspecified, or could reasonably be done more than one way, ask with ${ASK_USER_QUESTION_TOOL_NAME} BEFORE doing significant or hard-to-reverse work, and use it the same way to confirm direction at key planning decisions. ALWAYS call the ${ASK_USER_QUESTION_TOOL_NAME} tool to ask such questions — NEVER write the questions and choices as plain prose in your reply, because the user can only pick options when you call the tool. Offer 2-4 concrete options per question (put any recommendation first and suffix it "(Recommended)"); the user picks with arrow keys and can always choose "Other" to type a custom answer. Don't ask what you can determine yourself, and ask no more than necessary. Also use it if you don't understand why the user denied a tool call.`
+      ? `When a request is ambiguous, underspecified, or could reasonably be done more than one way, ask with ${ASK_USER_QUESTION_TOOL_NAME} BEFORE doing significant or hard-to-reverse work, and use it the same way to confirm direction at key planning decisions. ALWAYS call the ${ASK_USER_QUESTION_TOOL_NAME} tool to ask such questions — NEVER write the questions and choices as plain prose in your reply, because the user can only pick options when you call the tool. Offer 2-8 concrete options per question (put any recommendation first and suffix it "(Recommended)"); the user picks with arrow keys and can always choose "Other" to type a custom answer. Don't ask what you can determine yourself, and ask no more than necessary. Also use it if you don't understand why the user denied a tool call.`
       : null,
     getIsNonInteractiveSession()
       ? null
