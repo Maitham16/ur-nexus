@@ -16,41 +16,54 @@ export async function createURHQSubscriptionClient(
     model?: string
   },
 ): Promise<URHQ> {
+  async function doRequest(params: any, extraHeaders?: Record<string, string>) {
+    const clientRequestId = params?.headers?.['x-client-request-id']
+
+    // Spawn the CLI command with the prompt
+    // This is a simplified implementation - real implementation would
+    // handle streaming, tool calls, etc.
+    const data = {
+      id: `${providerId}-${randomUUID()}`,
+      type: 'message',
+      role: 'assistant',
+      model: params.model,
+      content: [{ type: 'text', text: 'Subscription CLI response' }],
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+      },
+    }
+
+    return {
+      data,
+      response: {
+        headers: clientRequestId ? { 'x-client-request-id': clientRequestId } : {},
+        ...extraHeaders,
+      },
+    }
+  }
+
   const messagesAPI = {
-    async create(params: any) {
-      // Spawn the CLI command with the prompt
-      // This is a simplified implementation - real implementation would
-      // handle streaming, tool calls, etc.
+    async create(params: any, options?: any) {
+      const { response, data } = await doRequest(params, options?.headers)
+
+      // Return an object with withResponse method, matching URHQ SDK pattern
       return {
-        id: `${providerId}-${randomUUID()}`,
-        type: 'message',
-        role: 'assistant',
-        model: params.model,
-        content: [{ type: 'text', text: 'Subscription CLI response' }],
-        stop_reason: 'end_turn',
-        stop_sequence: null,
-        usage: {
-          input_tokens: 0,
-          output_tokens: 0,
-          cache_creation_input_tokens: 0,
-          cache_read_input_tokens: 0,
-        },
+        ...data,
+        withResponse: () => ({
+          data,
+          response,
+          request_id: data.id,
+        }),
       }
     },
     async countTokens(params: any) {
       return {
         input_tokens: estimateTokenCount(params),
-      }
-    },
-    async withResponse(params: any) {
-      const clientRequestId = params?.headers?.['x-client-request-id']
-      const data = await messagesAPI.create(params)
-      return {
-        data,
-        request_id: data.id,
-        response: {
-          headers: clientRequestId ? { 'x-client-request-id': clientRequestId } : {},
-        },
       }
     },
   }
