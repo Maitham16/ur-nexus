@@ -2,6 +2,8 @@ import { isUpdateAvailable } from './updateNotice.js'
 
 export type StatusBarInput = {
   version: string
+  providerLabel?: string | null
+  authMode?: string | null
   model?: string | null
   mode?: string | null
   branch?: string | null
@@ -43,6 +45,8 @@ export function statusBarShouldDisplay({
 
 export function buildDefaultStatusBar({
   version,
+  providerLabel,
+  authMode,
   model,
   mode,
   branch,
@@ -54,6 +58,12 @@ export function buildDefaultStatusBar({
 }: StatusBarInput): string {
   const parts = [`UR-AGENT v${version}`]
 
+  if (providerLabel) {
+    parts.push(`Provider: ${providerLabel}`)
+  }
+  if (authMode) {
+    parts.push(`Auth: ${authMode}`)
+  }
   if (model) {
     parts.push(`model: ${model}`)
   }

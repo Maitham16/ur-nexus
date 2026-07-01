@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.0
+
+- Add legal multi-provider auth/provider management for subscription CLI, API-key, and local runtime access paths.
+- Add provider doctor/status/config commands, provider-aware status bar display, and explicit no-token-scraping safety policy.
+- Relax plan-mode clarification choices so professional redesign prompts do not fail when more than four options are supplied.
+
 ## 1.24.0
 
 ### Added

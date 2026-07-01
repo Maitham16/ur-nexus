@@ -45,7 +45,7 @@ ur -p \
   "summarize this project"
 ```
 
-## Models
+## Models And Providers
 
 The wrapper in `bin/ur.js` honors explicit model choices in this order:
 
@@ -82,7 +82,31 @@ Precedence: `--ollama-host` > `OLLAMA_HOST` env > `ollama.host` setting > `local
 `--discover-ollama` shows the picker every time but does **not** save the choice;
 use `ollama.host` in settings if you want plain `ur` to default to a LAN host.
 
-Models exposed by the chosen Ollama app are valid, including local models and Ollama Cloud-backed models. UR does not call provider APIs directly or manage model API keys.
+Models exposed by the chosen Ollama app are valid, including local models and
+Ollama Cloud-backed models.
+
+UR-AGENT also has explicit provider commands for legal access paths:
+
+```sh
+ur provider list
+ur provider status
+ur provider doctor
+ur auth chatgpt
+ur auth claude
+ur auth gemini
+ur auth antigravity
+ur config set provider ollama
+ur config set provider openai-compatible
+ur config set model <model>
+ur config set base_url <url>
+ur config set provider.fallback ollama
+```
+
+API modes are explicit and read keys only from environment variables:
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and
+`OPENROUTER_API_KEY`. Subscription modes call official CLIs such as Codex,
+Claude Code, Gemini CLI, or Antigravity where supported. UR-AGENT never scrapes
+browser sessions, extracts OAuth tokens, or bypasses provider restrictions.
 
 ## Project Instructions
 
@@ -197,7 +221,7 @@ Interactive sessions include a compact bottom status bar when stdout is a real
 terminal:
 
 ```text
-UR-AGENT v1.24.0 | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.23.3 -> 1.24.0 available
+UR-AGENT v1.25.0 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.24.0 -> 1.25.0 available
 ```
 
 The bar is not rendered in non-interactive mode, CI, dumb terminals, or

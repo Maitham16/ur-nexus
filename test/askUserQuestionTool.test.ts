@@ -122,6 +122,43 @@ test('AskUserQuestion is available without ToolSearch preloading', () => {
   expect(AskUserQuestionTool.shouldDefer).toBe(false)
 })
 
+test('AskUserQuestion allows up to eight professional clarification options', () => {
+  const parsed = AskUserQuestionTool.inputSchema.safeParse({
+    question: 'Which professional redesign direction should I take?',
+    options: [
+      'Minimal',
+      'Editorial',
+      'Dashboard',
+      'Enterprise',
+      'Portfolio',
+      'Commerce',
+      'Documentation',
+      'Experimental',
+    ],
+  })
+
+  expect(parsed.success).toBe(true)
+})
+
+test('AskUserQuestion rejects unbounded clarification option lists', () => {
+  const parsed = AskUserQuestionTool.inputSchema.safeParse({
+    question: 'Which option should fail?',
+    options: [
+      'One',
+      'Two',
+      'Three',
+      'Four',
+      'Five',
+      'Six',
+      'Seven',
+      'Eight',
+      'Nine',
+    ],
+  })
+
+  expect(parsed.success).toBe(false)
+})
+
 test('AskUserQuestion still rejects duplicate inferred option labels', () => {
   const parsed = AskUserQuestionTool.inputSchema.safeParse({
     question: 'Which duplicate option should fail?',

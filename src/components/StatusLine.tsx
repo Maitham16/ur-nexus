@@ -3,6 +3,7 @@ import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
+import { getProviderRuntimeInfo } from 'src/services/providers/providerRegistry.js';
 import { useAppState, useSetAppState } from 'src/state/AppState.js';
 import type { PermissionMode } from 'src/utils/permissions/PermissionMode.js';
 import { getIsRemoteMode, getKairosActive, getMainThreadAgentType, getOriginalCwd, getSdkBetas, getSessionId } from '../bootstrap/state.js';
@@ -53,6 +54,7 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
     mainLoopModel,
     exceeds200kTokens
   });
+  const providerRuntime = getProviderRuntimeInfo(settings);
   const outputStyleName = settings?.outputStyle || DEFAULT_OUTPUT_STYLE_NAME;
   const currentUsage = getCurrentUsage(messages);
   const contextWindowSize = getContextWindowForModel(runtimeModel, getSdkBetas());
@@ -82,6 +84,14 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
     model: {
       id: runtimeModel,
       display_name: renderModelName(runtimeModel)
+    },
+    provider: {
+      id: providerRuntime.provider,
+      display_name: providerRuntime.providerLabel,
+      auth_mode: providerRuntime.authLabel,
+      model: providerRuntime.model,
+      base_url: providerRuntime.baseUrl,
+      fallback: providerRuntime.fallback
     },
     workspace: {
       current_dir: getCwd(),
@@ -171,11 +181,14 @@ function StatusLineInner({
   // re-reads settings.json on every call, so another session's /model write
   // would leak into this session's statusline (urhqs/ur#37596).
   const mainLoopModel = useMainLoopModel();
+  const providerRuntime = getProviderRuntimeInfo(settings);
   const taskValues = Object.values(tasks);
   const taskRunningCount = taskValues.filter(task => task.status === 'running' || task.status === 'pending').length;
   const defaultStatusLineText = buildDefaultStatusBar({
     version: MACRO.VERSION,
-    model: renderModelName(mainLoopModel),
+    providerLabel: providerRuntime.providerLabel,
+    authMode: providerRuntime.authLabel,
+    model: providerRuntime.model ?? renderModelName(mainLoopModel),
     mode: permissionMode,
     branch,
     taskRunningCount,

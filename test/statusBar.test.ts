@@ -7,7 +7,9 @@ import {
 describe('UR-AGENT status bar', () => {
   test('formats compact runtime state', () => {
     const text = buildDefaultStatusBar({
-      version: '1.24.0',
+      version: '1.25.0',
+      providerLabel: 'ChatGPT/Codex',
+      authMode: 'subscription',
       model: 'modelH',
       mode: 'acceptEdits',
       branch: 'main',
@@ -16,7 +18,9 @@ describe('UR-AGENT status bar', () => {
       checksStatus: 'tests passed',
     })
 
-    expect(text).toContain('UR-AGENT v1.24.0')
+    expect(text).toContain('UR-AGENT v1.25.0')
+    expect(text).toContain('Provider: ChatGPT/Codex')
+    expect(text).toContain('Auth: subscription')
     expect(text).toContain('model: modelH')
     expect(text).toContain('mode: acceptEdits')
     expect(text).toContain('branch: main')
@@ -27,10 +31,10 @@ describe('UR-AGENT status bar', () => {
   test('shows update availability when known', () => {
     const text = buildDefaultStatusBar({
       version: '1.23.3',
-      latestVersion: '1.24.0',
+      latestVersion: '1.25.0',
     })
 
-    expect(text).toContain('Update: 1.23.3 -> 1.24.0 available')
+    expect(text).toContain('Update: 1.23.3 -> 1.25.0 available')
   })
 
   test('hides by default in CI, dumb terminals, and non-tty output', () => {

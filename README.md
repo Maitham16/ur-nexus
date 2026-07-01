@@ -21,9 +21,9 @@ multi-agent execution, test-first quality loops, CI repair loops, background
 agents, MCP servers, plugins, skills, memory, permission safety policy,
 project context packing, verification, and local model routing.
 
-UR sends model requests through the configured local Ollama app. That app can
-serve local models or Ollama Cloud-backed models, while UR itself stays out of
-provider API key management.
+UR-AGENT integrates official model access paths only: subscription CLIs,
+explicit API-key mode, and local OpenAI-compatible runtimes. It never scrapes
+browser sessions, extracts OAuth tokens, or bypasses provider restrictions.
 
 ## Why UR
 
@@ -38,6 +38,10 @@ handing work off to other tools or agents when needed.
   `ur -p` for automation-friendly output.
 - **Local model runtime.** Use any model exposed by Ollama, set a specific host
   with `--ollama-host`, or discover LAN Ollama servers with `--discover-ollama`.
+- **Legal provider routing.** Use `ur provider`, `ur auth chatgpt`,
+  `ur auth claude`, `ur auth gemini`, `ur auth antigravity`, and safe
+  `ur config set ...` commands to select official subscription, API, or local
+  providers without storing secrets in UR settings.
 - **Agent workflows.** Use `ur spec`, `ur arena`, `ur test-first`,
   `ur ci-loop`, `ur bg`, `ur workflow`, `ur crew`, and `ur automation` for
   structured work beyond a single chat turn.
@@ -143,6 +147,47 @@ Model selection precedence is `OLLAMA_MODEL`, then `UR_MODEL`, then the model
 router over the configured Ollama host. If model discovery fails, the built-in
 fallback is `qwen3-coder:480b-cloud`.
 
+### Legal Provider Auth
+
+UR-AGENT stores only safe provider preferences: provider name, model name,
+base URL, command path, fallback preference, and non-secret settings. API keys
+must stay in environment variables and subscription providers must authenticate
+through their official CLIs.
+
+```sh
+ur provider list
+ur provider status
+ur provider doctor
+ur auth chatgpt
+ur auth claude
+ur auth gemini
+ur auth antigravity
+ur config set provider codex-cli
+ur config set model qwen3-coder:480b-cloud
+ur config set base_url http://localhost:11434
+ur config set provider.fallback ollama
+```
+
+| Provider | Access type | Legal path |
+| --- | --- | --- |
+| ChatGPT/Codex | subscription | official Codex CLI login |
+| Claude Code | subscription | official Claude Code login |
+| Gemini CLI | subscription | official Gemini Code Assist login |
+| Antigravity | subscription | official Antigravity login, where supported |
+| OpenAI | API | `OPENAI_API_KEY` |
+| Anthropic Claude | API | `ANTHROPIC_API_KEY` |
+| Gemini | API | `GEMINI_API_KEY` |
+| OpenRouter | API/router | `OPENROUTER_API_KEY` |
+| Ollama | local | localhost Ollama runtime |
+| LM Studio | local | local OpenAI-compatible server |
+| llama.cpp | local | local OpenAI-compatible server |
+| vLLM | local/server | OpenAI-compatible server |
+
+Security policy: UR-AGENT never scrapes browser sessions, extracts OAuth
+tokens, bypasses subscription/quota/region/organization restrictions, proxies a
+consumer web session as an API, or claims support for a provider unless the
+official CLI/API path works. See [Provider Guide](docs/providers.md).
+
 ## Command Surface
 
 Run `ur --help` for the complete CLI reference. These commands are implemented
@@ -180,6 +225,12 @@ as first-class subcommands in the shipped CLI.
 | `ur eval bench` | Import local SWE-bench, Terminal-Bench, or Aider Polyglot exports. |
 | `ur model-doctor` | Inspect Ollama models and report likely agent capabilities. |
 | `ur model-route` | Recommend a local model for a task by capability fit. |
+| `ur provider` | List, check, and diagnose legal model provider adapters. |
+| `ur auth chatgpt` | Launch the official Codex CLI login for ChatGPT subscription access. |
+| `ur auth claude` | Launch the official Claude Code login flow. |
+| `ur auth gemini` | Use the official Gemini CLI login flow where supported. |
+| `ur auth antigravity` | Use the official Antigravity CLI login flow where supported. |
+| `ur config set` | Persist safe non-secret provider settings such as provider, model, base URL, command path, and fallback. |
 | `ur mcp` | Configure and manage Model Context Protocol servers. |
 | `ur plugin` | Install, update, enable, disable, and validate UR plugins that can add MCP tools, skills, templates, validators, language adapters, LSP servers, agents, hooks, output styles, and commands. |
 | `ur role-mode` | Install built-in Architect, Code, Debug, and Ask role modes. |
@@ -199,7 +250,7 @@ viewer mode.
 Example:
 
 ```text
-UR-AGENT v1.24.0 | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.23.3 -> 1.24.0 available
+UR-AGENT v1.25.0 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.24.0 -> 1.25.0 available
 ```
 
 If a custom status-line hook is configured, UR-AGENT uses that hook output

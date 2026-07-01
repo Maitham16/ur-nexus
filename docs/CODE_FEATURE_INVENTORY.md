@@ -977,7 +977,8 @@ The broader settings schema also covers:
 
 ## Model/provider behavior
 
-- This external build routes model calls through an Ollama provider shim.
+- This external build supports legal provider adapters for subscription CLIs,
+  explicit API-key providers, and local/OpenAI-compatible runtimes.
 - The Ollama router inspects local models and classifies likely coding/fast
   capabilities.
 - Auto-routing is on by default through `UR_OLLAMA_AUTO_ROUTE`.

@@ -4201,6 +4201,79 @@ async function run(): Promise<CommanderCommand> {
     } = await import('./cli/handlers/auth.js');
     await authLogout();
   });
+  auth.command('chatgpt').description('Sign in through the official Codex CLI for ChatGPT subscription access').option('--device-auth', 'Use Codex CLI device authorization when supported').option('--dry-run', 'Show the official command without launching it').option('--json', 'Output as JSON').action(async (options: {
+    deviceAuth?: boolean;
+    dryRun?: boolean;
+    json?: boolean;
+  }) => {
+    const {
+      providerAuthHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerAuthHandler('chatgpt', options);
+  });
+  auth.command('claude').description('Sign in through the official Claude Code CLI subscription login').option('--dry-run', 'Show the official command without launching it').option('--json', 'Output as JSON').action(async (options: {
+    dryRun?: boolean;
+    json?: boolean;
+  }) => {
+    const {
+      providerAuthHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerAuthHandler('claude', options);
+  });
+  auth.command('gemini').description('Use the official Gemini CLI login flow where supported').option('--dry-run', 'Show the official command without launching it').option('--json', 'Output as JSON').action(async (options: {
+    dryRun?: boolean;
+    json?: boolean;
+  }) => {
+    const {
+      providerAuthHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerAuthHandler('gemini', options);
+  });
+  auth.command('antigravity').description('Use the official Antigravity CLI login flow where supported').option('--dry-run', 'Show the official command without launching it').option('--json', 'Output as JSON').action(async (options: {
+    dryRun?: boolean;
+    json?: boolean;
+  }) => {
+    const {
+      providerAuthHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerAuthHandler('antigravity', options);
+  });
+
+  // ur provider
+  const provider = program.command('provider').description('Manage legal model providers').configureHelp(createSortedHelpConfig());
+  provider.command('list').description('List supported provider adapters and legal access paths').option('--json', 'Output as JSON').action(async (options: {
+    json?: boolean;
+  }) => {
+    const {
+      providerListHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerListHandler(options);
+  });
+  provider.command('status').description('Show selected provider readiness').option('--json', 'Output as JSON').action(async (options: {
+    json?: boolean;
+  }) => {
+    const {
+      providerStatusHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerStatusHandler(options);
+  });
+  provider.command('doctor [provider]').description('Check a provider without reading hidden credential files').option('--json', 'Output as JSON').action(async (providerArg: string | undefined, options: {
+    json?: boolean;
+  }) => {
+    const {
+      providerDoctorHandler
+    } = await import('./cli/handlers/providers.js');
+    await providerDoctorHandler(providerArg, options);
+  });
+
+  // ur config
+  const configCmd = program.command('config').description('Manage safe UR-AGENT settings').configureHelp(createSortedHelpConfig());
+  configCmd.command('set <key> <value...>').description('Set a safe non-secret setting: provider, provider.fallback, provider.command_path, model, or base_url').action(async (key: string, value: string[]) => {
+    const {
+      configSetHandler
+    } = await import('./cli/handlers/providers.js');
+    await configSetHandler(key, value);
+  });
 
   /**
    * Helper function to handle marketplace command errors consistently.

@@ -252,6 +252,28 @@ export const CUSTOMIZATION_SURFACES = [
   'mcp',
 ] as const
 
+const PROVIDER_SETTING_IDS = [
+  'codex-cli',
+  'claude-code-cli',
+  'gemini-cli',
+  'antigravity-cli',
+  'openai-api',
+  'anthropic-api',
+  'gemini-api',
+  'openrouter',
+  'openai-compatible',
+  'ollama',
+  'lmstudio',
+  'llama.cpp',
+  'vllm',
+] as const
+
+const NonSecretPreferenceSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+])
+
 export const SettingsSchema = lazySchema(() =>
   z
     .object({
@@ -376,6 +398,35 @@ export const SettingsSchema = lazySchema(() =>
         .string()
         .optional()
         .describe('Override the default model used by UR'),
+      provider: z
+        .object({
+          active: z
+            .enum(PROVIDER_SETTING_IDS)
+            .optional()
+            .describe('Active legal model provider adapter'),
+          model: z
+            .string()
+            .optional()
+            .describe('Selected model name for the active provider'),
+          baseUrl: z
+            .string()
+            .optional()
+            .describe('Provider base URL without embedded credentials'),
+          commandPath: z
+            .string()
+            .optional()
+            .describe('Explicit official CLI executable path for subscription providers'),
+          fallback: z
+            .union([z.enum(PROVIDER_SETTING_IDS), z.literal('disabled')])
+            .optional()
+            .describe('Optional fallback provider; UR asks before using it'),
+          preferences: z
+            .record(z.string(), NonSecretPreferenceSchema)
+            .optional()
+            .describe('Non-secret provider preferences only'),
+        })
+        .optional()
+        .describe('Legal provider configuration; credentials must stay in environment variables or official CLIs'),
       // Enterprise allowlist of models
       availableModels: z
         .array(z.string())

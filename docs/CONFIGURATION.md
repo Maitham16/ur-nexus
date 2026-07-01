@@ -2,15 +2,51 @@
 
 UR reads configuration from CLI flags, environment variables, and project or user settings files.
 
-## Model Provider
+## Model Providers
 
-UR runs models strictly through the local Ollama app. The default request endpoint is:
+UR-AGENT supports official provider access paths only:
+
+- Subscription/login CLI providers: Codex CLI, Claude Code CLI, Gemini CLI,
+  and Antigravity CLI where officially supported.
+- Explicit API providers: OpenAI, Anthropic, Gemini, OpenRouter, and
+  OpenAI-compatible endpoints.
+- Local providers: Ollama, LM Studio, llama.cpp, and vLLM OpenAI-compatible
+  server mode.
+
+UR-AGENT never scrapes browser sessions, extracts OAuth refresh tokens, reads
+hidden provider auth files, bypasses provider restrictions, or proxies consumer
+web sessions as APIs.
+
+The default local request endpoint is:
 
 ```text
 http://localhost:11434/api
 ```
 
 Any model exposed by that Ollama app can be used, including local models and Ollama Cloud-backed models. UR does not call remote provider APIs directly and does not manage model API keys.
+
+Provider configuration commands:
+
+```sh
+ur provider list
+ur provider doctor
+ur provider status
+ur config set provider ollama
+ur config set provider openai-compatible
+ur config set provider.fallback ollama
+ur config set model <model>
+ur config set base_url <url>
+```
+
+API keys are not written to UR settings. Set them in the environment when you
+explicitly choose API mode:
+
+```sh
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+GEMINI_API_KEY=...
+OPENROUTER_API_KEY=...
+```
 
 ### Reconfiguring the Ollama host
 
