@@ -21,6 +21,10 @@ export const PROVIDER_IDS = [
 ] as const
 
 export type ProviderId = (typeof PROVIDER_IDS)[number]
+export type ProviderAliasEntry = {
+  canonical: ProviderId
+  aliases: string[]
+}
 export type ProviderAccessType = 'subscription' | 'api' | 'local'
 export type ProviderAuthMode =
   | 'subscription'
@@ -153,7 +157,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     accessType: 'subscription',
     authMode: 'personal-login',
     legalPath: 'official Antigravity CLI login, where supported',
-    commandCandidates: ['antigravity', 'google-antigravity', 'ag'],
+    commandCandidates: ['agy', 'antigravity', 'google-antigravity', 'ag'],
     versionArgs: ['--version'],
     loginArgs: [],
   },
@@ -245,8 +249,87 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
   },
 }
 
+const PROVIDER_ALIAS_ENTRIES: ProviderAliasEntry[] = [
+  {
+    canonical: 'codex-cli',
+    aliases: ['chatgpt', 'codex', 'codex cli', 'openai codex', 'chatgpt codex'],
+  },
+  {
+    canonical: 'claude-code-cli',
+    aliases: ['claude', 'claude code', 'claude cli', 'anthropic claude'],
+  },
+  {
+    canonical: 'gemini-cli',
+    aliases: ['gemini', 'gemini cli', 'gemini code assist', 'google gemini cli'],
+  },
+  {
+    canonical: 'antigravity-cli',
+    aliases: ['antigravity', 'antigravity cli', 'agy', 'ag', 'google antigravity'],
+  },
+  {
+    canonical: 'openai-api',
+    aliases: ['openai', 'openai api'],
+  },
+  {
+    canonical: 'anthropic-api',
+    aliases: ['anthropic', 'anthropic claude api', 'claude api'],
+  },
+  {
+    canonical: 'gemini-api',
+    aliases: ['gemini api', 'google gemini api'],
+  },
+  {
+    canonical: 'openrouter',
+    aliases: ['openrouter api'],
+  },
+  {
+    canonical: 'openai-compatible',
+    aliases: ['compatible', 'openai compatible', 'openai compatible api'],
+  },
+  {
+    canonical: 'ollama',
+    aliases: ['ollama local'],
+  },
+  {
+    canonical: 'lmstudio',
+    aliases: ['lm studio', 'lm-studio'],
+  },
+  {
+    canonical: 'llama.cpp',
+    aliases: ['llama cpp', 'llamacpp', 'llama-cpp'],
+  },
+  {
+    canonical: 'vllm',
+    aliases: ['vllm server'],
+  },
+]
+
+function normalizeProviderInput(value: string): string {
+  return value.trim().toLowerCase().replace(/[_\s]+/g, '-')
+}
+
+const PROVIDER_ALIASES: Record<string, ProviderId> = Object.fromEntries(
+  PROVIDER_ALIAS_ENTRIES.flatMap(entry => [
+    [normalizeProviderInput(entry.canonical), entry.canonical],
+    [entry.canonical, entry.canonical],
+    ...entry.aliases.map(alias => [normalizeProviderInput(alias), entry.canonical] as const),
+  ]),
+) as Record<string, ProviderId>
+
 export function isProviderId(value: string): value is ProviderId {
   return (PROVIDER_IDS as readonly string[]).includes(value)
+}
+
+export function resolveProviderId(value: string): ProviderId | null {
+  const normalized = normalizeProviderInput(value)
+  if (isProviderId(normalized)) {
+    return normalized
+  }
+  return PROVIDER_ALIASES[normalized] ?? null
+}
+
+export function providerAliasesFor(id: ProviderId): string[] {
+  return PROVIDER_ALIAS_ENTRIES.find(entry => entry.canonical === id)?.aliases ?? []
 }
 
 export function getProviderDefinition(id: ProviderId): ProviderDefinition {
@@ -255,13 +338,19 @@ export function getProviderDefinition(id: ProviderId): ProviderDefinition {
 
 export function getActiveProviderSettings(settings: SettingsJson = getInitialSettings()): ProviderSettings {
   const configured = settings.provider ?? {}
-  const active = configured.active && isProviderId(configured.active) ? configured.active : 'ollama'
+  const active = configured.active ? resolveProviderId(configured.active) ?? 'ollama' : 'ollama'
+  const fallback =
+    configured.fallback === 'disabled'
+      ? 'disabled'
+      : configured.fallback
+        ? resolveProviderId(configured.fallback) ?? undefined
+        : undefined
   return {
     active,
     model: configured.model ?? settings.model,
     baseUrl: configured.baseUrl,
     commandPath: configured.commandPath,
-    fallback: configured.fallback,
+    fallback,
   }
 }
 
@@ -349,21 +438,23 @@ export function setSafeProviderConfig(
   let settings: SettingsJson
   try {
     if (key === 'provider') {
-      if (!isProviderId(trimmed)) {
+      const provider = resolveProviderId(trimmed)
+      if (!provider) {
         return {
           ok: false,
           message: `Unknown provider "${trimmed}". Run: ur provider list`,
         }
       }
-      settings = { provider: { active: trimmed } } as SettingsJson
+      settings = { provider: { active: provider } } as SettingsJson
     } else if (key === 'provider.fallback') {
-      if (trimmed !== 'disabled' && !isProviderId(trimmed)) {
+      const fallback = trimmed === 'disabled' ? 'disabled' : resolveProviderId(trimmed)
+      if (!fallback) {
         return {
           ok: false,
           message: `Unknown fallback provider "${trimmed}". Run: ur provider list`,
         }
       }
-      settings = { provider: { fallback: trimmed as ProviderId | 'disabled' } } as SettingsJson
+      settings = { provider: { fallback } } as SettingsJson
     } else if (key === 'provider.command_path') {
       settings = { provider: { commandPath: trimmed } } as SettingsJson
     } else if (key === 'model') {
@@ -385,7 +476,13 @@ export function setSafeProviderConfig(
       message: `Failed to write UR-AGENT settings: ${result.error.message}`,
     }
   }
-  return { ok: true, message: `Set ${key} to ${trimmed}.` }
+  const savedValue =
+    key === 'provider' || key === 'provider.fallback'
+      ? key === 'provider.fallback' && trimmed === 'disabled'
+        ? 'disabled'
+        : resolveProviderId(trimmed) ?? trimmed
+      : trimmed
+  return { ok: true, message: `Set ${key} to ${savedValue}.` }
 }
 
 function outputText(result: CommandResult): string {
@@ -543,11 +640,11 @@ async function checkSubscriptionProvider(
 ): Promise<void> {
   const commandPath = await resolveCommand(definition, settings, adapters)
   if (!commandPath) {
-    const command = definition.commandCandidates?.[0] ?? definition.id
+    const commands = definition.commandCandidates?.join(', ') ?? definition.id
     result.checks.push({
       name: 'cli',
       status: 'fail',
-      message: `${command} is not installed or not on PATH.`,
+      message: `No official CLI command found on PATH. Tried: ${commands}.`,
     })
     addFailure(result, 'CLI missing', `Install the official ${definition.displayName} CLI, then run ur auth ${authAliasForProvider(definition.id)}.`)
     return
@@ -823,12 +920,14 @@ export async function launchProviderAuth(
   }
   const commandPath = await resolveCommand(getProviderDefinition(provider), {}, {})
   if (!commandPath) {
+    const commands = getProviderDefinition(provider).commandCandidates?.join(', ') ?? provider
     return {
       ok: false,
-      message: `${authCommand.command} is not installed. Install the official CLI first.`,
+      message: `No official ${getProviderDefinition(provider).displayName} CLI command found. Tried: ${commands}. Install the official CLI first.`,
     }
   }
-  const printable = [authCommand.command, ...authCommand.args].join(' ')
+  const printableCommand = commandPath.split(/[\\/]/).pop() ?? authCommand.command
+  const printable = [printableCommand, ...authCommand.args].join(' ')
   if (options.dryRun || !process.stdin.isTTY || !process.stdout.isTTY) {
     return {
       ok: true,
@@ -854,6 +953,7 @@ export function formatProviderList(json = false): string {
   const providers = listProviders().map(provider => ({
     id: provider.id,
     name: provider.displayName,
+    aliases: providerAliasesFor(provider.id),
     accessType: provider.accessType,
     authMode: provider.authMode,
     legalPath: provider.legalPath,
@@ -862,10 +962,10 @@ export function formatProviderList(json = false): string {
     return JSON.stringify(providers, null, 2)
   }
   return [
-    'Provider             Access type        Legal path',
-    '---------------------------------------------------------',
+    'Provider | ID | Aliases | Access type | Legal path',
+    '--- | --- | --- | --- | ---',
     ...providers.map(provider =>
-      `${provider.name.padEnd(20)} ${provider.accessType.padEnd(17)} ${provider.legalPath}`,
+      `${provider.name} | ${provider.id} | ${provider.aliases.slice(0, 3).join(', ') || '-'} | ${provider.accessType} | ${provider.legalPath}`,
     ),
   ].join('\n')
 }

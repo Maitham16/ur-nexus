@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.25.3
+
+- Add provider alias resolution so `ur config set provider claude`,
+  `ur config set provider "Claude Code"`, and `ur provider doctor agy`
+  resolve to canonical provider IDs.
+- Detect the official Antigravity `agy` CLI command for auth and doctor checks.
+- Update provider documentation and status-bar examples for the 1.25.3 release.
+
 ## 1.25.2
 
 - Refresh public documentation so README, docs, static site, validation runbook,

@@ -81,10 +81,13 @@ describe('documentation coverage', () => {
       expect(doc).toContain('OpenAI-compatible')
     }
 
-    expect(readme).toContain('UR-AGENT v1.25.2')
-    expect(usage).toContain('UR-AGENT v1.25.2')
-    expect(site).toContain('Version 1.25.2')
-    expect(site).toContain('Update: 1.25.1 -&gt; 1.25.2 available')
+    expect(readme).toContain('ur config set provider claude')
+    expect(providers).toContain('ur provider doctor agy')
+    expect(providers).toContain('`antigravity-cli` | `antigravity`, `agy`')
+    expect(readme).toContain('UR-AGENT v1.25.3')
+    expect(usage).toContain('UR-AGENT v1.25.3')
+    expect(site).toContain('Version 1.25.3')
+    expect(site).toContain('Update: 1.25.2 -&gt; 1.25.3 available')
     expect(readme).toContain('Development build detected. To update, pull latest source or install from npm.')
     expect(features).toContain('AskUserQuestion')
     expect(features).toContain('up to eight concrete options')

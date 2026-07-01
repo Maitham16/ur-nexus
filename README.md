@@ -163,10 +163,19 @@ ur auth claude
 ur auth gemini
 ur auth antigravity
 ur config set provider codex-cli
+ur config set provider claude
+ur config set provider "Claude Code"
+ur config set provider antigravity
 ur config set model qwen3-coder:480b-cloud
 ur config set base_url http://localhost:11434
 ur config set provider.fallback ollama
 ```
+
+Provider config accepts canonical IDs and common aliases. Examples:
+`codex-cli`, `chatgpt`, `codex`, `claude-code-cli`, `claude`,
+`Claude Code`, `gemini-cli`, `gemini`, `antigravity-cli`, `antigravity`,
+`agy`, `ollama`, `lmstudio`, `LM Studio`, `llama.cpp`, and `vllm`.
+Use quotes for shell values with spaces.
 
 | Provider | Access type | Legal path |
 | --- | --- | --- |
@@ -250,7 +259,7 @@ viewer mode.
 Example:
 
 ```text
-UR-AGENT v1.25.2 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.25.1 -> 1.25.2 available
+UR-AGENT v1.25.3 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.25.2 -> 1.25.3 available
 ```
 
 If a custom status-line hook is configured, UR-AGENT uses that hook output

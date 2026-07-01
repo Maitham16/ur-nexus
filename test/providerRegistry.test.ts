@@ -3,7 +3,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   buildProviderAuthCommand,
   doctorProvider,
+  formatProviderList,
   getProviderRuntimeInfo,
+  resolveProviderId,
   type CommandResult,
   type ProviderDoctorAdapters,
 } from '../src/services/providers/providerRegistry.js'
@@ -30,6 +32,27 @@ function adapters(options: {
 }
 
 describe('provider registry legal access paths', () => {
+  test('resolves user-facing provider aliases to canonical IDs', () => {
+    expect(resolveProviderId('claude')).toBe('claude-code-cli')
+    expect(resolveProviderId('Claude Code')).toBe('claude-code-cli')
+    expect(resolveProviderId('chatgpt')).toBe('codex-cli')
+    expect(resolveProviderId('codex-cli')).toBe('codex-cli')
+    expect(resolveProviderId('agy')).toBe('antigravity-cli')
+    expect(resolveProviderId('LM Studio')).toBe('lmstudio')
+    expect(resolveProviderId('llama cpp')).toBe('llama.cpp')
+    expect(resolveProviderId('not-a-provider')).toBeNull()
+  })
+
+  test('provider list shows canonical IDs and aliases', () => {
+    const text = formatProviderList()
+
+    expect(text).toContain('ID')
+    expect(text).toContain('claude-code-cli')
+    expect(text).toContain('claude')
+    expect(text).toContain('antigravity-cli')
+    expect(text).toContain('agy')
+  })
+
   test('reports Codex CLI missing', async () => {
     const result = await doctorProvider('codex-cli', {
       adapters: adapters({ missing: ['codex'] }),
@@ -158,13 +181,26 @@ describe('provider registry legal access paths', () => {
 
   test('reports Antigravity CLI missing', async () => {
     const result = await doctorProvider('antigravity-cli', {
-      adapters: adapters({ missing: ['antigravity', 'google-antigravity', 'ag'] }),
+      adapters: adapters({ missing: ['agy', 'antigravity', 'google-antigravity', 'ag'] }),
       settings: {},
     })
 
     expect(result.ok).toBe(false)
     expect(result.failureReason).toBe('CLI missing')
   })
+
+  test('detects the official agy Antigravity CLI command', async () => {
+    const result = await doctorProvider('antigravity-cli', {
+      adapters: adapters({ missing: ['antigravity', 'google-antigravity', 'ag'] }),
+      settings: {},
+    })
+    const auth = buildProviderAuthCommand('antigravity-cli')
+
+    expect(result.ok).toBe(true)
+    expect(result.checks.find(check => check.name === 'cli')?.message).toContain('/usr/bin/agy')
+    expect(auth?.command).toBe('agy')
+  })
+
 
   test('reports Ollama unavailable and available', async () => {
     const unavailable = await doctorProvider('ollama', {

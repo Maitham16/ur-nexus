@@ -48,12 +48,34 @@ ur auth claude
 ur auth gemini
 ur auth antigravity
 ur config set provider codex-cli
+ur config set provider claude
+ur config set provider "Claude Code"
+ur config set provider antigravity
+ur provider doctor agy
 ur config set provider ollama
 ur config set provider openai-compatible
 ur config set model <model>
 ur config set base_url <url>
 ur config set provider.fallback ollama
 ```
+
+Provider config and doctor commands accept canonical IDs and common aliases:
+
+| Canonical ID | Accepted examples |
+| --- | --- |
+| `codex-cli` | `chatgpt`, `codex`, `openai codex` |
+| `claude-code-cli` | `claude`, `Claude Code`, `anthropic claude` |
+| `gemini-cli` | `gemini`, `gemini cli`, `gemini code assist` |
+| `antigravity-cli` | `antigravity`, `agy`, `ag`, `google antigravity` |
+| `openai-api` | `openai`, `openai api` |
+| `anthropic-api` | `anthropic`, `claude api` |
+| `gemini-api` | `gemini api`, `google gemini api` |
+| `openrouter` | `openrouter api` |
+| `openai-compatible` | `compatible`, `openai compatible` |
+| `ollama` | `ollama local` |
+| `lmstudio` | `LM Studio`, `lm-studio` |
+| `llama.cpp` | `llama cpp`, `llamacpp`, `llama-cpp` |
+| `vllm` | `vllm server` |
 
 `ur provider doctor` checks the selected provider. It reports installed/missing
 CLIs, official login status where available, API key presence for API providers,
@@ -73,7 +95,9 @@ fallback option.
   doctor warns that API-key mode may override subscription auth.
 - `gemini-cli`: launches only the official Gemini CLI flow. If the detected
   path is an unsupported personal-account path, UR-AGENT prints a clear error.
-- `antigravity-cli`: launches only an installed official CLI command where
+- `antigravity-cli`: detects official CLI commands including `agy --version`,
+  `antigravity --version`, `google-antigravity --version`, or `ag --version`
+  where installed. It launches only an installed official CLI command where
   supported; UR-AGENT does not invent flags.
 
 ## API and local providers
@@ -101,4 +125,3 @@ Local providers use their normal servers:
 - LM Studio: `http://localhost:1234/v1`
 - llama.cpp server mode: `http://localhost:8080/v1`
 - vLLM server mode: `http://localhost:8000/v1`
-

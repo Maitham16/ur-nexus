@@ -38,11 +38,21 @@ ur auth claude
 ur auth gemini
 ur auth antigravity
 ur config set provider ollama
+ur config set provider claude
+ur config set provider "Claude Code"
+ur config set provider antigravity
+ur provider doctor agy
 ur config set provider openai-compatible
 ur config set provider.fallback ollama
 ur config set model <model>
 ur config set base_url <url>
 ```
+
+Provider values accept canonical IDs and common aliases. Examples:
+`codex-cli`, `chatgpt`, `codex`, `claude-code-cli`, `claude`,
+`Claude Code`, `gemini-cli`, `gemini`, `antigravity-cli`, `antigravity`,
+`agy`, `ollama`, `lmstudio`, `LM Studio`, `llama.cpp`, and `vllm`.
+Values with spaces should be quoted in shell commands.
 
 API keys are not written to UR settings. Set them in the environment when you
 explicitly choose API mode:

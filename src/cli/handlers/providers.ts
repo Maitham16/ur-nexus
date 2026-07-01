@@ -5,9 +5,9 @@ import {
   formatProviderList,
   formatProviderStatus,
   getActiveProviderSettings,
-  isProviderId,
   launchProviderAuth,
   type ProviderId,
+  resolveProviderId,
   setSafeProviderConfig,
   doctorProvider,
 } from '../../services/providers/providerRegistry.js'
@@ -44,11 +44,12 @@ export async function providerDoctorHandler(
 ): Promise<void> {
   let provider: ProviderId | undefined
   if (providerArg) {
-    if (!isProviderId(providerArg)) {
+    const resolved = resolveProviderId(providerArg)
+    if (!resolved) {
       writeError(`Unknown provider "${providerArg}". Run: ur provider list`)
       process.exit(1)
     }
-    provider = providerArg
+    provider = resolved
   }
 
   const settings = getInitialSettings()

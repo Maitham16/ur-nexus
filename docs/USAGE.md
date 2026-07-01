@@ -100,11 +100,20 @@ ur auth claude
 ur auth gemini
 ur auth antigravity
 ur config set provider ollama
+ur config set provider claude
+ur config set provider "Claude Code"
+ur config set provider antigravity
+ur provider doctor agy
 ur config set provider openai-compatible
 ur config set model <model>
 ur config set base_url <url>
 ur config set provider.fallback ollama
 ```
+
+Provider values accept canonical IDs and common aliases. For example,
+`claude`, `Claude Code`, and `claude-code-cli` all select
+`claude-code-cli`; `antigravity`, `agy`, and `antigravity-cli` all select
+`antigravity-cli`.
 
 API modes are explicit and read keys only from environment variables:
 `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and
@@ -226,7 +235,7 @@ Interactive sessions include a compact bottom status bar when stdout is a real
 terminal:
 
 ```text
-UR-AGENT v1.25.2 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.25.1 -> 1.25.2 available
+UR-AGENT v1.25.3 | Provider: Ollama | Auth: local | model: qwen3-coder:480b-cloud | mode: ask | branch: main | tasks: idle | Update: 1.25.2 -> 1.25.3 available
 ```
 
 The bar is not rendered in non-interactive mode, CI, dumb terminals, or
