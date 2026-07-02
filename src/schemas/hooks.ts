@@ -78,12 +78,11 @@ function buildHookSchemas() {
       .positive()
       .optional()
       .describe('Timeout in seconds for this specific prompt evaluation'),
-    // @[MODEL LAUNCH]: Update the example model ID in the .describe() strings below (prompt + agent hooks).
     model: z
       .string()
       .optional()
       .describe(
-        'Model to use for this prompt hook (e.g., "ur-modelS-4-6"). If not specified, uses the default small fast model.',
+        'Provider-scoped model to use for this prompt hook. If not specified, uses the active provider/model selection.',
       ),
     statusMessage: z
       .string()
@@ -151,7 +150,7 @@ function buildHookSchemas() {
       .string()
       .optional()
       .describe(
-        'Model to use for this agent hook (e.g., "ur-modelS-4-6"). If not specified, uses modelH.',
+        'Provider-scoped model to use for this agent hook. If not specified, uses the active provider/model selection.',
       ),
     statusMessage: z
       .string()

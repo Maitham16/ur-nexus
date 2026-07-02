@@ -31,9 +31,7 @@ export const getInferenceProfileBackingModel = memoize(async function (
   return null
 })
 
-/**
- * Check if a model ID is a foundation model (e.g., "urhq.ur-modelS-4-5-20250929-v1:0")
- */
+/** Check if a model ID is a foundation model. */
 export function isFoundationModel(modelId: string): boolean {
   return modelId.startsWith('urhq.')
 }

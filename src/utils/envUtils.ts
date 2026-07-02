@@ -138,38 +138,12 @@ export function isInProtectedNamespace(): boolean {
   return false
 }
 
-// @[MODEL LAUNCH]: Add a Vertex region override env var for the new model.
-/**
- * Model prefix → env var for Vertex region overrides.
- * Order matters: more specific prefixes must come before less specific ones
- * (e.g., 'ur-modelO-4-1' before 'ur-modelO-4').
- */
-const VERTEX_REGION_OVERRIDES: ReadonlyArray<[string, string]> = [
-  ['ur-modelH-4-5', 'VERTEX_REGION_UR_MODELH_4_5'],
-  ['ur-3-5-modelH', 'VERTEX_REGION_UR_3_5_MODELH'],
-  ['ur-3-5-modelS', 'VERTEX_REGION_UR_3_5_MODELS'],
-  ['ur-3-7-modelS', 'VERTEX_REGION_UR_3_7_MODELS'],
-  ['ur-modelO-4-1', 'VERTEX_REGION_UR_4_1_MODELO'],
-  ['ur-modelO-4', 'VERTEX_REGION_UR_4_0_MODELO'],
-  ['ur-modelS-4-6', 'VERTEX_REGION_UR_4_6_MODELS'],
-  ['ur-modelS-4-5', 'VERTEX_REGION_UR_4_5_MODELS'],
-  ['ur-modelS-4', 'VERTEX_REGION_UR_4_0_MODELS'],
-]
-
 /**
  * Get the Vertex AI region for a specific model.
  * Different models may be available in different regions.
  */
 export function getVertexRegionForModel(
-  model: string | undefined,
+  _model: string | undefined,
 ): string | undefined {
-  if (model) {
-    const match = VERTEX_REGION_OVERRIDES.find(([prefix]) =>
-      model.startsWith(prefix),
-    )
-    if (match) {
-      return process.env[match[1]] || getDefaultVertexRegion()
-    }
-  }
   return getDefaultVertexRegion()
 }

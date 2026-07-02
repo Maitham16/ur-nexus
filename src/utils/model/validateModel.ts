@@ -9,7 +9,6 @@ import {
   APIConnectionError,
   AuthenticationError,
 } from '@urhq-ai/sdk'
-import { getModelStrings } from './modelStrings.js'
 
 // Cache valid models to avoid repeated API calls
 const validModelCache = new Map<string, boolean>()
@@ -149,15 +148,6 @@ function get3PFallbackSuggestion(model: string): string | undefined {
   if (getAPIProvider() === 'firstParty') {
     return undefined
   }
-  const lowerModel = model.toLowerCase()
-  if (lowerModel.includes('modelO-4-6') || lowerModel.includes('modelO_4_6')) {
-    return getModelStrings().modelO41
-  }
-  if (lowerModel.includes('modelS-4-6') || lowerModel.includes('modelS_4_6')) {
-    return getModelStrings().modelS45
-  }
-  if (lowerModel.includes('modelS-4-5') || lowerModel.includes('modelS_4_5')) {
-    return getModelStrings().modelS40
-  }
+  void model
   return undefined
 }

@@ -157,10 +157,12 @@ environment variables. API, local, and OpenAI-compatible server providers are
 UR-native runtimes and behave like Ollama: UR owns the conversation loop, tool
 loop, errors, and output.
 
-Subscription CLI integrations (Codex CLI, Claude Code, Gemini CLI, and
-Antigravity) are external app bridges. They are shown for diagnostics and can be
-checked with `ur provider doctor`, but they are not required and are disabled
-for normal runtime selection unless `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` is set.
+The default provider list includes a generic `subscription` access entry so the
+access type is visible, but this build does not invent subscription models or
+route through provider apps. If no independent subscription runtime is
+configured, that entry is marked unavailable. Subscription CLI integrations are
+external app bridges; they are diagnostics/opt-in only and are disabled for
+normal runtime selection unless `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` is set.
 
 ```sh
 ur provider list
@@ -185,6 +187,7 @@ Use quotes for shell values with spaces.
 
 | Provider | Access type | Runtime kind | Legal path |
 | --- | --- | --- | --- |
+| Subscription | subscription | unavailable until configured | independent subscription runtime only |
 | OpenAI API | API key | UR-native | `OPENAI_API_KEY` |
 | Claude API | API key | UR-native | `ANTHROPIC_API_KEY` |
 | Gemini API | API key | UR-native | `GEMINI_API_KEY` |
@@ -193,10 +196,7 @@ Use quotes for shell values with spaces.
 | LM Studio | local/server | UR-native | local OpenAI-compatible server |
 | llama.cpp | local/server | UR-native | local OpenAI-compatible server |
 | vLLM | local/server | UR-native | OpenAI-compatible server |
-| Codex CLI | subscription | external app bridge | official Codex CLI login |
-| Claude Code | subscription | external app bridge | official Claude Code login |
-| Gemini CLI | subscription | external app bridge | official Gemini Code Assist login |
-| Antigravity | subscription | external app bridge | official Antigravity login, where supported |
+| External app bridges | subscription | opt-in diagnostics | disabled unless explicitly enabled |
 
 #### Provider-first model selection
 
@@ -210,12 +210,13 @@ In the interactive app, `/model` is a two-step, provider-first picker:
    by source: `live` (discovered from the endpoint), `cache` (last discovery),
    or `static` (predefined). Local/server providers (Ollama, LM Studio,
    llama.cpp, vLLM) and OpenAI-compatible endpoints are discovered live; API
-   providers use their curated model list. External app bridges are shown but
-   blocked unless explicitly opted in.
+   providers use their curated model list. The generic `subscription` entry has
+   no models unless a real independent subscription backend is configured.
+   External app bridges are hidden unless explicitly opted in.
 
 Model lists never cross providers: OpenAI API, Claude API, Gemini API,
 OpenRouter, Ollama, and OpenAI-compatible local/server endpoints are separate
-access paths. API keys, local runtimes, and external app logins are not
+access paths. API keys, local runtimes, and subscription logins are not
 interchangeable. The provider/model pair is validated before it is saved and
 again before every request; changing provider clears an incompatible model.
 `ur config set provider X` warns and clears an incompatible model, and
@@ -237,6 +238,9 @@ identity line in the system prompt reflects it too:
 - **External app bridges** for subscription CLIs are disabled by default because
   they delegate the turn to another agent app. Opt in with
   `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` only when that behavior is intentional.
+- **Subscription** access does not list fake models. If no independent
+  subscription backend is configured, `/model` marks it unavailable and asks you
+  to choose a connected local, server, or API provider.
 
 Ollama is used only when Ollama is selected. There is no silent cross-provider
 fallback: if dispatch fails, UR reports the selected provider, model, and runtime

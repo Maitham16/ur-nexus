@@ -10,14 +10,11 @@ export function isBilledAsExtraUsage(
   if (isFastMode) return true
   if (model === null || !has1mContext(model)) return false
 
-  const m = model
-    .toLowerCase()
-    .replace(/\[1m\]$/, '')
-    .trim()
-  const ismodelO46 = m === 'modelO' || m.includes('modelO-4-6')
-  const ismodelS46 = m === 'modelS' || m.includes('modelS-4-6')
+  const m = model.toLowerCase().replace(/\[1m\]$/, '').trim()
+  const ismodelO = m === 'modelo'
+  const ismodelS = m === 'models'
 
-  if (ismodelO46 && ismodelO1mMerged) return false
+  if (ismodelO && ismodelO1mMerged) return false
 
-  return ismodelO46 || ismodelS46
+  return ismodelO || ismodelS
 }

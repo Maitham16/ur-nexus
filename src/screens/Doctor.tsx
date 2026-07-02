@@ -152,7 +152,7 @@ export function Doctor(t0) {
       upperLimit: TASK_MAX_OUTPUT_UPPER_LIMIT
     }, {
       name: "UR_CODE_MAX_OUTPUT_TOKENS",
-      ...getModelMaxOutputTokens("ur-modelO-4-6")
+      ...getModelMaxOutputTokens("active-provider-model")
     }];
     t4 = envVars.map(_temp8).filter(_temp9);
     $[5] = t4;

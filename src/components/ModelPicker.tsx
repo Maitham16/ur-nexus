@@ -298,7 +298,7 @@ export function ModelPicker({
           </Text>
           <Text dimColor>
             {headerText ??
-              'Switch between UR models. Applies to this session and future UR sessions. For other/previous model names, specify with --model.'}
+              'Switch between models for the active provider. Applies to this session and future UR sessions. For other provider-scoped model names, specify with --model.'}
           </Text>
           {sessionModel && (
             <Text dimColor>

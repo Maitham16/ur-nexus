@@ -145,7 +145,6 @@ export function unstable_v2_resumeSession(
   throw new Error('unstable_v2_resumeSession is not implemented in the SDK')
 }
 
-// @[MODEL LAUNCH]: Update the example model ID in this docstring.
 /**
  * V2 API - UNSTABLE
  * One-shot convenience function for single prompts.
@@ -154,7 +153,7 @@ export function unstable_v2_resumeSession(
  * @example
  * ```typescript
  * const result = await unstable_v2_prompt("What files are here?", {
- *   model: 'ur-modelS-4-6'
+ *   model: 'provider/model-id'
  * })
  * ```
  */

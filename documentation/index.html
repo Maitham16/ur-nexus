@@ -44,7 +44,7 @@
     <main id="content" class="content">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Version 1.30.5</p>
+          <p class="eyebrow">Version 1.30.6</p>
           <h1>UR-AGENT Documentation</h1>
           <p class="lead">A practical, tutorial-style reference for installing, configuring, automating, extending, and operating UR-AGENT.</p>
         </div>
@@ -63,7 +63,7 @@
         <div class="stat-grid">
           <article>
             <strong>Local-first runtime</strong>
-            <span>Use local Ollama/OpenAI-compatible runtimes for private and offline work, or explicitly select official subscription/API provider paths.</span>
+            <span>Use local Ollama/OpenAI-compatible runtimes for private and offline work, or explicitly select configured API provider paths. Subscription access stays visible but unavailable when no independent backend exists.</span>
           </article>
           <article>
             <strong>Interactive and headless</strong>
@@ -79,7 +79,7 @@
           </article>
           <article>
             <strong>Legal provider routing</strong>
-            <span><code>ur provider</code>, <code>ur auth</code>, and safe <code>ur config set</code> commands select official subscription, API, and local providers without storing secrets.</span>
+            <span><code>ur provider</code> and safe <code>ur config set</code> commands select API, local, server, or configured subscription providers without storing secrets.</span>
           </article>
           <article>
             <strong>Reliable repo editing</strong>
@@ -146,7 +146,7 @@ ur auth claude
 ur auth gemini
 ur auth antigravity
 ur provider doctor agy</code></pre>
-            <p>Codex CLI, Claude Code CLI, Gemini CLI, and Antigravity are optional external app bridges. UR checks CLI presence and official login status without reading hidden credential files, but normal runtime selection uses API, local, or OpenAI-compatible providers unless <code>UR_ENABLE_EXTERNAL_APP_PROVIDERS=1</code> is set.</p>
+            <p>External app bridges are optional diagnostics only. Normal runtime selection uses API, local, OpenAI-compatible, or a real configured subscription backend; the generic subscription entry does not expose fake models and stays unavailable when no independent backend exists.</p>
           </article>
           <article>
             <h3>API and local providers</h3>
@@ -159,7 +159,7 @@ ur config set provider.fallback ollama</code></pre>
           </article>
           <article>
             <h3>Status bar and updates</h3>
-            <pre><code>Ollama | llama3 | ask | main | update 1.30.5 available</code></pre>
+            <pre><code>Ollama | llama3 | ask | main | update 1.30.6 available</code></pre>
             <p>The interactive status bar shows only important runtime state: provider, model, mode, branch, active tasks, checks status when known, and update availability. It is hidden in CI, dumb terminals, and non-interactive mode.</p>
           </article>
         </div>

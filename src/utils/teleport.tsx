@@ -95,11 +95,7 @@ type TitleAndBranch = {
   branchName: string;
 };
 
-/**
- * Generates a title and branch name for a coding session using UR modelH
- * @param description The description/prompt for the session
- * @returns Promise<TitleAndBranch> The generated title and branch name
- */
+/** Generate a title and branch name for a coding session. */
 async function generateTitleAndBranch(description: string, signal: AbortSignal): Promise<TitleAndBranch> {
   const fallbackTitle = truncateToWidth(description, 75);
   const fallbackBranch = 'ur/task';

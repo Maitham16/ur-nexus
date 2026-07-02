@@ -1301,7 +1301,7 @@ export const AgentDefinitionSchema = lazySchema(() =>
         .string()
         .optional()
         .describe(
-          "Model alias (e.g. 'modelS', 'modelO', 'modelH') or full model ID (e.g. 'ur-modelO-4-5'). If omitted or 'inherit', uses the main model",
+          "Provider-scoped model ID. If omitted or 'inherit', uses the active provider/model selection.",
         ),
       mcpServers: z.array(AgentMcpServerSpecSchema()).optional(),
       criticalSystemReminder_EXPERIMENTAL: z

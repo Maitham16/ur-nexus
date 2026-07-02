@@ -67,6 +67,9 @@ function getStatusFromDoctorResult(
 }
 
 function getCredentialType(provider: ProviderDefinition): string {
+  if (provider.credentialType) {
+    return provider.credentialType
+  }
   switch (provider.authMode) {
     case 'subscription':
       return 'cli-login'

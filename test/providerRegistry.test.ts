@@ -62,6 +62,7 @@ describe('provider registry legal access paths', () => {
     expect(text).toContain('ID')
     expect(text).toContain('Access type')
     expect(text).toContain('Credential')
+    expect(text).toContain('subscription')
     expect(text).toContain('ollama')
     expect(text).toContain('openai-api')
     expect(text).not.toContain('claude-code-cli')
@@ -81,11 +82,14 @@ describe('provider registry legal access paths', () => {
 
   test('/model provider entries show access type and credential type', () => {
     const providers = listProviders()
+    const subscription = providers.find(provider => provider.id === 'subscription')
     const openai = providers.find(provider => provider.id === 'openai-api')
     const ollama = providers.find(provider => provider.id === 'ollama')
     const lmstudio = providers.find(provider => provider.id === 'lmstudio')
 
     expect(providers.some(provider => provider.runtimeKind === 'external-app')).toBe(false)
+    expect(subscription?.accessType).toBe('subscription')
+    expect(subscription?.credentialType).toBe('subscription-login')
     expect(openai?.accessType).toBe('api')
     expect(openai?.credentialType).toBe('api-key')
     expect(ollama?.accessType).toBe('local')
@@ -96,9 +100,13 @@ describe('provider registry legal access paths', () => {
 
   test('API and external app bridge providers are metadata-distinct when explicitly included', () => {
     const providers = listProviders({ includeExternalAppBridges: true })
+    const subscription = providers.find(provider => provider.id === 'subscription')
     const codex = providers.find(provider => provider.id === 'codex-cli')
     const openai = providers.find(provider => provider.id === 'openai-api')
 
+    expect(subscription?.accessType).toBe('subscription')
+    expect(subscription?.credentialType).toBe('subscription-login')
+    expect(subscription?.runtimeKind).toBe('ur-native')
     expect(codex?.accessType).toBe('subscription')
     expect(codex?.credentialType).toBe('cli-login')
     expect(codex?.runtimeKind).toBe('external-app')
@@ -318,6 +326,19 @@ describe('provider registry legal access paths', () => {
     expect(enabled.fallback?.message).toContain('will ask before using it')
   })
 
+  test('generic subscription provider is visible but unavailable without fake models', async () => {
+    const result = await doctorProvider('subscription', {
+      adapters: adapters(),
+      settings: {},
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.failureReason).toBe('subscription runtime unavailable')
+    expect(result.checks.find(check => check.name === 'subscription_runtime')?.message).toContain(
+      'No independent subscription runtime is configured',
+    )
+  })
+
   test('status bar runtime info includes provider auth display', () => {
     const info = getProviderRuntimeInfo({
       provider: {
@@ -400,11 +421,13 @@ describe('provider-scoped model listing', () => {
   })
 
   test('getDefaultModelForProvider returns provider default', () => {
+    const subscriptionDefault = getDefaultModelForProvider('subscription')
     const openaiDefault = getDefaultModelForProvider('openai-api')
     const anthropicDefault = getDefaultModelForProvider('anthropic-api')
     const geminiDefault = getDefaultModelForProvider('gemini-api')
     const geminiCliDefault = getDefaultModelForProvider('gemini-cli')
 
+    expect(subscriptionDefault).toBeUndefined()
     expect(openaiDefault).toBe('gpt-5.5')
     expect(anthropicDefault).toBe('claude-sonnet-5')
     expect(geminiDefault).toBe('gemini-3.5-flash')
@@ -413,9 +436,11 @@ describe('provider-scoped model listing', () => {
 
   test('getValidModelIdsForProvider returns only non-dynamic model IDs', () => {
     cacheProviderModelsForProvider('ollama', ['llama3', 'qwen3-coder'])
+    const subscriptionModels = getValidModelIdsForProvider('subscription')
     const openaiModels = getValidModelIdsForProvider('openai-api')
     const ollamaModels = getValidModelIdsForProvider('ollama')
 
+    expect(subscriptionModels).toEqual([])
     expect(openaiModels).toContain('gpt-5.5')
     expect(openaiModels).toContain('gpt-4o')
     expect(openaiModels).not.toContain('dynamic')

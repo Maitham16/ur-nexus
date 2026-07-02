@@ -7,6 +7,7 @@ import { which } from '../../utils/which.js'
 
 export const PROVIDER_IDS = [
   'ollama',
+  'subscription',
   'lmstudio',
   'llama.cpp',
   'vllm',
@@ -34,6 +35,7 @@ export type ProviderFamily =
   | 'openai'
   | 'google'
   | 'openai-compatible'
+  | 'subscription'
   | 'ollama'
 
 export type ProviderAliasEntry = {
@@ -42,12 +44,13 @@ export type ProviderAliasEntry = {
 }
 export type ProviderAccessType = 'subscription' | 'api' | 'local' | 'server'
 export type ProviderCredentialType =
+  | 'subscription-login'
   | 'cli-login'
   | 'api-key'
   | 'local-runtime'
   | 'openai-compatible-endpoint'
 export type ProviderModelDiscoveryType = 'static' | 'live'
-export type ProviderStatusCheckType = 'cli-login' | 'api-key' | 'endpoint'
+export type ProviderStatusCheckType = 'subscription-login' | 'cli-login' | 'api-key' | 'endpoint'
 export type ProviderModelListType = 'static' | 'ollama-tags' | 'openai-compatible-models'
 export type ProviderModelValidationType = 'static-list' | 'discovered-list'
 export type ProviderRuntimeKind = 'ur-native' | 'external-app'
@@ -172,6 +175,21 @@ export type ProviderModelDiscoveryResult = {
 const LOCALHOST_RE = /^(https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\]|::1)(:\d+)?(\/|$)/i
 
 export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
+  subscription: {
+    id: 'subscription',
+    displayName: 'Subscription',
+    statusBarName: 'Subscription',
+    accessType: 'subscription',
+    credentialType: 'subscription-login',
+    modelDiscoveryType: 'static',
+    statusCheck: 'subscription-login',
+    listModels: 'static',
+    validateModel: 'static-list',
+    runtimeKind: 'ur-native',
+    authMode: 'subscription',
+    legalPath: 'independent subscription runtime only',
+    accessPathLabel: 'subscription login; no external provider app bridge',
+  },
   'codex-cli': {
     id: 'codex-cli',
     displayName: 'Codex CLI',
@@ -406,6 +424,10 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
 
 const PROVIDER_ALIAS_ENTRIES: ProviderAliasEntry[] = [
   {
+    canonical: 'subscription',
+    aliases: ['subscriptions', 'subscription login'],
+  },
+  {
     canonical: 'codex-cli',
     aliases: ['chatgpt', 'codex', 'codex cli', 'openai codex', 'chatgpt codex'],
   },
@@ -533,6 +555,8 @@ export function getProviderRuntimeInfo(settings: SettingsJson = getInitialSettin
 export function getProviderRuntimeBackend(providerId: ProviderId | string): string {
   const provider = resolveProviderId(providerId)
   switch (provider) {
+    case 'subscription':
+      return 'subscription:unconfigured'
     case 'ollama':
       return 'ollama'
     case 'lmstudio':
@@ -565,6 +589,7 @@ export function getProviderRuntimeBackend(providerId: ProviderId | string): stri
 }
 
 const PROVIDER_FAMILIES: Record<ProviderId, ProviderFamily> = {
+  subscription: 'subscription',
   'anthropic-api': 'anthropic',
   'claude-code-cli': 'anthropic',
   'openai-api': 'openai',
@@ -612,6 +637,8 @@ export function getProviderAccessTypeLabel(provider: ProviderDefinition): string
 
 export function credentialTypeLabel(type: ProviderCredentialType): string {
   switch (type) {
+    case 'subscription-login':
+      return 'subscription login'
     case 'cli-login':
       return 'subscription login'
     case 'api-key':
@@ -641,6 +668,9 @@ export function getProviderRuntimeBlockReason(
     return `Unknown provider "${providerId}". Run: ur provider list`
   }
   const definition = getProviderDefinition(provider)
+  if (provider === 'subscription') {
+    return `Provider "subscription" represents subscription login, but no independent subscription runtime is configured. UR will not fake subscription models or call provider apps by default. Choose a local, server, or API provider with /model.`
+  }
   if (definition.runtimeKind !== 'external-app') {
     return null
   }
@@ -973,6 +1003,20 @@ async function checkSubscriptionProvider(
   adapters: ProviderDoctorAdapters,
   result: ProviderDoctorResult,
 ): Promise<void> {
+  if (definition.credentialType === 'subscription-login') {
+    result.checks.push({
+      name: 'subscription_runtime',
+      status: 'fail',
+      message: 'No independent subscription runtime is configured.',
+    })
+    addFailure(
+      result,
+      'subscription runtime unavailable',
+      'Run /model and choose a connected local, server, or API provider.',
+    )
+    return
+  }
+
   const commandPath = await resolveCommand(definition, settings, adapters)
   if (!commandPath) {
     const commands = definition.commandCandidates?.join(', ') ?? definition.id
@@ -1182,6 +1226,7 @@ export function getConnectionStatusFromDoctorResult(result: ProviderDoctorResult
   if (
     result.failureReason?.includes('not logged in') ||
     result.failureReason?.includes('not authenticated') ||
+    result.failureReason?.includes('subscription runtime unavailable') ||
     result.failureReason?.includes('API key missing') ||
     result.failureReason?.includes('endpoint') ||
     result.failureReason?.includes('HTTP')
@@ -1209,6 +1254,9 @@ export function formatProviderStatusLabel(
       }
       if (provider.credentialType === 'cli-login') {
         return 'subscription login connected'
+      }
+      if (provider.credentialType === 'subscription-login') {
+        return 'subscription connected'
       }
       return 'connected'
     case 'missing':
@@ -1449,6 +1497,10 @@ export type ProviderModelDefinition = {
 }
 
 export const PROVIDER_MODELS: Record<ProviderId, ProviderModelDefinition[]> = {
+  // Generic subscription entry. No models are listed because this build has no
+  // independent subscription backend. External app bridges keep their own
+  // scoped lists behind explicit opt-in.
+  subscription: [],
   // OpenAI subscription CLI (codex) - uses Codex CLI subscription login
   'codex-cli': [
     { id: 'codex/gpt-5.5', displayName: 'GPT-5.5 (Codex CLI)', description: 'Subscription model through official Codex CLI login', isDefault: true },

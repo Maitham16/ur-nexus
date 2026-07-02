@@ -283,66 +283,11 @@ export function getDefaultMainLoopModel(): ModelName {
   return parseUserSpecifiedModel(getDefaultMainLoopModelSetting())
 }
 
-// @[MODEL LAUNCH]: Add a canonical name mapping for the new model below.
 /**
- * Pure string-match that strips date/provider suffixes from a first-party model
- * name. Input must already be a 1P-format ID (e.g. 'ur-3-7-modelS-20250219',
- * 'us.urhq.ur-modelO-4-6-v1:0'). Does not touch settings, so safe at
- * module top-level (see MODEL_COSTS in modelCost.ts).
+ * Normalize a model name for legacy helpers that still compare model strings.
  */
 export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
-  name = name.toLowerCase()
-  // Special cases for UR 4+ models to differentiate versions
-  // Order matters: check more specific versions first (4-5 before 4)
-  if (name.includes('ur-modelO-4-6')) {
-    return 'ur-modelO-4-6'
-  }
-  if (name.includes('ur-modelO-4-5')) {
-    return 'ur-modelO-4-5'
-  }
-  if (name.includes('ur-modelO-4-1')) {
-    return 'ur-modelO-4-1'
-  }
-  if (name.includes('ur-modelO-4')) {
-    return 'ur-modelO-4'
-  }
-  if (name.includes('ur-modelS-4-6')) {
-    return 'ur-modelS-4-6'
-  }
-  if (name.includes('ur-modelS-4-5')) {
-    return 'ur-modelS-4-5'
-  }
-  if (name.includes('ur-modelS-4')) {
-    return 'ur-modelS-4'
-  }
-  if (name.includes('ur-modelH-4-5')) {
-    return 'ur-modelH-4-5'
-  }
-  // UR 3.x models use a different naming scheme (ur-3-{family})
-  if (name.includes('ur-3-7-modelS')) {
-    return 'ur-3-7-modelS'
-  }
-  if (name.includes('ur-3-5-modelS')) {
-    return 'ur-3-5-modelS'
-  }
-  if (name.includes('ur-3-5-modelH')) {
-    return 'ur-3-5-modelH'
-  }
-  if (name.includes('ur-3-modelO')) {
-    return 'ur-3-modelO'
-  }
-  if (name.includes('ur-3-modelS')) {
-    return 'ur-3-modelS'
-  }
-  if (name.includes('ur-3-modelH')) {
-    return 'ur-3-modelH'
-  }
-  const match = name.match(/(ur-(\d+-\d+-)?\w+)/)
-  if (match && match[1]) {
-    return match[1]
-  }
-  // Fall back to the original name if no pattern matches
-  return name
+  return name.toLowerCase()
 }
 
 /**
@@ -608,20 +553,14 @@ export function resolveSkillModelOverride(
   if (has1mContext(skillModel) || !has1mContext(currentModel)) {
     return skillModel
   }
-  // modelSupports1M matches on canonical IDs ('ur-modelO-4-6', 'ur-modelS-4');
-  // a bare 'modelO' alias falls through getCanonicalName unmatched. Resolve first.
+  // Resolve aliases before checking provider capability metadata.
   if (modelSupports1M(parseUserSpecifiedModel(skillModel))) {
     return skillModel + '[1m]'
   }
   return skillModel
 }
 
-const LEGACY_MODELO_FIRSTPARTY = [
-  'ur-modelO-4-20250514',
-  'ur-modelO-4-1-20250805',
-  'ur-modelO-4-0',
-  'ur-modelO-4-1',
-]
+const LEGACY_MODELO_FIRSTPARTY: string[] = []
 
 function isLegacymodelOFirstParty(model: string): boolean {
   return LEGACY_MODELO_FIRSTPARTY.includes(model)
@@ -647,7 +586,6 @@ export function modelDisplayString(model: ModelSetting): string {
   return model === resolvedModel ? resolvedModel : `${model} (${resolvedModel})`
 }
 
-// @[MODEL LAUNCH]: Add a marketing name mapping for the new model below.
 export function getMarketingNameForModel(modelId: string): string | undefined {
   if (getAPIProvider() === 'foundry' || getAPIProvider() === 'ollama') {
     // deployment ID is user-defined in Foundry, so it may have no relation to the actual model
@@ -657,38 +595,14 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   const has1m = modelId.toLowerCase().includes('[1m]')
   const canonical = getCanonicalName(modelId)
 
-  if (canonical.includes('ur-modelO-4-6')) {
-    return has1m ? 'modelO 4.6 (with 1M context)' : 'modelO 4.6'
+  if (canonical === 'modelo') {
+    return has1m ? 'modelO (with 1M context)' : 'modelO'
   }
-  if (canonical.includes('ur-modelO-4-5')) {
-    return 'modelO 4.5'
+  if (canonical === 'models') {
+    return has1m ? 'modelS (with 1M context)' : 'modelS'
   }
-  if (canonical.includes('ur-modelO-4-1')) {
-    return 'modelO 4.1'
-  }
-  if (canonical.includes('ur-modelO-4')) {
-    return 'modelO 4'
-  }
-  if (canonical.includes('ur-modelS-4-6')) {
-    return has1m ? 'modelS 4.6 (with 1M context)' : 'modelS 4.6'
-  }
-  if (canonical.includes('ur-modelS-4-5')) {
-    return has1m ? 'modelS 4.5 (with 1M context)' : 'modelS 4.5'
-  }
-  if (canonical.includes('ur-modelS-4')) {
-    return has1m ? 'modelS 4 (with 1M context)' : 'modelS 4'
-  }
-  if (canonical.includes('ur-3-7-modelS')) {
-    return 'UR 3.7 modelS'
-  }
-  if (canonical.includes('ur-3-5-modelS')) {
-    return 'UR 3.5 modelS'
-  }
-  if (canonical.includes('ur-modelH-4-5')) {
-    return 'modelH 4.5'
-  }
-  if (canonical.includes('ur-3-5-modelH')) {
-    return 'UR 3.5 modelH'
+  if (canonical === 'modelh') {
+    return 'modelH'
   }
 
   return undefined

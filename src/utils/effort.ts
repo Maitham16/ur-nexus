@@ -20,9 +20,7 @@ export const EFFORT_LEVELS = [
 
 export type EffortValue = EffortLevel | number
 
-// @[MODEL LAUNCH]: Add the new model to the allowlist if it supports the effort parameter.
 export function modelSupportsEffort(model: string): boolean {
-  const m = model.toLowerCase()
   if (isEnvTruthy(process.env.UR_CODE_ALWAYS_ENABLE_EFFORT)) {
     return true
   }
@@ -30,34 +28,14 @@ export function modelSupportsEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
-  // Supported by a subset of UR 4 models
-  if (m.includes('modelO-4-6') || m.includes('modelS-4-6')) {
-    return true
-  }
-  // Exclude any other known legacy models (modelH, older modelO/modelS variants)
-  if (m.includes('modelH') || m.includes('modelS') || m.includes('modelO')) {
-    return false
-  }
-
-  // IMPORTANT: Do not change the default effort support without notifying
-  // the model launch DRI and research. This is a sensitive setting that can
-  // greatly affect model quality and bashing.
-
-  // Default to true for unknown model strings on 1P.
-  // Do not default to true for 3P as they have different formats for their
-  // model strings (ex. urhqs/ur#30795)
+  void model
   return getAPIProvider() === 'firstParty'
 }
 
-// @[MODEL LAUNCH]: Add the new model to the allowlist if it supports 'max' effort.
-// Per API docs, 'max' effort is model-specific; unsupported models return an error.
 export function modelSupportsMaxEffort(model: string): boolean {
   const supported3P = get3PModelCapabilityOverride(model, 'max_effort')
   if (supported3P !== undefined) {
     return supported3P
-  }
-  if (model.toLowerCase().includes('modelO-4-6')) {
-    return true
   }
   if (process.env.USER_TYPE === 'ant' && resolveAntModel(model)) {
     return true
@@ -160,7 +138,7 @@ export function resolveAppliedEffort(
   }
   const resolved =
     envOverride ?? appStateEffortValue ?? getDefaultEffortForModel(model)
-  // API rejects 'max' on non-modelO-4.6 models — downgrade to 'high'.
+  // API rejects 'max' on models without max-effort support; downgrade to 'high'.
   if (resolved === 'max' && !modelSupportsMaxEffort(model)) {
     return 'high'
   }
@@ -305,9 +283,7 @@ export function getDefaultEffortForModel(
   // the model launch DRI and research. Default effort is a sensitive setting
   // that can greatly affect model quality and bashing.
 
-  // Default effort on modelO 4.6 to medium for Pro.
-  // Max/Team also get medium when the tengu_grey_step2 config is enabled.
-  if (model.toLowerCase().includes('modelO-4-6')) {
+  if (modelSupportsEffort(model)) {
     if (isProSubscriber()) {
       return 'medium'
     }

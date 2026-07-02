@@ -105,39 +105,21 @@ export function modelSupportsThinking(model: string): boolean {
       return true
     }
   }
-  // IMPORTANT: Do not change thinking support without notifying the model
-  // launch DRI and research. This can greatly affect model quality and bashing.
-  const canonical = getCanonicalName(model)
-  // 1P and Foundry: all UR 4+ models (including modelH 4.5)
   if (provider === 'foundry' || provider === 'firstParty') {
-    return !canonical.includes('ur-3-')
+    return true
   }
-  // 3P (Bedrock/Vertex): only modelO 4+ and modelS 4+
-  return canonical.includes('modelS-4') || canonical.includes('modelO-4')
+  return false
 }
 
-// @[MODEL LAUNCH]: Add the new model to the allowlist if it supports adaptive thinking.
 export function modelSupportsAdaptiveThinking(model: string): boolean {
   const supported3P = get3PModelCapabilityOverride(model, 'adaptive_thinking')
   if (supported3P !== undefined) {
     return supported3P
   }
-  const canonical = getCanonicalName(model)
   if (getAPIProvider() === 'ollama') {
     return false
   }
-  // Supported by a subset of UR 4 models
-  if (canonical.includes('modelO-4-6') || canonical.includes('modelS-4-6')) {
-    return true
-  }
-  // Exclude any other known legacy models (allowlist above catches 4-6 variants first)
-  if (
-    canonical.includes('modelO') ||
-    canonical.includes('modelS') ||
-    canonical.includes('modelH')
-  ) {
-    return false
-  }
+  void model
   // IMPORTANT: Do not change adaptive thinking support without notifying the
   // model launch DRI and research. This can greatly affect model quality and
   // bashing.

@@ -85,25 +85,13 @@ export function getExperimentAdvisorModels():
     : undefined
 }
 
-// @[MODEL LAUNCH]: Add the new model if it supports the advisor tool.
 // Checks whether the main loop model supports calling the advisor tool.
-export function modelSupportsAdvisor(model: string): boolean {
-  const m = model.toLowerCase()
-  return (
-    m.includes('modelO-4-6') ||
-    m.includes('modelS-4-6') ||
-    process.env.USER_TYPE === 'ant'
-  )
+export function modelSupportsAdvisor(_model: string): boolean {
+  return process.env.USER_TYPE === 'ant' || shouldIncludeFirstPartyOnlyBetas()
 }
 
-// @[MODEL LAUNCH]: Add the new model if it can serve as an advisor model.
-export function isValidAdvisorModel(model: string): boolean {
-  const m = model.toLowerCase()
-  return (
-    m.includes('modelO-4-6') ||
-    m.includes('modelS-4-6') ||
-    process.env.USER_TYPE === 'ant'
-  )
+export function isValidAdvisorModel(_model: string): boolean {
+  return process.env.USER_TYPE === 'ant' || shouldIncludeFirstPartyOnlyBetas()
 }
 
 export function getInitialAdvisorSetting(): string | undefined {

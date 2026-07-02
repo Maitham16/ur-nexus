@@ -4,11 +4,10 @@ import {
 } from '../utils/settings/settings.js'
 
 /**
- * Migrate users on removed fennec model aliases to their new modelO 4.6 aliases.
+ * Migrate users on removed fennec model aliases to generic model aliases.
  * - fennec-latest → modelO
  * - fennec-latest[1m] → modelO[1m]
  * - fennec-fast-latest → modelO[1m] + fast mode
- * - modelO-4-5-fast → modelO + fast mode
  *
  * Only touches userSettings. Reading and writing the same source keeps this
  * idempotent without a completion flag. Fennec aliases in project/local/policy
@@ -32,10 +31,7 @@ export function migrateFennecTomodelO(): void {
       updateSettingsForSource('userSettings', {
         model: 'modelO',
       })
-    } else if (
-      model.startsWith('fennec-fast-latest') ||
-      model.startsWith('modelO-4-5-fast')
-    ) {
+    } else if (model.startsWith('fennec-fast-latest')) {
       updateSettingsForSource('userSettings', {
         model: 'modelO[1m]',
         fastMode: true,

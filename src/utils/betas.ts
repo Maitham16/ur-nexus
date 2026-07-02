@@ -107,62 +107,36 @@ export function modelSupportsISP(model: string): boolean {
     return true
   }
   if (provider === 'firstParty') {
-    return !canonical.includes('ur-3-')
+    return true
   }
-  return (
-    canonical.includes('ur-modelO-4') || canonical.includes('ur-modelS-4')
-  )
+  return false
 }
 
-function vertexModelSupportsWebSearch(model: string): boolean {
-  const canonical = getCanonicalName(model)
-  // Web search only supported on UR 4.0+ models on Vertex
-  return (
-    canonical.includes('ur-modelO-4') ||
-    canonical.includes('ur-modelS-4') ||
-    canonical.includes('ur-modelH-4')
-  )
+function vertexModelSupportsWebSearch(_model: string): boolean {
+  return false
 }
 
-// Context management is supported on UR 4+ models
 export function modelSupportsContextManagement(model: string): boolean {
   if (getAPIProvider() === 'ollama') {
     return false
   }
-  const canonical = getCanonicalName(model)
+  void model
   const provider = getAPIProvider()
   if (provider === 'foundry') {
     return true
   }
   if (provider === 'firstParty') {
-    return !canonical.includes('ur-3-')
+    return true
   }
-  return (
-    canonical.includes('ur-modelO-4') ||
-    canonical.includes('ur-modelS-4') ||
-    canonical.includes('ur-modelH-4')
-  )
+  return false
 }
 
-// @[MODEL LAUNCH]: Add the new model ID to this list if it supports structured outputs.
 export function modelSupportsStructuredOutputs(model: string): boolean {
-  const canonical = getCanonicalName(model)
+  void model
   const provider = getAPIProvider()
-  // Structured outputs only supported on firstParty and Foundry (not Bedrock/Vertex yet)
-  if (provider !== 'firstParty' && provider !== 'foundry') {
-    return false
-  }
-  return (
-    canonical.includes('ur-modelS-4-6') ||
-    canonical.includes('ur-modelS-4-5') ||
-    canonical.includes('ur-modelO-4-1') ||
-    canonical.includes('ur-modelO-4-5') ||
-    canonical.includes('ur-modelO-4-6') ||
-    canonical.includes('ur-modelH-4-5')
-  )
+  return provider === 'firstParty' || provider === 'foundry'
 }
 
-// @[MODEL LAUNCH]: Add the new model if it supports auto mode (specifically PI probes) — ask in #proj-ur-safety-research.
 export function modelSupportsAutoMode(model: string): boolean {
   if (feature('TRANSCRIPT_CLASSIFIER')) {
     const m = getCanonicalName(model)
@@ -188,14 +162,10 @@ export function modelSupportsAutoMode(model: string): boolean {
       return true
     }
     if (process.env.USER_TYPE === 'ant') {
-      // Denylist: block known-unsupported ur models, allow everything else (ant-internal models etc.)
-      if (m.includes('ur-3-')) return false
-      // ur-*-4 not followed by -[6-9]: blocks bare -4, -4-YYYYMMDD, -4@, -4-0 thru -4-5
-      if (/ur-(modelO|modelS|modelH)-4(?!-[6-9])/.test(m)) return false
+      void m
       return true
     }
-    // External allowlist (firstParty already checked above).
-    return /^ur-(modelO|modelS)-4-6/.test(m)
+    return false
   }
   return false
 }

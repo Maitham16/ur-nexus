@@ -82,13 +82,14 @@ describe('documentation coverage', () => {
     }
 
     expect(readme).toContain('ur config set provider openai-api')
+    expect(readme).toContain('does not invent subscription models')
     expect(readme).toContain('external app bridge')
     expect(providers).toContain('ur provider doctor agy')
     expect(providers).toContain('`antigravity-cli` | `antigravity`, `agy`')
     expect(readme).toContain('Ollama | llama3 | ask | main')
-    expect(usage).toContain('Ollama | llama3 | ask | main | update 1.30.5 available')
-    expect(site).toContain('Version 1.30.5')
-    expect(site).toContain('update 1.30.5 available')
+    expect(usage).toContain('Ollama | llama3 | ask | main | update 1.30.6 available')
+    expect(site).toContain('Version 1.30.6')
+    expect(site).toContain('update 1.30.6 available')
     expect(readme).toContain('Development build detected. To update, pull latest source or install from npm.')
     expect(features).toContain('AskUserQuestion')
     expect(features).toContain('up to eight concrete options')

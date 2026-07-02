@@ -29,7 +29,6 @@ import {
   getDefaultMainLoopModelSetting,
   isNonCustommodelOModel,
 } from 'src/utils/model/model.js'
-import { getModelStrings } from 'src/utils/model/modelStrings.js'
 import { getAPIProvider } from 'src/utils/model/providers.js'
 import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
 import {
@@ -743,7 +742,7 @@ export function getAssistantMessageFromError(
   ) {
     return createAssistantAPIErrorMessage({
       content:
-        'UR modelO is not available with the UR Pro plan. If you have updated your subscription plan recently, run /logout and /login for the plan to take effect.',
+        'The selected model is not available with the current plan. Run /model and choose a valid model for the active provider.',
       error: 'invalid_request',
     })
   }
@@ -942,20 +941,7 @@ function get3PModelFallbackSuggestion(model: string): string | undefined {
   if (getAPIProvider() === 'firstParty') {
     return undefined
   }
-  // @[MODEL LAUNCH]: Add a fallback suggestion chain for the new model → previous version for 3P
-  const m = model.toLowerCase()
-  // If the failing model looks like an modelO 4.6 variant, suggest the default modelO (4.1 for 3P)
-  if (m.includes('modelO-4-6') || m.includes('modelO_4_6')) {
-    return getModelStrings().modelO41
-  }
-  // If the failing model looks like a modelS 4.6 variant, suggest modelS 4.5
-  if (m.includes('modelS-4-6') || m.includes('modelS_4_6')) {
-    return getModelStrings().modelS45
-  }
-  // If the failing model looks like a modelS 4.5 variant, suggest modelS 4
-  if (m.includes('modelS-4-5') || m.includes('modelS_4_5')) {
-    return getModelStrings().modelS40
-  }
+  void model
   return undefined
 }
 
@@ -1196,10 +1182,9 @@ export function getErrorMessageIfRefusal(
     ? `${API_ERROR_MESSAGE_PREFIX}: UR is unable to respond to this request. Try rephrasing the request or attempting a different approach.`
     : `${API_ERROR_MESSAGE_PREFIX}: UR is unable to respond to this request. Please double press esc to edit your last message or start a new session for UR to assist with a different task.`
 
-  const modelSuggestion =
-    model !== 'ur-modelS-4-20250514'
-      ? ' If you are seeing this refusal repeatedly, try running /model ur-modelS-4-20250514 to switch models.'
-      : ''
+  const modelSuggestion = getIsNonInteractiveSession()
+    ? ''
+    : ' If you are seeing this refusal repeatedly, run /model and choose another valid model for the active provider.'
 
   return createAssistantAPIErrorMessage({
     content: baseMessage + modelSuggestion,

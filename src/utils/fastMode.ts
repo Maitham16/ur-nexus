@@ -171,9 +171,10 @@ export function isFastModeSupportedByModel(
   if (!isFastModeEnabled()) {
     return false
   }
-  const model = modelSetting ?? getDefaultMainLoopModelSetting()
-  const parsedModel = parseUserSpecifiedModel(model)
-  return parsedModel.toLowerCase().includes('modelO-4-6')
+  void modelSetting
+  void getDefaultMainLoopModelSetting
+  void parseUserSpecifiedModel
+  return false
 }
 
 // --- Fast mode runtime state ---

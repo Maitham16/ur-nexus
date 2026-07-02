@@ -56,7 +56,7 @@ const featureGroups = [
   {
     title: 'Providers and auth',
     tags: ['subscription', 'API', 'local', 'status bar'],
-    text: 'UR-native API/local/OpenAI-compatible runtimes, optional external app bridge diagnostics, provider doctor checks, non-secret config, fallback hints, and provider-aware status-bar output.',
+    text: 'UR-native API/local/OpenAI-compatible runtimes, visible-but-unavailable subscription access when no independent backend exists, optional external app bridge diagnostics, provider doctor checks, non-secret config, fallback hints, and provider-aware status-bar output.',
     commands: ['ur provider list', 'ur provider status', 'ur provider doctor agy', 'ur config set provider openai-api', 'ur config set provider ollama'],
   },
   {
@@ -170,7 +170,7 @@ const commands = [
     name: 'auth',
     category: 'Ops',
     aliases: [],
-    summary: 'Launch official subscription CLI login flows for ChatGPT/Codex, Claude Code, Gemini CLI, and Antigravity where supported.',
+    summary: 'Launch optional external app bridge login flows only when those bridge diagnostics are explicitly enabled.',
     examples: ['ur auth chatgpt', 'ur auth claude', 'ur auth gemini', 'ur auth antigravity'],
   },
   {
@@ -590,8 +590,8 @@ const examples = [
   },
   {
     title: 'Provider setup',
-    text: 'Inspect legal provider paths, choose a local provider, and keep fallback explicit.',
-    code: 'ur provider list\nur provider doctor agy\nur config set provider openai-api\nur config set provider ollama\nur config set model qwen3-coder:480b-cloud\nur config set provider.fallback ollama',
+    text: 'Inspect legal provider paths, choose a local/API provider, and keep fallback explicit.',
+    code: 'ur provider list\nur provider doctor subscription\nur config set provider openai-api\nur config set provider ollama\nur config set model qwen3-coder:480b-cloud\nur config set provider.fallback ollama',
   },
   {
     title: 'PR handoff with self-review',

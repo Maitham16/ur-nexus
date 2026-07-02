@@ -32,66 +32,66 @@ export const UR_3_5_MODELH_CONFIG = {
 } as const satisfies ModelConfig
 
 export const UR_MODELH_4_5_CONFIG = {
-  firstParty: 'ur-modelH-4-5-20251001',
-  bedrock: 'us.urhq.ur-modelH-4-5-20251001-v1:0',
-  vertex: 'ur-modelH-4-5@20251001',
-  foundry: 'ur-modelH-4-5',
+  firstParty: 'modelH',
+  bedrock: 'modelH',
+  vertex: 'modelH',
+  foundry: 'modelH',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELS_4_CONFIG = {
-  firstParty: 'ur-modelS-4-20250514',
-  bedrock: 'us.urhq.ur-modelS-4-20250514-v1:0',
-  vertex: 'ur-modelS-4@20250514',
-  foundry: 'ur-modelS-4',
+  firstParty: 'modelS',
+  bedrock: 'modelS',
+  vertex: 'modelS',
+  foundry: 'modelS',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELS_4_5_CONFIG = {
-  firstParty: 'ur-modelS-4-5-20250929',
-  bedrock: 'us.urhq.ur-modelS-4-5-20250929-v1:0',
-  vertex: 'ur-modelS-4-5@20250929',
-  foundry: 'ur-modelS-4-5',
+  firstParty: 'modelS',
+  bedrock: 'modelS',
+  vertex: 'modelS',
+  foundry: 'modelS',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELO_4_CONFIG = {
-  firstParty: 'ur-modelO-4-20250514',
-  bedrock: 'us.urhq.ur-modelO-4-20250514-v1:0',
-  vertex: 'ur-modelO-4@20250514',
-  foundry: 'ur-modelO-4',
+  firstParty: 'modelO',
+  bedrock: 'modelO',
+  vertex: 'modelO',
+  foundry: 'modelO',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELO_4_1_CONFIG = {
-  firstParty: 'ur-modelO-4-1-20250805',
-  bedrock: 'us.urhq.ur-modelO-4-1-20250805-v1:0',
-  vertex: 'ur-modelO-4-1@20250805',
-  foundry: 'ur-modelO-4-1',
+  firstParty: 'modelO',
+  bedrock: 'modelO',
+  vertex: 'modelO',
+  foundry: 'modelO',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELO_4_5_CONFIG = {
-  firstParty: 'ur-modelO-4-5-20251101',
-  bedrock: 'us.urhq.ur-modelO-4-5-20251101-v1:0',
-  vertex: 'ur-modelO-4-5@20251101',
-  foundry: 'ur-modelO-4-5',
+  firstParty: 'modelO',
+  bedrock: 'modelO',
+  vertex: 'modelO',
+  foundry: 'modelO',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELO_4_6_CONFIG = {
-  firstParty: 'ur-modelO-4-6',
-  bedrock: 'us.urhq.ur-modelO-4-6-v1',
-  vertex: 'ur-modelO-4-6',
-  foundry: 'ur-modelO-4-6',
+  firstParty: 'modelO',
+  bedrock: 'modelO',
+  vertex: 'modelO',
+  foundry: 'modelO',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
 export const UR_MODELS_4_6_CONFIG = {
-  firstParty: 'ur-modelS-4-6',
-  bedrock: 'us.urhq.ur-modelS-4-6',
-  vertex: 'ur-modelS-4-6',
-  foundry: 'ur-modelS-4-6',
+  firstParty: 'modelS',
+  bedrock: 'modelS',
+  vertex: 'modelS',
+  foundry: 'modelS',
   ollama: DEFAULT_OLLAMA_MODEL,
 } as const satisfies ModelConfig
 
@@ -112,7 +112,7 @@ export const ALL_MODEL_CONFIGS = {
 
 export type ModelKey = keyof typeof ALL_MODEL_CONFIGS
 
-/** Union of all canonical first-party model IDs, e.g. 'ur-modelO-4-6' | 'ur-modelS-4-5-20250929' | … */
+/** Union of legacy model aliases retained for compatibility. */
 export type CanonicalModelId =
   (typeof ALL_MODEL_CONFIGS)[ModelKey]['firstParty']
 

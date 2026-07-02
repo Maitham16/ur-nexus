@@ -380,8 +380,6 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   return payg3pOptions
 }
 
-// @[MODEL LAUNCH]: Add the new model ID to the appropriate family pattern below
-// so the "newer version available" hint works correctly.
 /**
  * Map a full model name to its family alias and the marketing name of the
  * version the alias currently resolves to. Used to detect when a user has
@@ -392,33 +390,21 @@ function getModelFamilyInfo(
 ): { alias: string; currentVersionName: string } | null {
   const canonical = getCanonicalName(model)
 
-  // modelS family
-  if (
-    canonical.includes('ur-modelS-4-6') ||
-    canonical.includes('ur-modelS-4-5') ||
-    canonical.includes('ur-modelS-4-') ||
-    canonical.includes('ur-3-7-modelS') ||
-    canonical.includes('ur-3-5-modelS')
-  ) {
+  if (canonical.includes('models')) {
     const currentName = getMarketingNameForModel(getDefaultmodelSModel())
     if (currentName) {
       return { alias: 'modelS', currentVersionName: currentName }
     }
   }
 
-  // modelO family
-  if (canonical.includes('ur-modelO-4')) {
+  if (canonical.includes('modelo')) {
     const currentName = getMarketingNameForModel(getDefaultmodelOModel())
     if (currentName) {
       return { alias: 'modelO', currentVersionName: currentName }
     }
   }
 
-  // modelH family
-  if (
-    canonical.includes('ur-modelH') ||
-    canonical.includes('ur-3-5-modelH')
-  ) {
+  if (canonical.includes('modelh')) {
     const currentName = getMarketingNameForModel(getDefaultmodelHModel())
     if (currentName) {
       return { alias: 'modelH', currentVersionName: currentName }
@@ -429,7 +415,7 @@ function getModelFamilyInfo(
 }
 
 /**
- * Returns a ModelOption for a known UR model with a human-readable
+ * Returns a ModelOption for a known model with a human-readable
  * label, and an upgrade hint if a newer version is available via the alias.
  * Returns null if the model is not recognized.
  */
@@ -513,7 +499,7 @@ export function getModelOptions(fastMode = false): ModelOption[] {
       getMergedmodelO1MOption(fastMode),
     ])
   } else {
-    // Try to show a human-readable label for known UR models, with an
+    // Try to show a human-readable label for known models, with an
     // upgrade hint if the alias now resolves to a newer version.
     const knownOption = getKnownModelOption(customModel)
     if (knownOption) {

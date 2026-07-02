@@ -218,9 +218,8 @@ function EffortOptionLabel(t0) {
  * - Everyone else: mark as dismissed so it never shows
  */
 export function shouldShowEffortCallout(model: string): boolean {
-  // Only show for modelO 4.6 for now
   const parsed = parseUserSpecifiedModel(model);
-  if (!parsed.toLowerCase().includes('modelO-4-6')) {
+  if (!parsed.toLowerCase().includes('modelo')) {
     return false;
   }
   const config = getGlobalConfig();

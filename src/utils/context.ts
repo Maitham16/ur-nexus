@@ -1,9 +1,7 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { CONTEXT_1M_BETA_HEADER } from '../constants/betas.js'
-import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { resolveAntModel } from './model/antModels.js'
-import { getCanonicalName } from './model/model.js'
 import { getModelCapability } from './model/modelCapabilities.js'
 import { getOllamaContextLengthForModel } from './model/ollamaModels.js'
 import { getAPIProvider, type APIProvider } from './model/providers.js'
@@ -42,7 +40,6 @@ export function has1mContext(model: string): boolean {
   return /\[1m\]/i.test(model)
 }
 
-// @[MODEL LAUNCH]: Update this pattern if the new model supports 1M context
 export function modelSupports1M(model: string): boolean {
   if (is1mContextDisabled()) {
     return false
@@ -50,8 +47,8 @@ export function modelSupports1M(model: string): boolean {
   if (getAPIProvider() === 'ollama') {
     return false
   }
-  const canonical = getCanonicalName(model)
-  return canonical.includes('ur-modelS-4') || canonical.includes('modelO-4-6')
+  const cap = getModelCapability(model)
+  return Boolean(cap?.max_input_tokens && cap.max_input_tokens >= 1_000_000)
 }
 
 export function getContextWindowForModel(
@@ -119,14 +116,12 @@ export function getmodelS1mExpTreatmentEnabled(model: string): boolean {
   if (is1mContextDisabled()) {
     return false
   }
-  // Only applies to modelS 4.6 without an explicit [1m] suffix
+  // No provider-independent model family gets implicit 1M context in this build.
   if (has1mContext(model)) {
     return false
   }
-  if (!getCanonicalName(model).includes('modelS-4-6')) {
-    return false
-  }
-  return getGlobalConfig().clientDataCache?.['coral_reef_modelS'] === 'true'
+  void model
+  return false
 }
 
 /**
@@ -168,8 +163,8 @@ export function getModelMaxOutputTokens(model: string): {
   default: number
   upperLimit: number
 } {
-  let defaultTokens: number
-  let upperLimit: number
+  let defaultTokens = MAX_OUTPUT_TOKENS_DEFAULT
+  let upperLimit = MAX_OUTPUT_TOKENS_UPPER_LIMIT
 
   if (process.env.USER_TYPE === 'ant') {
     const antModel = resolveAntModel(model.toLowerCase())
@@ -178,44 +173,6 @@ export function getModelMaxOutputTokens(model: string): {
       upperLimit = antModel.upperMaxTokensLimit ?? MAX_OUTPUT_TOKENS_UPPER_LIMIT
       return { default: defaultTokens, upperLimit }
     }
-  }
-
-  const m = getCanonicalName(model)
-
-  if (m.includes('modelO-4-6')) {
-    defaultTokens = 64_000
-    upperLimit = 128_000
-  } else if (m.includes('modelS-4-6')) {
-    defaultTokens = 32_000
-    upperLimit = 128_000
-  } else if (
-    m.includes('modelO-4-5') ||
-    m.includes('modelS-4') ||
-    m.includes('modelH-4')
-  ) {
-    defaultTokens = 32_000
-    upperLimit = 64_000
-  } else if (m.includes('modelO-4-1') || m.includes('modelO-4')) {
-    defaultTokens = 32_000
-    upperLimit = 32_000
-  } else if (m.includes('ur-3-modelO')) {
-    defaultTokens = 4_096
-    upperLimit = 4_096
-  } else if (m.includes('ur-3-modelS')) {
-    defaultTokens = 8_192
-    upperLimit = 8_192
-  } else if (m.includes('ur-3-modelH')) {
-    defaultTokens = 4_096
-    upperLimit = 4_096
-  } else if (m.includes('3-5-modelS') || m.includes('3-5-modelH')) {
-    defaultTokens = 8_192
-    upperLimit = 8_192
-  } else if (m.includes('3-7-modelS')) {
-    defaultTokens = 32_000
-    upperLimit = 64_000
-  } else {
-    defaultTokens = MAX_OUTPUT_TOKENS_DEFAULT
-    upperLimit = MAX_OUTPUT_TOKENS_UPPER_LIMIT
   }
 
   const cap = getModelCapability(model)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.30.6
+
+- Restore a visible `subscription` access entry in provider lists without
+  exposing provider app bridges as normal runtimes.
+- Keep subscription selection honest: no fake UR model IDs are listed, and the
+  generic subscription entry is blocked until a real independent subscription
+  runtime exists.
+
 ## 1.30.5
 
 - Hide external app bridge providers from normal `/model`, `/provider`, and

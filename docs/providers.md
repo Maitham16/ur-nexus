@@ -26,6 +26,7 @@ variables only when the user explicitly selects API mode.
 
 | Provider | Access type | Runtime kind | Runtime backend | Legal path |
 | --- | --- | --- | --- | --- |
+| Subscription | subscription | unavailable until configured | `subscription:unconfigured` | independent subscription runtime only |
 | OpenAI API | API | UR-native | `api:openai` | `OPENAI_API_KEY` |
 | Claude API | API | UR-native | `api:anthropic` | `ANTHROPIC_API_KEY` |
 | Gemini API | API | UR-native | `api:gemini` | `GEMINI_API_KEY` |
@@ -34,10 +35,7 @@ variables only when the user explicitly selects API mode.
 | LM Studio | local/server | UR-native | `openai-compatible:lmstudio` | local OpenAI-compatible server |
 | llama.cpp | local/server | UR-native | `openai-compatible:llama.cpp` | local OpenAI-compatible server |
 | vLLM | local/server | UR-native | `openai-compatible:vllm` | OpenAI-compatible server |
-| Codex CLI | subscription | external app bridge | `subscription-cli:codex` | official Codex CLI login |
-| Claude Code | subscription | external app bridge | `subscription-cli:claude-code` | official Claude Code login |
-| Gemini CLI | subscription | external app bridge | `subscription-cli:gemini` | official Gemini Code Assist login |
-| Antigravity | subscription | external app bridge | `subscription-cli:antigravity` | official Antigravity login, where supported |
+| External app bridges | subscription | opt-in diagnostics | `subscription-cli:*` | disabled unless explicitly enabled |
 
 ## Commands
 
@@ -62,7 +60,7 @@ ur config set provider.fallback ollama
 
 ## Provider-scoped model selection
 
-UR-AGENT shows providers first, then only models available for the selected provider. This prevents incompatible model/provider pairs and keeps API-key, local/server, and external app bridge model lists separate.
+UR-AGENT shows providers first, then only models available for the selected provider. This prevents incompatible model/provider pairs and keeps API-key, local/server, subscription, and external app bridge model lists separate. The generic `subscription` entry has no models unless a real independent subscription runtime is configured; UR does not list fake subscription models.
 
 ## Runtime provider routing
 
@@ -75,6 +73,9 @@ through that provider's backend:
   they delegate turns to another agent app. If deliberately enabled with
   `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1`, failures still remain provider-scoped
   and never fall back to Ollama.
+- **Subscription** access is visible but blocked when no independent
+  subscription backend exists. It does not expose fake UR model IDs and does not
+  call external provider apps by default.
 
 The selected provider determines:
 - Which backend receives your requests

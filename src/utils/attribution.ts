@@ -68,9 +68,8 @@ export function getAttributionTexts(): AttributionTexts {
     return { commit: '', pr: '' }
   }
 
-  // @[MODEL LAUNCH]: Update the hardcoded fallback model name below (guards against codename leaks).
-  // For internal repos, use the real model name. For external repos,
-  // fall back to "UR modelO 4.6" for unrecognized models to avoid leaking codenames.
+  // For internal repos, use the real model name. For external repos, keep the
+  // fallback generic to avoid leaking or inventing model names.
   const model = getMainLoopModel()
   const isKnownPublicModel = getPublicModelDisplayName(model) !== null
   const modelName =
@@ -285,12 +284,12 @@ async function getTranscriptStats(): Promise<{
 /**
  * Get enhanced PR attribution text with UR contribution stats.
  *
- * Format: "🤖 Generated with UR (93% 3-shotted by ur-modelO-4-5)"
+ * Format: "Generated with UR (93% 3-shotted)"
  *
  * Rules:
  * - Shows UR contribution percentage from commit attribution
  * - Shows N-shotted where N is the prompt count (1-shotted, 2-shotted, etc.)
- * - Shows short model name (e.g., ur-modelO-4-5)
+ * - Avoids inventing provider model IDs
  * - Returns default attribution if stats can't be computed
  *
  * @param getAppState Function to get the current AppState (from command context)
@@ -367,7 +366,7 @@ export async function getEnhancedPRAttribution(
     return defaultAttribution
   }
 
-  // Build the enhanced attribution: "🤖 Generated with UR (93% 3-shotted by ur-modelO-4-5, 2 memories recalled)"
+  // Build the enhanced attribution with contribution and memory stats.
   const memSuffix =
     memoryAccessCount > 0
       ? `, ${memoryAccessCount} ${memoryAccessCount === 1 ? 'memory' : 'memories'} recalled`

@@ -46,7 +46,7 @@ information. Do not blow your cover.
 
 NEVER include in commit messages or PR descriptions:
 - Internal model codenames (animal names like Capybara, Tengu, etc.)
-- Unreleased model version numbers (e.g., modelO-4-7, modelS-4-8)
+- Unreleased model version numbers
 - Internal repo or project names (e.g., ur-cli-internal, urhqs/…)
 - Internal tooling, Slack channels, or short links (e.g., go/cc, #ur-…)
 - The phrase "UR" or any mention that you are an AI
@@ -63,9 +63,9 @@ GOOD:
 
 BAD (never write these):
 - "Fix bug found while testing with UR Capybara"
-- "1-shotted by ur-modelO-4-6"
+- "1-shotted by internal-model-id"
 - "Generated with UR"
-- "Co-Authored-By: UR modelO 4.6 <…>"
+- "Co-Authored-By: UR internal model <…>"
 `
   }
   return ''

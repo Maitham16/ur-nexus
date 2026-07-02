@@ -433,9 +433,7 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Allowlist of models that users can select. ' +
-            'Accepts family aliases ("modelO" allows any modelO version), ' +
-            'version prefixes ("modelO-4-5" allows only that version), ' +
-            'and full model IDs. ' +
+            'Accepts exact provider-scoped model IDs and provider-specific aliases. ' +
             'If undefined, all models are available. If empty array, only the default model is available. ' +
             'Typically set in managed settings by enterprise administrators.',
         ),
@@ -443,8 +441,8 @@ export const SettingsSchema = lazySchema(() =>
         .record(z.string(), z.string())
         .optional()
         .describe(
-          'Override mapping from URHQ model ID (e.g. "ur-modelO-4-6") to provider-specific ' +
-            'model ID (e.g. a Bedrock inference profile ARN). Typically set in managed settings by ' +
+          'Override mapping from an existing model ID to a provider-specific ' +
+            'model ID. Typically set in managed settings by ' +
             'enterprise administrators.',
         ),
       // Whether to automatically approve all MCP servers in the project

@@ -81,7 +81,7 @@ export const isInternalModelRepo = sequential(async (): Promise<boolean> => {
  * Converts internal model variants to their public equivalents.
  */
 export function sanitizeSurfaceKey(surfaceKey: string): string {
-  // Split surface key into surface and model parts (e.g., "cli/modelO-4-5-fast" -> ["cli", "modelO-4-5-fast"])
+  // Split surface key into surface and model parts.
   const slashIndex = surfaceKey.lastIndexOf('/')
   if (slashIndex === -1) {
     return surfaceKey
@@ -94,25 +94,11 @@ export function sanitizeSurfaceKey(surfaceKey: string): string {
   return `${surface}/${sanitizedModel}`
 }
 
-// @[MODEL LAUNCH]: Add a mapping for the new model ID so git commit trailers show the public name.
 /**
  * Sanitize a model name to its public equivalent.
- * Maps internal variants to their public names based on model family.
  */
 export function sanitizeModelName(shortName: string): string {
-  // Map internal variants to public equivalents based on model family
-  if (shortName.includes('modelO-4-6')) return 'ur-modelO-4-6'
-  if (shortName.includes('modelO-4-5')) return 'ur-modelO-4-5'
-  if (shortName.includes('modelO-4-1')) return 'ur-modelO-4-1'
-  if (shortName.includes('modelO-4')) return 'ur-modelO-4'
-  if (shortName.includes('modelS-4-6')) return 'ur-modelS-4-6'
-  if (shortName.includes('modelS-4-5')) return 'ur-modelS-4-5'
-  if (shortName.includes('modelS-4')) return 'ur-modelS-4'
-  if (shortName.includes('modelS-3-7')) return 'ur-modelS-3-7'
-  if (shortName.includes('modelH-4-5')) return 'ur-modelH-4-5'
-  if (shortName.includes('modelH-3-5')) return 'ur-modelH-3-5'
-  // Unknown models get a generic name
-  return 'ur'
+  return shortName.replace(/[^a-zA-Z0-9._:/-]/g, '').slice(0, 80) || 'provider-model'
 }
 
 /**
@@ -180,7 +166,7 @@ export function getClientSurface(): string {
 
 /**
  * Build a surface key that includes the model name.
- * Format: "surface/model" (e.g., "cli/ur-modelS")
+ * Format: "surface/model" (e.g., "cli/provider-model")
  */
 export function buildSurfaceKey(surface: string, model: ModelName): string {
   return `${surface}/${getCanonicalName(model)}`

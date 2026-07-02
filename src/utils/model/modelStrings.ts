@@ -42,10 +42,9 @@ async function getBedrockModelStrings(): Promise<ModelStrings> {
   if (!profiles?.length) {
     return fallback
   }
-  // Each config's firstParty ID is the canonical substring we search for in the
-  // user's inference profile list (e.g. "ur-modelO-4-6" matches
-  // "eu.urhq.ur-modelO-4-6-v1"). Fall back to the hardcoded bedrock ID
-  // when no matching profile is found.
+  // Each config's firstParty alias is the canonical substring we search for in
+  // the user's inference profile list. Fall back to the configured provider
+  // value when no matching profile is found.
   const out = {} as ModelStrings
   for (const key of MODEL_KEYS) {
     const needle = ALL_MODEL_CONFIGS[key].firstParty
@@ -56,9 +55,8 @@ async function getBedrockModelStrings(): Promise<ModelStrings> {
 
 /**
  * Layer user-configured modelOverrides (from settings.json) on top of the
- * provider-derived model strings. Overrides are keyed by canonical first-party
- * model ID (e.g. "ur-modelO-4-6") and map to arbitrary provider-specific
- * strings — typically Bedrock inference profile ARNs.
+ * provider-derived model strings. Overrides are keyed by legacy model alias and
+ * map to arbitrary provider-specific strings.
  */
 function applyModelOverrides(ms: ModelStrings): ModelStrings {
   const overrides = getInitialSettings().modelOverrides

@@ -115,6 +115,11 @@ back to Ollama, Claude API does not fall back to Claude Code, and local/server
 providers do not leak cloud model lists. Use `ur provider status` to inspect the
 active provider, model, access type, and runtime backend.
 
+The default provider list keeps subscription access visible as `subscription`,
+but it is marked unavailable unless a real independent subscription runtime is
+configured. UR does not list fake subscription models and does not call provider
+apps by default.
+
 Provider values accept canonical IDs and common aliases. For example,
 `openai-api`, `anthropic-api`, `gemini-api`, `openrouter`, `ollama`,
 `lmstudio`, `llama.cpp`, and `vllm` are normal UR-native runtime providers.
@@ -124,12 +129,11 @@ opt-in is enabled.
 
 API modes are explicit and read keys only from environment variables:
 `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and
-`OPENROUTER_API_KEY`. Codex CLI, Claude Code, Gemini CLI, and Antigravity are
-external app bridges, not required dependencies; they are blocked from normal
-runtime selection unless `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` is set. UR-AGENT
-never scrapes browser sessions, extracts OAuth tokens, or bypasses provider
-restrictions. OpenAI-compatible local or cloud endpoints use `base_url` plus
-`model`.
+`OPENROUTER_API_KEY`. Provider app bridges are not required dependencies; they
+are blocked from normal runtime selection unless
+`UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` is set. UR-AGENT never scrapes browser
+sessions, extracts OAuth tokens, or bypasses provider restrictions.
+OpenAI-compatible local or cloud endpoints use `base_url` plus `model`.
 
 Use `/model` in an interactive session to select provider first and model
 second. OpenAI API, Claude API, Gemini API, OpenRouter, Ollama, and
@@ -249,7 +253,7 @@ Interactive sessions include a compact bottom status bar when stdout is a real
 terminal:
 
 ```text
-Ollama | llama3 | ask | main | update 1.30.5 available
+Ollama | llama3 | ask | main | update 1.30.6 available
 ```
 
 The bar is not rendered in non-interactive mode, CI, dumb terminals, or

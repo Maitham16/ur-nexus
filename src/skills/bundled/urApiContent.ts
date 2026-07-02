@@ -28,20 +28,16 @@ import typescriptURApiReadme from './ur-api/typescript/ur-api/README.md'
 import typescriptURApiStreaming from './ur-api/typescript/ur-api/streaming.md'
 import typescriptURApiToolUse from './ur-api/typescript/ur-api/tool-use.md'
 
-// @[MODEL LAUNCH]: Update the model IDs/names below. These are substituted into {{VAR}}
-// placeholders in the .md files at runtime before the skill prompt is sent.
-// After updating these constants, manually update the two files that still hardcode models:
-//   - ur-api/SKILL.md (Current Models pricing table)
-//   - ur-api/shared/models.md (full model catalog with legacy versions and alias mappings)
+// These placeholders are substituted into bundled docs at runtime. Keep them
+// provider-scoped and non-branded; UR must not invent model IDs.
 export const SKILL_MODEL_VARS = {
-  MODELO_ID: 'ur-modelO-4-6',
-  MODELO_NAME: 'UR modelO 4.6',
-  MODELS_ID: 'ur-modelS-4-6',
-  MODELS_NAME: 'UR modelS 4.6',
-  MODELH_ID: 'ur-modelH-4-5',
-  MODELH_NAME: 'UR modelH 4.5',
-  // Previous modelS ID — used in "do not append date suffixes" example in SKILL.md.
-  PREV_MODELS_ID: 'ur-modelS-4-5',
+  MODELO_ID: 'provider/model-id',
+  MODELO_NAME: 'Selected provider model',
+  MODELS_ID: 'provider/model-id',
+  MODELS_NAME: 'Selected provider model',
+  MODELH_ID: 'provider/model-id',
+  MODELH_NAME: 'Selected provider model',
+  PREV_MODELS_ID: 'provider/model-id',
 } satisfies Record<string, string>
 
 export const SKILL_PROMPT: string = skillPrompt

@@ -176,14 +176,10 @@ export const WebSearchTool = buildTool({
       return true
     }
 
-    // Enable for Vertex AI with supported models (UR 4.0+)
+    // Vertex support is not exposed in this build.
     if (provider === 'vertex') {
-      const supportsWebSearch =
-        model.includes('ur-modelO-4') ||
-        model.includes('ur-modelS-4') ||
-        model.includes('ur-modelH-4')
-
-      return supportsWebSearch
+      void model
+      return false
     }
 
     // Foundry only ships models that already support Web Search

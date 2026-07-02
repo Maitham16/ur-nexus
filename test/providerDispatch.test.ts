@@ -363,6 +363,7 @@ describe('openai-compatible adapter', () => {
 describe('real provider identity', () => {
   test('every provider maps to a correct family', () => {
     const expected: Record<string, string> = {
+      subscription: 'subscription',
       'codex-cli': 'openai',
       'openai-api': 'openai',
       'claude-code-cli': 'anthropic',

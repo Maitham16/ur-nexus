@@ -12,7 +12,7 @@ function modelBelongsToFamily(model: string, family: string): boolean {
   if (model.includes(family)) {
     return true
   }
-  // Resolve aliases like "best" → "ur-modelO-4-6" to check family membership
+  // Resolve aliases like "best" before checking family membership.
   if (isModelAlias(model)) {
     const resolved = parseUserSpecifiedModel(model).toLowerCase()
     return resolved.includes(family)
@@ -23,7 +23,7 @@ function modelBelongsToFamily(model: string, family: string): boolean {
 /**
  * Check if a model name starts with a prefix at a segment boundary.
  * The prefix must match up to the end of the name or a "-" separator.
- * e.g. "ur-modelO-4-5" matches "ur-modelO-4-5-20251101" but not "ur-modelO-4-50".
+ * e.g. a prefix matches at a segment boundary, but not inside another segment.
  */
 function prefixMatchesModel(modelName: string, prefix: string): boolean {
   if (!modelName.startsWith(prefix)) {
@@ -34,8 +34,7 @@ function prefixMatchesModel(modelName: string, prefix: string): boolean {
 
 /**
  * Check if a model matches a version-prefix entry in the allowlist.
- * Supports shorthand like "modelO-4-5" (mapped to "ur-modelO-4-5") and
- * full prefixes like "ur-modelO-4-5". Resolves input aliases before matching.
+ * Supports provider-specific version prefixes and resolves input aliases before matching.
  */
 function modelMatchesVersionPrefix(model: string, entry: string): boolean {
   // Resolve the input model to a full name if it's an alias
@@ -43,11 +42,11 @@ function modelMatchesVersionPrefix(model: string, entry: string): boolean {
     ? parseUserSpecifiedModel(model).toLowerCase()
     : model
 
-  // Try the entry as-is (e.g. "ur-modelO-4-5")
+  // Try the entry as-is.
   if (prefixMatchesModel(resolvedModel, entry)) {
     return true
   }
-  // Try with "ur-" prefix (e.g. "modelO-4-5" → "ur-modelO-4-5")
+  // Try the legacy "ur-" prefix for old managed settings.
   if (
     !entry.startsWith('ur-') &&
     prefixMatchesModel(resolvedModel, `ur-${entry}`)
@@ -59,9 +58,8 @@ function modelMatchesVersionPrefix(model: string, entry: string): boolean {
 
 /**
  * Check if a family alias is narrowed by more specific entries in the allowlist.
- * When the allowlist contains both "modelO" and "modelO-4-5", the specific entry
- * takes precedence — "modelO" alone would be a wildcard, but "modelO-4-5" narrows
- * it to only that version.
+ * When the allowlist contains both a family alias and a specific entry, the
+ * specific entry takes precedence.
  */
 function familyHasSpecificEntries(
   family: string,
@@ -72,7 +70,7 @@ function familyHasSpecificEntries(
       continue
     }
     // Check if entry is a version-qualified variant of this family
-    // e.g., "modelO-4-5" or "ur-modelO-4-5-20251101" for the "modelO" family
+    // e.g., a version-qualified variant for the family
     // Must match at a segment boundary (followed by '-' or end) to avoid
     // false positives like "modelOplan" matching "modelO"
     const idx = entry.indexOf(family)
@@ -93,10 +91,10 @@ function familyHasSpecificEntries(
  *
  * Matching tiers:
  * 1. Family aliases ("modelO", "modelS", "modelH") — wildcard for the entire family,
- *    UNLESS more specific entries for that family also exist (e.g., "modelO-4-5").
+ *    UNLESS more specific entries for that family also exist.
  *    In that case, the family wildcard is ignored and only the specific entries apply.
- * 2. Version prefixes ("modelO-4-5", "ur-modelO-4-5") — any build of that version
- * 3. Full model IDs ("ur-modelO-4-5-20251101") — exact match only
+ * 2. Version prefixes — any build of that version
+ * 3. Full model IDs — exact match only
  */
 export function isModelAllowed(model: string): boolean {
   if (getAPIProvider() === 'ollama') {
@@ -118,8 +116,8 @@ export function isModelAllowed(model: string): boolean {
 
   // Direct match (alias-to-alias or full-name-to-full-name)
   // Skip family aliases that have been narrowed by specific entries —
-  // e.g., "modelO" in ["modelO", "modelO-4-5"] should NOT directly match,
-  // because the admin intends to restrict to modelO 4.5 only.
+  // A family alias should not directly match when the admin also configured
+  // more specific entries for that family.
   if (normalizedAllowlist.includes(normalizedModel)) {
     if (
       !isModelFamilyAlias(normalizedModel) ||
@@ -131,7 +129,7 @@ export function isModelAllowed(model: string): boolean {
 
   // Family-level aliases in the allowlist match any model in that family,
   // but only if no more specific entries exist for that family.
-  // e.g., ["modelO"] allows all modelO, but ["modelO", "modelO-4-5"] only allows modelO 4.5.
+  // A bare family alias allows that family only when no specific entries exist.
   for (const entry of normalizedAllowlist) {
     if (
       isModelFamilyAlias(entry) &&
@@ -161,8 +159,7 @@ export function isModelAllowed(model: string): boolean {
     }
   }
 
-  // Version-prefix matching: "modelO-4-5" or "ur-modelO-4-5" matches
-  // "ur-modelO-4-5-20251101" at a segment boundary
+  // Version-prefix matching at a segment boundary.
   for (const entry of normalizedAllowlist) {
     if (!isModelFamilyAlias(entry) && !isModelAlias(entry)) {
       if (modelMatchesVersionPrefix(normalizedModel, entry)) {

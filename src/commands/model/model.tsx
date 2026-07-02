@@ -154,13 +154,13 @@ function SetModelAndClose({
 
       // @[MODEL LAUNCH]: Update check for 1M access.
       if (model && ismodelO1mUnavailable(model)) {
-        onDone(`modelO 4.6 with 1M context is not available for your account. Learn more: https://docs.ur.dev/docs/en/model-config#extended-context-with-1m`, {
+        onDone(`The selected 1M-context model is not available for your account. Choose another model with /model.`, {
           display: 'system'
         });
         return;
       }
       if (model && ismodelS1mUnavailable(model)) {
-        onDone(`modelS 4.6 with 1M context is not available for your account. Learn more: https://docs.ur.dev/docs/en/model-config#extended-context-with-1m`, {
+        onDone(`The selected 1M-context model is not available for your account. Choose another model with /model.`, {
           display: 'system'
         });
         return;
@@ -240,13 +240,11 @@ function isKnownAlias(model: string): boolean {
 }
 function ismodelO1mUnavailable(model: string): boolean {
   const m = model.toLowerCase();
-  return !checkmodelO1mAccess() && !ismodelO1mMergeEnabled() && m.includes('modelO') && m.includes('[1m]');
+  return !checkmodelO1mAccess() && !ismodelO1mMergeEnabled() && m.includes('modelo') && m.includes('[1m]');
 }
 function ismodelS1mUnavailable(model: string): boolean {
   const m = model.toLowerCase();
-  // Warn about modelS and modelS 4.6, but not modelS 4.5 since that had
-  // a different access criteria.
-  return !checkmodelS1mAccess() && (m.includes('modelS[1m]') || m.includes('modelS-4-6[1m]'));
+  return !checkmodelS1mAccess() && m.includes('models') && m.includes('[1m]');
 }
 function ShowModelAndClose(t0) {
   const {

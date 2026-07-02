@@ -117,6 +117,16 @@ describe('provider runtime routing', () => {
       expect(result.error).toContain('external app bridge')
     }
   })
+
+  test('generic subscription provider is blocked instead of using app bridges or Ollama', async () => {
+    expect(isProviderRuntimeSelectable('subscription')).toBe(false)
+    expect(getProviderRuntimeBlockReason('subscription')).toContain('no independent subscription runtime')
+    const result = await validateProviderRuntime('subscription')
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain('no independent subscription runtime')
+    }
+  })
 })
 
 describe('provider separation', () => {
@@ -230,6 +240,17 @@ describe('runtime request dispatch', () => {
       clientFactory: recordingFactory(calls),
     })
     expect(calls).toEqual(['openai-api'])
+    expect(calls).not.toContain('ollama')
+  })
+
+  test('selected subscription provider does not call Ollama backend', async () => {
+    const calls: string[] = []
+    await expect(
+      streamModelResponse('subscription', 'anything', userMessages(), {
+        clientFactory: recordingFactory(calls),
+      }),
+    ).rejects.toThrow('no independent subscription runtime')
+    expect(calls).toEqual([])
     expect(calls).not.toContain('ollama')
   })
 

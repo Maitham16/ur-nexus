@@ -422,7 +422,7 @@ export async function isToolSearchEnabled(
   if (!modelSupportsToolReference(model)) {
     logForDebugging(
       `Tool search disabled for model '${model}': model does not support tool_reference blocks. ` +
-        `This feature is only available on UR modelS 4+, modelO 4+, and newer models.`,
+        `This feature is only available on provider models that support tool_reference blocks.`,
     )
     logModeDecision(false, 'standard', 'model_unsupported')
     return false
