@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { BetaToolUnion } from '@urhq-ai/sdk/resources/beta/messages/messages.mjs'
 import type { TextBlockParam } from '@urhq-ai/sdk/resources/index.mjs'
 import { createPatch } from 'diff'

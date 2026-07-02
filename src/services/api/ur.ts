@@ -22,6 +22,26 @@ type BetaStopReason = string
 import type { TextBlockParam } from '@urhq-ai/sdk/resources/index.mjs'
 import type { Stream } from '@urhq-ai/sdk/streaming.mjs'
 import { randomUUID } from 'crypto'
+
+type ProviderStreamResponse = {
+  data: Stream<BetaRawMessageStreamEvent>
+  request_id?: string
+  response?: Response
+}
+
+type ProviderStreamHandle = {
+  withResponse: () => Promise<ProviderStreamResponse>
+}
+
+function isProviderStreamHandle(value: unknown): value is ProviderStreamHandle {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'withResponse' in value &&
+      typeof (value as { withResponse?: unknown }).withResponse === 'function',
+  )
+}
+
 import {
   getAPIProvider,
   isFirstPartyURHQBaseUrl,
@@ -1806,17 +1826,19 @@ async function* queryModel(
         // BetaMessageStream calls partialParse() on every input_json_delta, which we don't need
         // since we handle tool input accumulation ourselves
         // biome-ignore lint/plugin: main conversation loop handles attribution separately
-        const result = await urhq.beta.messages
-          .create(
-            { ...params, stream: true },
-            {
-              signal,
-              ...(clientRequestId && {
-                headers: { [CLIENT_REQUEST_ID_HEADER]: clientRequestId },
-              }),
-            },
-          )
-          .withResponse()
+        const streamHandle = urhq.beta.messages.create(
+          { ...params, stream: true },
+          {
+            signal,
+            ...(clientRequestId && {
+              headers: { [CLIENT_REQUEST_ID_HEADER]: clientRequestId },
+            }),
+          },
+        )
+        if (!isProviderStreamHandle(streamHandle)) {
+          throw new Error('Provider stream request did not return a stream response handle.')
+        }
+        const result = await streamHandle.withResponse()
         queryCheckpoint('query_response_headers_received')
         streamRequestId = result.request_id
         streamResponse = result.response

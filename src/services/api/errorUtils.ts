@@ -1,4 +1,4 @@
-import type { APIError } from '@urhq-ai/sdk'
+import { APIConnectionError, type APIError } from '@urhq-ai/sdk'
 
 // SSL/TLS error codes from OpenSSL (used by both Node.js and Bun)
 // See: https://www.openssl.org/docs/man3.1/man3/X509_STORE_CTX_get_error.html
@@ -197,7 +197,7 @@ function extractNestedErrorMessage(error: APIError): string | null {
   return null
 }
 
-export function formatAPIError(error: APIError): string {
+export function formatAPIError(error: APIError | APIConnectionError): string {
   // Extract connection error details from the cause chain
   const connectionDetails = extractConnectionErrorDetails(error)
 
@@ -246,10 +246,18 @@ export function formatAPIError(error: APIError): string {
   // be a plain object without a `.message` property.  Return a safe fallback
   // instead of undefined, which would crash callers that access `.length`.
   if (!error.message) {
-    return (
-      extractNestedErrorMessage(error) ??
-      `API error (status ${error.status ?? 'unknown'})`
-    )
+    if (!(error instanceof APIConnectionError)) {
+      return (
+        extractNestedErrorMessage(error) ??
+        `API error (status ${error.status ?? 'unknown'})`
+      )
+    }
+    return 'Unable to connect to API. Check your internet connection'
+  }
+
+  if (error instanceof APIConnectionError) {
+    const sanitizedMessage = sanitizeMessageHTML(error.message)
+    return sanitizedMessage.length > 0 ? sanitizedMessage : error.message
   }
 
   const sanitizedMessage = sanitizeAPIError(error)

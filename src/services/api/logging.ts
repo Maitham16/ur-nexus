@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { feature } from 'bun:bundle'
 import { APIError } from '@urhq-ai/sdk'
 import type {

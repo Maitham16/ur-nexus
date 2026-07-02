@@ -1,6 +1,15 @@
 // Stub: not included in leaked source
 export interface AgentToolProgress {}
-export interface BashProgress {}
+export interface BashProgress {
+  type?: 'bash_progress'
+  output?: string
+  fullOutput: string
+  elapsedTimeSeconds: number
+  totalLines: number
+  totalBytes?: number
+  taskId?: string
+  timeoutMs?: number
+}
 export interface MCPProgress {}
 export interface PowerShellProgress {}
 export interface REPLToolProgress {}

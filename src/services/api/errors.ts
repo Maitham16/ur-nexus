@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -9,7 +8,6 @@ import type {
   BetaStopReason,
 } from '@urhq-ai/sdk/resources/beta/messages/messages.mjs'
 import { AFK_MODE_BETA_HEADER } from 'src/constants/betas.js'
-import type { SDKAssistantMessageError } from 'src/entrypoints/agentSdkTypes.js'
 import type {
   AssistantMessage,
   Message,
@@ -167,6 +165,15 @@ export const REPEATED_529_ERROR_MESSAGE = 'Repeated 529 Overloaded errors'
 export const CUSTOM_OFF_SWITCH_MESSAGE =
   'The current model is experiencing high load, please use /model to switch to another model'
 export const API_TIMEOUT_ERROR_MESSAGE = 'Request timed out'
+type SDKAssistantMessageErrorCode =
+  | 'authentication_failed'
+  | 'billing_error'
+  | 'rate_limit'
+  | 'invalid_request'
+  | 'server_error'
+  | 'unknown'
+  | 'max_output_tokens'
+
 export function getPdfTooLargeErrorMessage(): string {
   const limits = `max ${API_PDF_MAX_PAGES} pages, ${formatFileSize(PDF_TARGET_RAW_SIZE)}`
   return getIsNonInteractiveSession()
@@ -1149,7 +1156,7 @@ export function classifyAPIError(error: unknown): string {
 
 export function categorizeRetryableAPIError(
   error: APIError,
-): SDKAssistantMessageError {
+): SDKAssistantMessageErrorCode {
   if (
     error.status === 529 ||
     error.message?.includes('"type":"overloaded_error"')

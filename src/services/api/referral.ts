@@ -1,4 +1,3 @@
-// @ts-nocheck
 import axios from 'axios'
 import { getOauthConfig } from '../../constants/oauth.js'
 import {
@@ -25,7 +24,7 @@ const CACHE_EXPIRATION_MS = 24 * 60 * 60 * 1000
 let fetchInProgress: Promise<ReferralEligibilityResponse | null> | null = null
 
 export async function fetchReferralEligibility(
-  campaign: ReferralCampaign = 'ur_guest_pass',
+  campaign: ReferralCampaign | string = 'ur_guest_pass',
 ): Promise<ReferralEligibilityResponse> {
   const { accessToken, orgUUID } = await prepareApiRequest()
 

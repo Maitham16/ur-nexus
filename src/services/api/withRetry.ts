@@ -1,6 +1,4 @@
-// @ts-nocheck
 import { feature } from 'bun:bundle'
-import type URHQ from '@urhq-ai/sdk'
 import {
   APIConnectionError,
   APIError,
@@ -47,6 +45,7 @@ import {
 } from '../rateLimitMocking.js'
 import { REPEATED_529_ERROR_MESSAGE } from './errors.js'
 import { extractConnectionErrorDetails } from './errorUtils.js'
+import type { ProviderMessageClient } from './providerClient.js'
 
 const abortError = () => new APIUserAbortError()
 
@@ -169,9 +168,9 @@ export class FallbackTriggeredError extends Error {
 }
 
 export async function* withRetry<T>(
-  getClient: () => Promise<URHQ>,
+  getClient: () => Promise<ProviderMessageClient>,
   operation: (
-    client: URHQ,
+    client: ProviderMessageClient,
     attempt: number,
     context: RetryContext,
   ) => Promise<T>,
@@ -183,7 +182,7 @@ export async function* withRetry<T>(
     thinkingConfig: options.thinkingConfig,
     ...(isFastModeEnabled() && { fastMode: options.fastMode }),
   }
-  let client: URHQ | null = null
+  let client: ProviderMessageClient | null = null
   let consecutive529Errors = options.initialConsecutive529Errors ?? 0
   let lastError: unknown
   let persistentAttempt = 0
@@ -378,8 +377,8 @@ export async function* withRetry<T>(
       if (
         !handledCloudAuthError &&
         !(
-          (error instanceof APIError || error instanceof APIConnectionError) &&
-          shouldRetry(error)
+          error instanceof APIConnectionError ||
+          (error instanceof APIError && shouldRetry(error))
         )
       ) {
         throw new CannotRetryError(error, retryContext)

@@ -1,6 +1,4 @@
-// @ts-nocheck
 import axios, { type AxiosError } from 'axios'
-import type { UUID } from 'crypto'
 import { getOauthConfig } from '../../constants/oauth.js'
 import type { Entry, TranscriptMessage } from '../../types/logs.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -21,7 +19,7 @@ interface SessionIngressError {
 }
 
 // Module-level state
-const lastUuidMap: Map<string, UUID> = new Map()
+const lastUuidMap: Map<string, string> = new Map()
 
 const MAX_RETRIES = 10
 const BASE_DELAY_MS = 500
@@ -92,7 +90,7 @@ async function appendSessionLogImpl(
         // Check if our entry was actually stored (server returned 409 but entry exists)
         // This handles the scenario where entry was stored but client received an error
         // response, causing lastUuidMap to be stale
-        const serverLastUuid = response.headers['x-last-uuid']
+        const serverLastUuid = headerString(response.headers['x-last-uuid'])
         if (serverLastUuid === entry.uuid) {
           // Our entry IS the last entry on server - it was stored successfully previously
           lastUuidMap.set(sessionId, entry.uuid)
@@ -107,7 +105,7 @@ async function appendSessionLogImpl(
         // advanced the server's chain. Try to adopt the server's last UUID
         // from the response header, or re-fetch the session to discover it.
         if (serverLastUuid) {
-          lastUuidMap.set(sessionId, serverLastUuid as UUID)
+          lastUuidMap.set(sessionId, String(serverLastUuid))
           logForDebugging(
             `Session 409: adopting server lastUuid=${serverLastUuid} from header, retrying entry ${entry.uuid}`,
           )
@@ -489,12 +487,20 @@ async function fetchSessionLogsFromUrl(
  * Walk backward through entries to find the last one with a uuid.
  * Some entry types (SummaryMessage, TagMessage) don't have one.
  */
-function findLastUuid(logs: Entry[] | null): UUID | undefined {
+function findLastUuid(logs: Entry[] | null): string | undefined {
   if (!logs) {
     return undefined
   }
   const entry = logs.findLast(e => 'uuid' in e && e.uuid)
-  return entry && 'uuid' in entry ? (entry.uuid as UUID) : undefined
+  return entry && 'uuid' in entry ? String(entry.uuid) : undefined
+}
+
+function headerString(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value.find((item): item is string => typeof item === 'string')
+  }
+  return undefined
 }
 
 /**
