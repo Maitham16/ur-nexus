@@ -110,6 +110,21 @@ try {
   fail(`node ./bin/ur.js --version failed: ${error instanceof Error ? error.message : String(error)}`)
 }
 
+if (failures.length === 0) {
+  try {
+    execFileSync('node', ['scripts/package-check.mjs'], {
+      cwd: root,
+      stdio: 'inherit',
+    })
+  } catch (error) {
+    fail(
+      `packaged CLI smoke failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}
+
 if (failures.length > 0) {
   console.error('Release check failed:')
   for (const failure of failures) {

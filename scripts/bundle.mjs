@@ -17,6 +17,13 @@ const issues =
     ? packageJson.bugs.url
     : 'https://github.com/Maitham16/UR/issues'
 
+if (!packageJson.dependencies?.sharp) {
+  console.error(
+    'FAILED: sharp is externalized from the Bun bundle and must be declared in package.json dependencies.',
+  )
+  process.exit(1)
+}
+
 console.log(`Bundling UR-AGENT v${version} ...`)
 execFileSync(
   'bun',
