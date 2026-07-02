@@ -39,7 +39,7 @@ export async function createOpenRouterClient(
       `${OPENROUTER_BASE}/chat/completions`,
       {
         model: params.model,
-        messages: toOpenAIMessages(params),
+        messages: toOpenAIMessages(params, 'openrouter'),
         max_tokens: params.max_tokens,
         stream: Boolean(params.stream),
         ...(tools.length > 0 ? { tools } : {}),
@@ -82,7 +82,7 @@ export async function createOpenRouterClient(
       `${OPENROUTER_BASE}/chat/completions`,
       {
         model: params.model,
-        messages: toOpenAIMessages(params),
+        messages: toOpenAIMessages(params, 'openrouter'),
         max_tokens: params.max_tokens,
         stream: true,
         ...(tools.length > 0 ? { tools } : {}),

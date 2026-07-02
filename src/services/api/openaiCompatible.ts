@@ -4,7 +4,10 @@
  */
 
 import { randomUUID } from 'crypto'
-import { ProviderResponseParseError } from './providerClient.js'
+import {
+  ProviderCapabilityError,
+  ProviderResponseParseError,
+} from './providerClient.js'
 import {
   createOpenAISSEMessageStream,
   mergeAbortSignals,
@@ -13,6 +16,18 @@ import {
 type URHQClient = {
   beta: { messages: any }
 }
+
+type NormalizedImageSource =
+  | {
+    type: 'base64'
+    mediaType: string
+    data: string
+  }
+  | {
+    type: 'url'
+    url: string
+    mediaType?: string
+  }
 
 export async function createOpenAICompatibleClient(
   options: {
@@ -137,21 +152,22 @@ export function toOpenAICompatibleRequest(params: any): any {
   }
 }
 
-export function toOpenAIMessages(params: any): any[] {
+export function toOpenAIMessages(params: any, providerName = 'openai-compatible'): any[] {
   const messages: any[] = []
-  const system = systemToText(params.system)
+  const system = systemToText(params.system, providerName)
   if (system) {
     messages.push({ role: 'system', content: system })
   }
   const toolNamesById = collectToolNamesById(params.messages)
   for (const message of params.messages ?? []) {
-    messages.push(...messageToOpenAIMessages(message, toolNamesById))
+    messages.push(...messageToOpenAIMessages(message, toolNamesById, providerName))
   }
   return messages
 }
 
-export function systemToText(system: any): string {
+export function systemToText(system: any, providerName = 'provider'): string {
   if (!system) return ''
+  assertNoImageBlocks(system, providerName, 'system content')
   if (typeof system === 'string') return system
   if (Array.isArray(system)) {
     return system.map(block => block?.text ?? '').join('\n\n')
@@ -170,6 +186,106 @@ export function contentToText(content: any): string {
       return ''
     })
     .join('\n')
+}
+
+export function assertNoImageBlocks(
+  content: any,
+  providerName: string,
+  context: string,
+): void {
+  if (!containsImageBlock(content)) return
+  throw new ProviderCapabilityError(
+    `${providerName} does not support image content in ${context}`,
+    { providerName, capability: 'multimodal_input', context },
+  )
+}
+
+export function containsImageBlock(content: any): boolean {
+  if (!Array.isArray(content)) return false
+  return content.some(block => {
+    if (block?.type === 'image') return true
+    if (block?.type === 'tool_result') return containsImageBlock(block.content)
+    return false
+  })
+}
+
+export function normalizeImageBlockSource(
+  block: any,
+  providerName: string,
+  context: string,
+): NormalizedImageSource {
+  if (block?.type !== 'image') {
+    throw new ProviderCapabilityError(
+      `${providerName} expected an image block in ${context}`,
+      { providerName, capability: 'multimodal_input', context, block },
+    )
+  }
+  const source = block.source
+  if (!source || typeof source !== 'object') {
+    throw new ProviderCapabilityError(
+      `${providerName} received an image block without a source in ${context}`,
+      { providerName, capability: 'multimodal_input', context, block },
+    )
+  }
+
+  if (source.type === 'base64') {
+    const mediaType = source.media_type ?? source.mediaType
+    if (typeof mediaType !== 'string' || mediaType.length === 0) {
+      throw new ProviderCapabilityError(
+        `${providerName} image block in ${context} is missing media_type`,
+        { providerName, capability: 'multimodal_input', context, block },
+      )
+    }
+    if (typeof source.data !== 'string' || source.data.length === 0) {
+      throw new ProviderCapabilityError(
+        `${providerName} image block in ${context} is missing base64 data`,
+        { providerName, capability: 'multimodal_input', context, block },
+      )
+    }
+    return {
+      type: 'base64',
+      mediaType,
+      data: source.data,
+    }
+  }
+
+  if (source.type === 'url') {
+    if (typeof source.url !== 'string' || source.url.length === 0) {
+      throw new ProviderCapabilityError(
+        `${providerName} image block in ${context} is missing a URL`,
+        { providerName, capability: 'multimodal_input', context, block },
+      )
+    }
+    const mediaType = source.media_type ?? source.mediaType
+    return {
+      type: 'url',
+      url: source.url,
+      ...(typeof mediaType === 'string' && mediaType.length > 0
+        ? { mediaType }
+        : {}),
+    }
+  }
+
+  throw new ProviderCapabilityError(
+    `${providerName} does not support image source type "${String(source.type)}" in ${context}`,
+    { providerName, capability: 'multimodal_input', context, block },
+  )
+}
+
+export function imageBlockToOpenAIContentPart(
+  block: any,
+  providerName: string,
+  context: string,
+): any {
+  const source = normalizeImageBlockSource(block, providerName, context)
+  const url =
+    source.type === 'base64'
+      ? `data:${source.mediaType};base64,${source.data}`
+      : source.url
+  return {
+    type: 'image_url',
+    image_url: { url },
+  }
 }
 
 export function toOpenAITools(tools: any): any[] {
@@ -313,6 +429,7 @@ function collectToolNamesById(messages: any): Map<string, string> {
 function messageToOpenAIMessages(
   message: any,
   toolNamesById: Map<string, string>,
+  providerName: string,
 ): any[] {
   const content = message?.content
   if (typeof content === 'string') {
@@ -323,17 +440,41 @@ function messageToOpenAIMessages(
   }
 
   const textParts: string[] = []
+  const multimodalParts: any[] = []
+  let pendingTextParts: string[] = []
+  let hasImageContent = false
   const toolCalls: any[] = []
   const toolResults: any[] = []
+  const flushTextPart = () => {
+    if (pendingTextParts.length === 0) return
+    const text = pendingTextParts.join('\n')
+    if (text.length > 0) {
+      multimodalParts.push({ type: 'text', text })
+    }
+    pendingTextParts = []
+  }
 
-  for (const block of content) {
+  for (const [index, block] of content.entries()) {
     if (typeof block === 'string') {
       textParts.push(block)
+      pendingTextParts.push(block)
       continue
     }
     switch (block?.type) {
       case 'text':
         textParts.push(block.text ?? '')
+        pendingTextParts.push(block.text ?? '')
+        break
+      case 'image':
+        flushTextPart()
+        multimodalParts.push(
+          imageBlockToOpenAIContentPart(
+            block,
+            providerName,
+            `messages[].content[${index}]`,
+          ),
+        )
+        hasImageContent = true
         break
       case 'tool_use':
         toolCalls.push({
@@ -346,6 +487,11 @@ function messageToOpenAIMessages(
         })
         break
       case 'tool_result':
+        assertNoImageBlocks(
+          block.content,
+          providerName,
+          `tool_result ${block.tool_use_id ?? index} content`,
+        )
         toolResults.push({
           role: 'tool',
           tool_call_id: block.tool_use_id,
@@ -361,11 +507,13 @@ function messageToOpenAIMessages(
   }
 
   const text = textParts.join('\n')
+  flushTextPart()
+  const messageContent = hasImageContent ? multimodalParts : text
   if (message.role === 'assistant' && toolCalls.length > 0) {
     return [
       {
         role: 'assistant',
-        content: text || null,
+        content: hasImageContent ? messageContent : text || null,
         tool_calls: toolCalls,
       },
     ]
@@ -373,14 +521,16 @@ function messageToOpenAIMessages(
 
   if (toolResults.length > 0) {
     const result: any[] = []
-    if (text) {
+    if (hasImageContent) {
+      result.push({ role: message.role, content: messageContent })
+    } else if (text) {
       result.push({ role: message.role, content: text })
     }
     result.push(...toolResults)
     return result
   }
 
-  return [{ role: message.role, content: text }]
+  return [{ role: message.role, content: messageContent }]
 }
 
 function parseOpenAIMessageContent(

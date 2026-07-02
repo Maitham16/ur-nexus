@@ -56,6 +56,17 @@ export class ProviderResponseParseError extends Error {
   }
 }
 
+export class ProviderCapabilityError extends Error {
+  readonly details?: unknown
+
+  constructor(message: string, details?: unknown) {
+    super(message)
+    this.name = 'ProviderCapabilityError'
+    this.details = details
+    Object.setPrototypeOf(this, new.target.prototype)
+  }
+}
+
 export type ProviderRuntimeSelection = {
   providerId: ProviderId
   providerName: string

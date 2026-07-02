@@ -8,14 +8,19 @@ import axios from 'axios'
 import { randomUUID } from 'crypto'
 import { getProviderFamily } from '../providers/providerRegistry.js'
 import {
+  assertNoImageBlocks,
   contentToText,
   mapOpenAIToolChoice,
+  normalizeImageBlockSource,
   parseOpenAICompatibleResponse,
   systemToText,
   toOpenAIMessages,
   toOpenAITools,
 } from './openaiCompatible.js'
-import { ProviderResponseParseError } from './providerClient.js'
+import {
+  ProviderCapabilityError,
+  ProviderResponseParseError,
+} from './providerClient.js'
 import {
   createAnthropicSSEMessageStream,
   createGeminiSSEMessageStream,
@@ -177,7 +182,7 @@ function buildAPIRequest(family: string, params: any): any {
       const tools = toOpenAITools(params.tools)
       return {
         model: params.model,
-        messages: toOpenAIMessages(params),
+        messages: toOpenAIMessages(params, 'openai'),
         max_tokens: params.max_tokens,
         ...(params.temperature !== undefined && { temperature: params.temperature }),
         stream: Boolean(params.stream),
@@ -191,8 +196,8 @@ function buildAPIRequest(family: string, params: any): any {
       const tools = toAnthropicTools(params.tools)
       return {
         model: params.model,
-        ...(params.system && { system: params.system }),
-        messages: params.messages,
+        ...(params.system && { system: toAnthropicSystem(params.system) }),
+        messages: toAnthropicMessages(params.messages),
         max_tokens: params.max_tokens ?? 4096,
         ...(params.temperature !== undefined && { temperature: params.temperature }),
         stream: Boolean(params.stream),
@@ -324,8 +329,88 @@ function toGeminiContents(params: any): Array<{ role: string; parts: any[] }> {
 }
 
 function geminiSystemInstruction(params: any): { parts: Array<{ text: string }> } | undefined {
-  const system = systemToText(params.system)
+  const system = systemToText(params.system, 'gemini')
   return system ? { parts: [{ text: system }] } : undefined
+}
+
+function toAnthropicSystem(system: any): any {
+  assertNoImageBlocks(system, 'anthropic', 'system content')
+  return system
+}
+
+function toAnthropicMessages(messages: any): any[] {
+  if (!Array.isArray(messages)) return []
+  return messages.map((message, messageIndex) => ({
+    ...message,
+    content: toAnthropicContent(
+      message?.content,
+      `messages[${messageIndex}].content`,
+    ),
+  }))
+}
+
+function toAnthropicContent(content: any, context: string): any {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content.map((block, index) =>
+    toAnthropicContentBlock(block, `${context}[${index}]`),
+  )
+}
+
+function toAnthropicContentBlock(block: any, context: string): any {
+  if (typeof block === 'string') return { type: 'text', text: block }
+  if (block?.type === 'text') {
+    return { type: 'text', text: block.text ?? '' }
+  }
+  if (block?.type === 'image') {
+    const source = normalizeImageBlockSource(block, 'anthropic', context)
+    if (source.type === 'base64') {
+      return {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: source.mediaType,
+          data: source.data,
+        },
+      }
+    }
+    return {
+      type: 'image',
+      source: {
+        type: 'url',
+        url: source.url,
+      },
+    }
+  }
+  if (block?.type === 'tool_result') {
+    return {
+      ...block,
+      content: toAnthropicToolResultContent(
+        block.content,
+        `${context}.content`,
+      ),
+    }
+  }
+  return block
+}
+
+function toAnthropicToolResultContent(content: any, context: string): any {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return content
+  return content.map((block, index) =>
+    toAnthropicToolResultBlock(block, `${context}[${index}]`),
+  )
+}
+
+function toAnthropicToolResultBlock(block: any, context: string): any {
+  if (typeof block === 'string') return { type: 'text', text: block }
+  if (block?.type === 'text') {
+    return { type: 'text', text: block.text ?? '' }
+  }
+  if (block?.type === 'image') {
+    return toAnthropicContentBlock(block, context)
+  }
+  return block
 }
 
 function toAnthropicTools(tools: any): any[] {
@@ -460,28 +545,82 @@ function contentToGeminiParts(content: any, toolNamesById: Map<string, string>):
   if (!Array.isArray(content)) return [{ text: '' }]
 
   const parts: any[] = []
-  const text = contentToText(content)
-  if (text) {
-    parts.push({ text })
+  let pendingTextParts: string[] = []
+  const flushTextPart = () => {
+    if (pendingTextParts.length === 0) return
+    const text = pendingTextParts.join('\n')
+    if (text.length > 0) {
+      parts.push({ text })
+    }
+    pendingTextParts = []
   }
-  for (const block of content) {
-    if (block?.type === 'tool_use') {
-      parts.push({
-        functionCall: {
-          name: block.name,
-          args: block.input ?? {},
-        },
-      })
-    } else if (block?.type === 'tool_result') {
-      parts.push({
-        functionResponse: {
-          name: toolNamesById.get(block.tool_use_id) ?? block.tool_use_id,
-          response: { result: contentToText(block.content) },
-        },
-      })
+
+  for (const [index, block] of content.entries()) {
+    if (typeof block === 'string') {
+      pendingTextParts.push(block)
+      continue
+    }
+    switch (block?.type) {
+      case 'text':
+        pendingTextParts.push(block.text ?? '')
+        break
+      case 'image':
+        flushTextPart()
+        parts.push(imageBlockToGeminiPart(block, `content[${index}]`))
+        break
+      case 'tool_use':
+        flushTextPart()
+        parts.push({
+          functionCall: {
+            name: block.name,
+            args: block.input ?? {},
+          },
+        })
+        break
+      case 'tool_result':
+        flushTextPart()
+        assertNoImageBlocks(
+          block.content,
+          'gemini',
+          `tool_result ${block.tool_use_id ?? index} content`,
+        )
+        parts.push({
+          functionResponse: {
+            name: toolNamesById.get(block.tool_use_id) ?? block.tool_use_id,
+            response: { result: contentToText(block.content) },
+          },
+        })
+        break
+      default:
+        break
     }
   }
+  flushTextPart()
   return parts.length > 0 ? parts : [{ text: '' }]
+}
+
+function imageBlockToGeminiPart(block: any, context: string): any {
+  const source = normalizeImageBlockSource(block, 'gemini', context)
+  if (source.type === 'base64') {
+    return {
+      inlineData: {
+        mimeType: source.mediaType,
+        data: source.data,
+      },
+    }
+  }
+  if (!source.mediaType) {
+    throw new ProviderCapabilityError(
+      'gemini image URL content requires media_type for fileData mapping',
+      { providerName: 'gemini', capability: 'multimodal_input', context },
+    )
+  }
+  return {
+    fileData: {
+      mimeType: source.mediaType,
+      fileUri: source.url,
+    },
+  }
 }
 
 function collectToolNamesById(messages: any): Map<string, string> {
