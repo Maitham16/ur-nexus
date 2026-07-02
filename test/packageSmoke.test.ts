@@ -50,6 +50,22 @@ function runPackagedBin(packageRoot: string, args: string[]) {
   })
 }
 
+function runPackagedBundle(packageRoot: string, args: string[]) {
+  return spawnSync(bunBin, [join(packageRoot, 'dist', 'cli.js'), ...args], {
+    cwd: packageRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      BUN_BIN: bunBin,
+      UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
+      OPENAI_API_KEY: '',
+      ANTHROPIC_API_KEY: '',
+      GEMINI_API_KEY: '',
+      OPENROUTER_API_KEY: '',
+    },
+  })
+}
+
 describe('package runtime contract', () => {
   test('package metadata declares Bun runtime and sharp runtime dependency', () => {
     const pkg = readPackageJson()
@@ -76,7 +92,7 @@ describe('package runtime contract', () => {
     expect(result.stderr).toContain('BUN_BIN')
   })
 
-  test('packed package bin starts for version/help/doctor and reports missing API key cleanly', () => {
+  test('packed package CLI starts and reports missing API key cleanly', () => {
     const packageRoot = packAndExtract()
     try {
       const pkg = readPackageJson(packageRoot)
@@ -93,13 +109,18 @@ describe('package runtime contract', () => {
       expect(doctorHelp.status).toBe(0)
       expect(doctorHelp.stdout).toContain('Usage: ur doctor')
 
-      const providerDoctor = runPackagedBin(packageRoot, [
+      const providerDoctor = runPackagedBundle(packageRoot, [
         'provider',
         'doctor',
         'openai-api',
         '--json',
       ])
       expect(providerDoctor.status).toBe(1)
+      if (!providerDoctor.stdout.trim()) {
+        throw new Error(
+          `provider doctor produced no JSON on stdout\nstderr:\n${providerDoctor.stderr}`,
+        )
+      }
       const body = JSON.parse(providerDoctor.stdout)
       expect(body.failureReason).toBe('API key missing')
       expect(body.suggestedFix).toContain('OPENAI_API_KEY')

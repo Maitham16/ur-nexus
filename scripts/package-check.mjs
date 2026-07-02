@@ -68,6 +68,21 @@ function runPackagedBin(packageRoot, args) {
   })
 }
 
+function runPackagedBundle(packageRoot, args) {
+  return run(bunBin, [join(packageRoot, 'dist', 'cli.js'), ...args], {
+    cwd: packageRoot,
+    env: {
+      ...process.env,
+      BUN_BIN: bunBin,
+      UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
+      OPENAI_API_KEY: '',
+      ANTHROPIC_API_KEY: '',
+      GEMINI_API_KEY: '',
+      OPENROUTER_API_KEY: '',
+    },
+  })
+}
+
 function expectStatus(label, result, expectedStatus) {
   if (result.status !== expectedStatus) {
     fail(
@@ -118,7 +133,7 @@ function main() {
       fail('packed ur doctor --help did not print doctor usage')
     }
 
-    const providerDoctor = runPackagedBin(packageRoot, [
+    const providerDoctor = runPackagedBundle(packageRoot, [
       'provider',
       'doctor',
       'openai-api',
@@ -126,6 +141,9 @@ function main() {
     ])
     expectStatus('packed provider missing-key check', providerDoctor, 1)
     try {
+      if (!providerDoctor.stdout.trim()) {
+        throw new Error(`stdout was empty; stderr:\n${providerDoctor.stderr}`)
+      }
       const body = JSON.parse(providerDoctor.stdout)
       if (body.failureReason !== 'API key missing') {
         fail(
