@@ -1,13 +1,21 @@
-// @ts-nocheck
 /**
  * OpenRouter API client.
  * OpenRouter provides access to multiple models through a single API.
  */
 
-import type URHQ from '@urhq-ai/sdk'
 import axios from 'axios'
 import { randomUUID } from 'crypto'
+import {
+  mapOpenAIToolChoice,
+  parseOpenAICompatibleResponse,
+  toOpenAIMessages,
+  toOpenAITools,
+} from './openaiCompatible.js'
 import { createOneShotMessageStream } from './streamingAdapters.js'
+
+type URHQClient = {
+  beta: { messages: any }
+}
 
 export async function createOpenRouterClient(
   options: {
@@ -15,20 +23,25 @@ export async function createOpenRouterClient(
     maxRetries: number
     model?: string
   },
-): Promise<URHQ> {
+): Promise<URHQClient> {
   const { apiKey, maxRetries } = options
   const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 
   async function doRequest(params: any, extraHeaders?: Record<string, string>) {
     const clientRequestId = params?.headers?.['x-client-request-id']
+    const tools = toOpenAITools(params.tools)
 
     const response = await axios.post(
       `${OPENROUTER_BASE}/chat/completions`,
       {
         model: params.model,
-        messages: params.messages,
+        messages: toOpenAIMessages(params),
         max_tokens: params.max_tokens,
         stream: false,
+        ...(tools.length > 0 ? { tools } : {}),
+        ...(params.tool_choice !== undefined
+          ? { tool_choice: mapOpenAIToolChoice(params.tool_choice) }
+          : {}),
       },
       {
         headers: {
@@ -46,21 +59,11 @@ export async function createOpenRouterClient(
     const data = response.data
     return {
       response,
-      data: {
-        id: `openrouter-${randomUUID()}`,
-        type: 'message',
-        role: 'assistant',
-        model: data.model,
-        content: [{ type: 'text', text: data.choices?.[0]?.message?.content ?? '' }],
-        stop_reason: data.choices?.[0]?.finish_reason ?? 'end_turn',
-        stop_sequence: null,
-        usage: {
-          input_tokens: data.usage?.prompt_tokens ?? 0,
-          output_tokens: data.usage?.completion_tokens ?? 0,
-          cache_creation_input_tokens: 0,
-          cache_read_input_tokens: 0,
-        },
-      },
+      data: parseOpenAICompatibleResponse(
+        data.id ? data : { ...data, id: `openrouter-${randomUUID()}` },
+        params.model,
+        'openrouter',
+      ),
     }
   }
 
@@ -102,7 +105,7 @@ export async function createOpenRouterClient(
     beta: {
       messages: messagesAPI,
     },
-  } as URHQ
+  } as URHQClient
 }
 
 function estimateTokenCount(params: any): number {

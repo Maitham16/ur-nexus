@@ -26,6 +26,17 @@ import { getInitialSettings } from '../../utils/settings/settings.js'
 import type { SettingsJson } from '../../utils/settings/types.js'
 import { getProviderApiKey } from '../providers/providerCredentials.js'
 
+export class ProviderResponseParseError extends Error {
+  readonly details?: unknown
+
+  constructor(message: string, details?: unknown) {
+    super(message)
+    this.name = 'ProviderResponseParseError'
+    this.details = details
+    Object.setPrototypeOf(this, new.target.prototype)
+  }
+}
+
 export type ProviderRuntimeSelection = {
   providerId: ProviderId
   providerName: string
