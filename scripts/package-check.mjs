@@ -26,6 +26,24 @@ function run(command, args, options = {}) {
   })
 }
 
+function packageSmokeEnv() {
+  return {
+    ...process.env,
+    BUN_BIN: bunBin,
+    UR_CODE_SIMPLE: '1',
+    UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
+    URHQ_API_KEY: '',
+    URHQ_AUTH_TOKEN: '',
+    URHQ_UNIX_SOCKET: '',
+    UR_CODE_OAUTH_TOKEN: '',
+    UR_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: '',
+    OPENAI_API_KEY: '',
+    ANTHROPIC_API_KEY: '',
+    GEMINI_API_KEY: '',
+    OPENROUTER_API_KEY: '',
+  }
+}
+
 function packPackage(workDir) {
   const output = execFileSync(
     'npm',
@@ -56,30 +74,14 @@ function extractPackage(tarball, workDir) {
 function runPackagedBin(packageRoot, args) {
   return run(nodeBin, [join(packageRoot, 'bin', 'ur.js'), ...args], {
     cwd: packageRoot,
-    env: {
-      ...process.env,
-      BUN_BIN: bunBin,
-      UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
-      OPENAI_API_KEY: '',
-      ANTHROPIC_API_KEY: '',
-      GEMINI_API_KEY: '',
-      OPENROUTER_API_KEY: '',
-    },
+    env: packageSmokeEnv(),
   })
 }
 
 function runPackagedBundle(packageRoot, args) {
   return run(bunBin, [join(packageRoot, 'dist', 'cli.js'), ...args], {
     cwd: packageRoot,
-    env: {
-      ...process.env,
-      BUN_BIN: bunBin,
-      UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
-      OPENAI_API_KEY: '',
-      ANTHROPIC_API_KEY: '',
-      GEMINI_API_KEY: '',
-      OPENROUTER_API_KEY: '',
-    },
+    env: packageSmokeEnv(),
   })
 }
 

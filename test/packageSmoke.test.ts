@@ -12,6 +12,24 @@ function readPackageJson(path = repoRoot) {
   return JSON.parse(readFileSync(join(path, 'package.json'), 'utf8'))
 }
 
+function packageSmokeEnv() {
+  return {
+    ...process.env,
+    BUN_BIN: bunBin,
+    UR_CODE_SIMPLE: '1',
+    UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
+    URHQ_API_KEY: '',
+    URHQ_AUTH_TOKEN: '',
+    URHQ_UNIX_SOCKET: '',
+    UR_CODE_OAUTH_TOKEN: '',
+    UR_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: '',
+    OPENAI_API_KEY: '',
+    ANTHROPIC_API_KEY: '',
+    GEMINI_API_KEY: '',
+    OPENROUTER_API_KEY: '',
+  }
+}
+
 function packAndExtract(): string {
   const tmp = mkdtempSync(join(tmpdir(), 'ur-package-smoke-'))
   const packOutput = execFileSync(
@@ -38,15 +56,7 @@ function runPackagedBin(packageRoot: string, args: string[]) {
   return spawnSync(nodeBin, [join(packageRoot, 'bin', 'ur.js'), ...args], {
     cwd: packageRoot,
     encoding: 'utf8',
-    env: {
-      ...process.env,
-      BUN_BIN: bunBin,
-      UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
-      OPENAI_API_KEY: '',
-      ANTHROPIC_API_KEY: '',
-      GEMINI_API_KEY: '',
-      OPENROUTER_API_KEY: '',
-    },
+    env: packageSmokeEnv(),
   })
 }
 
@@ -54,15 +64,7 @@ function runPackagedBundle(packageRoot: string, args: string[]) {
   return spawnSync(bunBin, [join(packageRoot, 'dist', 'cli.js'), ...args], {
     cwd: packageRoot,
     encoding: 'utf8',
-    env: {
-      ...process.env,
-      BUN_BIN: bunBin,
-      UR_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'ur-package-config-')),
-      OPENAI_API_KEY: '',
-      ANTHROPIC_API_KEY: '',
-      GEMINI_API_KEY: '',
-      OPENROUTER_API_KEY: '',
-    },
+    env: packageSmokeEnv(),
   })
 }
 
