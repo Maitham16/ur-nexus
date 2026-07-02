@@ -39,6 +39,18 @@ describe('sandbox-adapter (direct regression coverage)', () => {
     resetSettingsCache()
   }
 
+  async function withAvailableBaseSandbox<T>(run: () => T | Promise<T>): Promise<T> {
+    const platformSpy = spyOn(BaseSandboxManager, 'isSupportedPlatform').mockReturnValue(true)
+    const depsSpy = spyOn(BaseSandboxManager, 'checkDependencies').mockReturnValue({ errors: [], warnings: [] })
+    try {
+      await SandboxManager.reset()
+      return await run()
+    } finally {
+      platformSpy.mockRestore()
+      depsSpy.mockRestore()
+    }
+  }
+
   test('disabled mode: sandbox is not required, no unavailable reason, sandboxing off', () => {
     setSandboxSettings({ enabled: false })
     expect(SandboxManager.isSandboxRequired()).toBe(false)
@@ -60,12 +72,14 @@ describe('sandbox-adapter (direct regression coverage)', () => {
     expect(SandboxManager.getSandboxUnavailableReason()).toBeDefined()
   })
 
-  test('getSandboxUnavailableReason returns a useful, human-readable reason when required+unavailable', () => {
-    setSandboxSettings({ enabled: true, failIfUnavailable: true, enabledPlatforms: [] })
-    const reason = SandboxManager.getSandboxUnavailableReason()
-    expect(typeof reason).toBe('string')
-    expect(reason!.length).toBeGreaterThan(0)
-    expect(reason).toContain('sandbox.enabledPlatforms')
+  test('getSandboxUnavailableReason returns a useful, human-readable reason when required+unavailable', async () => {
+    await withAvailableBaseSandbox(() => {
+      setSandboxSettings({ enabled: true, failIfUnavailable: true, enabledPlatforms: [] })
+      const reason = SandboxManager.getSandboxUnavailableReason()
+      expect(typeof reason).toBe('string')
+      expect(reason!.length).toBeGreaterThan(0)
+      expect(reason).toContain('sandbox.enabledPlatforms')
+    })
   })
 
   test('required mode proceeds (no unavailable reason) when the sandbox is actually available', async () => {

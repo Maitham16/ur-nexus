@@ -1,5 +1,6 @@
 /* eslint-disable custom-rules/no-process-exit -- CLI subcommand handlers intentionally exit */
 
+import type { Writable } from 'node:stream'
 import {
   formatProviderDoctor,
   formatProviderList,
@@ -18,16 +19,26 @@ type JsonOption = {
   json?: boolean
 }
 
-function writeOutput(text: string): void {
-  process.stdout.write(text.endsWith('\n') ? text : `${text}\n`)
+async function writeStream(stream: Writable, text: string): Promise<void> {
+  const output = text.endsWith('\n') ? text : `${text}\n`
+  await new Promise<void>((resolve, reject) => {
+    stream.write(output, error => {
+      if (error) reject(error)
+      else resolve()
+    })
+  })
 }
 
-function writeError(text: string): void {
-  process.stderr.write(text.endsWith('\n') ? text : `${text}\n`)
+function writeOutput(text: string): Promise<void> {
+  return writeStream(process.stdout, text)
+}
+
+function writeError(text: string): Promise<void> {
+  return writeStream(process.stderr, text)
 }
 
 export async function providerListHandler(options: JsonOption = {}): Promise<void> {
-  writeOutput(formatProviderList(Boolean(options.json)))
+  await writeOutput(formatProviderList(Boolean(options.json)))
   process.exit(0)
 }
 
@@ -35,7 +46,7 @@ export async function providerStatusHandler(options: JsonOption = {}): Promise<v
   const settings = getInitialSettings()
   const active = getActiveProviderSettings(settings).active ?? 'ollama'
   const result = await doctorProvider(active, { settings })
-  writeOutput(formatProviderStatus(result, Boolean(options.json)))
+  await writeOutput(formatProviderStatus(result, Boolean(options.json)))
   process.exit(result.ok ? 0 : 1)
 }
 
@@ -47,7 +58,7 @@ export async function providerDoctorHandler(
   if (providerArg) {
     const resolved = resolveProviderId(providerArg)
     if (!resolved) {
-      writeError(`Unknown provider "${providerArg}". Run: ur provider list`)
+      await writeError(`Unknown provider "${providerArg}". Run: ur provider list`)
       process.exit(1)
     }
     provider = resolved
@@ -56,7 +67,7 @@ export async function providerDoctorHandler(
   const settings = getInitialSettings()
   const active = getActiveProviderSettings(settings).active ?? 'ollama'
   const result = await doctorProvider(provider ?? active, { settings })
-  writeOutput(formatProviderDoctor(result, Boolean(options.json)))
+  await writeOutput(formatProviderDoctor(result, Boolean(options.json)))
   process.exit(result.ok ? 0 : 1)
 }
 
@@ -74,11 +85,11 @@ export async function providerAuthHandler(
   })
 
   if (options.json) {
-    writeOutput(JSON.stringify(result, null, 2))
+    await writeOutput(JSON.stringify(result, null, 2))
   } else if (result.ok) {
-    writeOutput(result.message)
+    await writeOutput(result.message)
   } else {
-    writeError(result.message)
+    await writeError(result.message)
   }
   process.exit(result.ok ? 0 : 1)
 }
@@ -95,7 +106,7 @@ export async function configSetHandler(
     key !== 'model' &&
     key !== 'base_url'
   ) {
-    writeError(
+    await writeError(
       `Unsupported config key "${key}". Supported: provider, provider.fallback, provider.command_path, model, base_url`,
     )
     process.exit(1)
@@ -107,7 +118,7 @@ export async function configSetHandler(
     const currentProvider = getActiveProviderSettings(settings).active ?? 'ollama'
     const validation = validateProviderModelCompatibility(currentProvider, value)
     if (validation.valid === false) {
-      writeError(`Invalid model for current provider:
+      await writeError(`Invalid model for current provider:
   Selected provider: ${currentProvider}
   Selected model: ${value}
   Valid models for ${currentProvider}: ${validation.validModels.join(', ') || '(no models discovered)'}
@@ -128,7 +139,7 @@ export async function configSetHandler(
         if (validation.valid === false) {
           const validModelsStr = validation.validModels.join(', ') || '(uses dynamic discovery)'
           const suggestedModel = validation.suggestedModel ?? '<model-name>'
-          writeError(`Warning: Current model "${currentModel}" is not available for provider "${newProvider}" and will be cleared.
+          await writeError(`Warning: Current model "${currentModel}" is not available for provider "${newProvider}" and will be cleared.
   Valid models for ${newProvider}: ${validModelsStr}
   After changing provider, run /model or: ur config set model ${suggestedModel}`)
           // Continue with provider change, but warn user
@@ -139,9 +150,9 @@ export async function configSetHandler(
 
   const result = setSafeProviderConfig(key, value)
   if (result.ok) {
-    writeOutput(result.message)
+    await writeOutput(result.message)
     process.exit(0)
   }
-  writeError(result.message)
+  await writeError(result.message)
   process.exit(1)
 }
