@@ -33,6 +33,7 @@ import {
 } from '../utils/model/model.js'
 import type { ModelOption } from '../utils/model/modelOptions.js'
 import {
+  getInitialSettings,
   getSettingsForSource,
   updateSettingsForSource,
 } from '../utils/settings/settings.js'
@@ -106,14 +107,15 @@ export function ModelPicker({
   )
   const [providerModelOptions, setProviderModelOptions] = useState<ModelOption[]>([])
   const [pickerError, setPickerError] = useState<string | null>(null)
+  const effectiveSettings = getInitialSettings()
   const currentProvider =
-    getActiveProviderSettings(getSettingsForSource('userSettings') ?? {}).active ?? 'ollama'
+    getActiveProviderSettings(effectiveSettings).active ?? 'ollama'
 
   // Load models for the current provider
   useEffect(() => {
     const controller = new AbortController()
     listModelsForProviderWithSource(currentProvider, {
-      settings: getSettingsForSource('userSettings') ?? undefined,
+      settings: effectiveSettings,
       signal: controller.signal,
     })
       .then(result => {
@@ -131,7 +133,7 @@ export function ModelPicker({
         setPickerError(error instanceof Error ? error.message : String(error))
       })
     return () => controller.abort()
-  }, [currentProvider])
+  }, [currentProvider, effectiveSettings])
 
   const modelOptions = providerModelOptions
 

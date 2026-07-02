@@ -1,3 +1,4 @@
+import { APIConnectionTimeoutError } from '@urhq-ai/sdk'
 import { expect, test } from 'bun:test'
 import {
   createOllamaURHQClient,
@@ -257,6 +258,41 @@ test('Ollama stream timeout applies after response headers', async () => {
     const iterator = data[Symbol.asyncIterator]()
     expect((await iterator.next()).value.type).toBe('message_start')
     await expect(iterator.next()).rejects.toThrow('Ollama stream timed out')
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('Ollama gateway timeout payload is classified and sanitized', async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = createMockOllamaFetch({
+    capabilities: ['completion', 'tools'],
+    chatResponse: new Response(
+      JSON.stringify({
+        error:
+          'Post "https://ollama.com:443/api/chat?ts=1782994332": read tcp 172.20.10.3:51907->34.36.133.15:443: read: operation timed out',
+      }),
+      {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    ),
+  })
+
+  try {
+    let caught: unknown
+    try {
+      await createStreamingOllamaResponse({
+        model: 'minimax-m3:cloud',
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(APIConnectionTimeoutError)
+    expect((caught as Error).message).toContain('Ollama gateway timed out')
+    expect((caught as Error).message).not.toContain('172.20.10.3')
+    expect((caught as Error).message).not.toContain('ollama.com:443')
   } finally {
     globalThis.fetch = previousFetch
   }

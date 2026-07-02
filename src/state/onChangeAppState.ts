@@ -96,8 +96,8 @@ export function onChangeAppState({
     newState.mainLoopModel !== oldState.mainLoopModel &&
     newState.mainLoopModel === null
   ) {
-    // Remove from settings
-    updateSettingsForSource('userSettings', { model: undefined })
+    // Remove from folder-local settings so model changes do not leak across projects.
+    updateSettingsForSource('localSettings', { model: undefined })
     setMainLoopModelOverride(null)
   }
 
@@ -106,8 +106,8 @@ export function onChangeAppState({
     newState.mainLoopModel !== oldState.mainLoopModel &&
     newState.mainLoopModel !== null
   ) {
-    // Save to settings
-    updateSettingsForSource('userSettings', { model: newState.mainLoopModel })
+    // Save to folder-local settings so model changes do not leak across projects.
+    updateSettingsForSource('localSettings', { model: newState.mainLoopModel })
     setMainLoopModelOverride(newState.mainLoopModel)
   }
 

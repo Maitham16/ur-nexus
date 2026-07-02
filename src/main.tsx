@@ -4893,14 +4893,23 @@ async function run(): Promise<CommanderCommand> {
     line?: string;
     json?: boolean;
   }) => {
-    const {
-      runIdeDiffCommand
-    } = await import('./commands/ide/inlineDiffCommand.js');
     if (action === 'open') {
       // biome-ignore lint/suspicious/noConsole:: CLI command output
       console.log('Use `/ide open` inside an interactive UR session, or use `ur ide diff ...` for inline diff bundles.');
       process.exit(0);
     }
+    if (action === 'status' || action === 'doctor' || action === 'config') {
+      const {
+        runIdeInfoCommand
+      } = await import('./commands/ide/ideInfoCommand.js');
+      const args = [action, ...rest, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
+      // biome-ignore lint/suspicious/noConsole:: CLI command output
+      console.log(await runIdeInfoCommand(args));
+      process.exit(0);
+    }
+    const {
+      runIdeDiffCommand
+    } = await import('./commands/ide/inlineDiffCommand.js');
     const command = action === 'diff' || action === 'diffs' ? [action, ...rest] : ['diff', action ?? 'list', ...rest];
     const args = [...command, opts.title ? `--title ${quoteLocalCommandArg(opts.title)}` : undefined, opts.base ? `--base ${quoteLocalCommandArg(opts.base)}` : undefined, opts.staged ? '--staged' : undefined, opts.feedback ? `--feedback ${quoteLocalCommandArg(opts.feedback)}` : undefined, opts.file ? `--file ${quoteLocalCommandArg(opts.file)}` : undefined, opts.line ? `--line ${opts.line}` : undefined, opts.json ? '--json' : undefined].filter(Boolean).join(' ');
     // biome-ignore lint/suspicious/noConsole:: CLI command output

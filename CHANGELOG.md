@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.35.1
+
+- Polished the bundled VS Code inline-diffs view with native toolbar icons,
+  useful empty-state rows, clearer diff labels, and a cleaner review webview.
+- Fixed `ur ide status` routing so the IDE extension status action reports
+  provider/model/plugin status instead of printing inline-diff usage.
+- Kept model/provider selections project-local by default and made transient
+  Ollama gateway timeouts retry cleanly.
+
 ## 1.35.0
 
 - New `ur connect` CLI command (same implementation as the `/connect` slash

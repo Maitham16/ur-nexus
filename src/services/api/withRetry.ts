@@ -377,7 +377,10 @@ export async function* withRetry<T>(
         handleAwsCredentialError(error) || handleGcpCredentialError(error)
       if (
         !handledCloudAuthError &&
-        (!(error instanceof APIError) || !shouldRetry(error))
+        !(
+          (error instanceof APIError || error instanceof APIConnectionError) &&
+          shouldRetry(error)
+        )
       ) {
         throw new CannotRetryError(error, retryContext)
       }

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { execFileNoThrow } from '../../utils/execFileNoThrow.js'
 import { getOllamaBaseUrl } from '../../utils/model/ollamaConfig.js'
 import { getInitialSettings, updateSettingsForSource } from '../../utils/settings/settings.js'
+import type { EditableSettingSource } from '../../utils/settings/constants.js'
 import type { SettingsJson } from '../../utils/settings/types.js'
 import { which } from '../../utils/which.js'
 
@@ -729,6 +730,7 @@ export function setSafeProviderConfig(
     | 'model'
     | 'base_url',
   value: string,
+  options: { source?: EditableSettingSource } = {},
 ): { ok: true; message: string } | { ok: false; message: string } {
   const trimmed = value.trim()
   if (!trimmed) {
@@ -825,7 +827,8 @@ export function setSafeProviderConfig(
     }
   }
 
-  const result = updateSettingsForSource('userSettings', settings)
+  const source = options.source ?? 'localSettings'
+  const result = updateSettingsForSource(source, settings)
   if (result.error) {
     return {
       ok: false,
@@ -2055,6 +2058,7 @@ export function setProviderModel(
   options: {
     availableModels?: Array<string | ProviderModelDefinition>
     modelSource?: ProviderModelSource
+    source?: EditableSettingSource
   } = {},
 ): { ok: true; message: string; provider: ProviderId; model: string; modelSource: ProviderModelSource } | { ok: false; message: string } {
   const provider = resolveProviderId(providerId)
@@ -2080,7 +2084,8 @@ export function setProviderModel(
       message: validation.error,
     }
   }
-  const result = updateSettingsForSource('userSettings', {
+  const source = options.source ?? 'localSettings'
+  const result = updateSettingsForSource(source, {
     provider: {
       active: provider,
       model: modelId,

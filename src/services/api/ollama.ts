@@ -103,6 +103,8 @@ type OllamaChatRequest = {
 
 const DEFAULT_OLLAMA_REQUEST_TIMEOUT_MS = 300_000
 const REMOTE_OLLAMA_REQUEST_TIMEOUT_MS = 120_000
+const OLLAMA_GATEWAY_TIMEOUT_MESSAGE =
+  'Ollama gateway timed out while waiting for the model to respond. Check the selected Ollama endpoint or increase API_TIMEOUT_MS if the model needs more time.'
 const ollamaModelCapabilitiesCache = new Map<
   string,
   OllamaModelCapabilities | null
@@ -211,9 +213,7 @@ async function fetchOllamaChat(
 
     if (!response.ok) {
       const body = await response.text().catch(() => '')
-      throw new Error(
-        `Ollama request failed (${response.status}): ${body || response.statusText}`,
-      )
+      throw createOllamaHTTPError(response.status, body, response.statusText)
     }
 
     return response
@@ -224,6 +224,13 @@ async function fetchOllamaChat(
       }
       throw new APIConnectionTimeoutError({ message: 'Ollama request timed out' })
     }
+    if (
+      error instanceof APIConnectionError ||
+      error instanceof APIConnectionTimeoutError ||
+      error instanceof APIUserAbortError
+    ) {
+      throw error
+    }
     if (error instanceof Error) {
       throw new APIConnectionError({ message: error.message, cause: error })
     }
@@ -233,6 +240,45 @@ async function fetchOllamaChat(
       clearTimeout(timeoutId)
     }
   }
+}
+
+function createOllamaHTTPError(
+  status: number,
+  body: string,
+  statusText: string,
+): Error {
+  const rawMessage = extractOllamaHTTPErrorMessage(body) || statusText
+  if (isOllamaGatewayTimeout(status, rawMessage)) {
+    return new APIConnectionTimeoutError({
+      message: OLLAMA_GATEWAY_TIMEOUT_MESSAGE,
+      cause: new Error(`Ollama request failed (${status}): ${rawMessage}`),
+    })
+  }
+  return new Error(`Ollama request failed (${status}): ${rawMessage}`)
+}
+
+function extractOllamaHTTPErrorMessage(body: string): string {
+  if (!body.trim()) {
+    return ''
+  }
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown }
+    if (typeof parsed.error === 'string') {
+      return parsed.error
+    }
+  } catch {
+    // fall back to raw body below
+  }
+  return body
+}
+
+function isOllamaGatewayTimeout(status: number, message: string): boolean {
+  if (status !== 502 && status !== 504) {
+    return false
+  }
+  return /operation timed out|read:.*timed out|timeout|deadline exceeded/i.test(
+    message,
+  )
 }
 
 function createLinkedAbortController(options?: RequestOptions): AbortController {

@@ -1,5 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import {
+  resetStateForTests,
+  setCwdState,
+  setOriginalCwd,
+} from '../src/bootstrap/state.js'
 import {
   buildProviderAuthCommand,
   cacheProviderModelsForProvider,
@@ -11,9 +18,12 @@ import {
   listProviders,
   resolveProviderId,
   listModelsForProviderWithSource,
+  setProviderModel,
+  setSafeProviderConfig,
   type CommandResult,
   type ProviderDoctorAdapters,
 } from '../src/services/providers/providerRegistry.js'
+import { resetSettingsCache } from '../src/utils/settings/settingsCache.js'
 
 beforeEach(() => {
   clearProviderModelCacheForTests()
@@ -651,5 +661,55 @@ describe('provider-scoped model listing', () => {
     expect(
       validateProviderModelCompatibility(settings.active, settings.model ?? '').valid,
     ).toBe(true)
+  })
+
+  test('provider/model selections are written to folder-local settings by default', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ur-provider-scope-'))
+    try {
+      resetStateForTests()
+      setOriginalCwd(dir)
+      setCwdState(dir)
+      resetSettingsCache()
+
+      const result = setProviderModel('ollama', 'qwen3-coder:480b-cloud', {
+        availableModels: ['qwen3-coder:480b-cloud'],
+      })
+
+      expect(result.ok).toBe(true)
+      const localPath = join(dir, '.ur', 'settings.local.json')
+      const userPath = join(dir, '.ur', 'settings.json')
+      const saved = JSON.parse(readFileSync(localPath, 'utf8'))
+      expect(saved.provider.active).toBe('ollama')
+      expect(saved.provider.model).toBe('qwen3-coder:480b-cloud')
+      expect(saved.model).toBe('qwen3-coder:480b-cloud')
+      expect(existsSync(userPath)).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+      resetStateForTests()
+      resetSettingsCache()
+    }
+  })
+
+  test('provider command config is folder-local by default', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ur-provider-config-scope-'))
+    try {
+      resetStateForTests()
+      setOriginalCwd(dir)
+      setCwdState(dir)
+      resetSettingsCache()
+
+      const result = setSafeProviderConfig('provider', 'ollama')
+
+      expect(result.ok).toBe(true)
+      const localPath = join(dir, '.ur', 'settings.local.json')
+      const userPath = join(dir, '.ur', 'settings.json')
+      const saved = JSON.parse(readFileSync(localPath, 'utf8'))
+      expect(saved.provider.active).toBe('ollama')
+      expect(existsSync(userPath)).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+      resetStateForTests()
+      resetSettingsCache()
+    }
   })
 })

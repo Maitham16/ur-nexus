@@ -13,7 +13,7 @@ import {
   setSafeProviderConfig,
 } from 'src/services/providers/providerRegistry.js'
 import { useSetAppState } from 'src/state/AppState.js'
-import { getSettingsForSource } from 'src/utils/settings/settings.js'
+import { getInitialSettings } from 'src/utils/settings/settings.js'
 import { Box, Text } from '../ink.js'
 import { useAppState as useAppStateSelector } from '../state/AppState.js'
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js'
@@ -77,7 +77,7 @@ export function ProviderPicker({
     if (!result.ok) {
       return
     }
-    const saved = getActiveProviderSettings(getSettingsForSource('userSettings') ?? {})
+    const saved = getActiveProviderSettings(getInitialSettings())
 
     // Update app state
     setAppState(prev => ({

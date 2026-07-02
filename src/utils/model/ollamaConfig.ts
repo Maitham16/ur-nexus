@@ -1,4 +1,4 @@
-import { getSettingsForSource } from '../settings/settings.js'
+import { getInitialSettings } from '../settings/settings.js'
 
 let sessionOverride: string | undefined
 
@@ -21,7 +21,7 @@ function normalizeOllamaBaseUrl(value: string | undefined): string {
  * Precedence:
  *  1. In-memory session override (set when the user picks a discovered host).
  *  2. `OLLAMA_HOST` environment variable.
- *  3. User settings: `ollama.host`.
+ *  3. Effective settings: `ollama.host` from user/project/local settings.
  *  4. Fallback `http://localhost:11434`.
  */
 export function getOllamaBaseUrl(
@@ -37,7 +37,7 @@ export function getOllamaBaseUrl(
   }
   const settingsHost =
     settings === undefined
-      ? getSettingsForSource('userSettings')?.ollama?.host
+      ? getInitialSettings().ollama?.host
       : settings.ollama?.host
   if (settingsHost) {
     return normalizeOllamaBaseUrl(settingsHost)
