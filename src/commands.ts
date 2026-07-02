@@ -68,6 +68,7 @@ import agentTrends from './commands/agent-trends/index.js'
 import bg from './commands/bg/index.js'
 import a2aCard from './commands/a2a-card/index.js'
 import acp from './commands/acp/index.js'
+import connect from './commands/connect/index.js'
 import automation from './commands/automation/index.js'
 import exec from './commands/exec/index.js'
 import browserQa from './commands/browser-qa/index.js'
@@ -411,6 +412,7 @@ const COMMANDS = memoize((): Command[] => [
   bg,
   a2aCard,
   acp,
+  connect,
   automation,
   exec,
   browserQa,

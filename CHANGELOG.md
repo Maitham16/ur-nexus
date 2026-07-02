@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.34.0
+
+- Restore the 1.30.3 subscription approach: Codex CLI, Claude Code, Gemini CLI
+  and Antigravity are first-class in `/model` again — shown by default and
+  usable directly (no `UR_ENABLE_EXTERNAL_APP_PROVIDERS` opt-in and no runtime
+  block). They dispatch through the official CLI; log in with
+  `ur auth <provider>`. The internal generic `subscription` placeholder is
+  hidden from listings.
+- API and local/server providers are unchanged: live model discovery from each
+  provider's `/models` endpoint and in-app masked API-key entry.
+
+## 1.33.0
+
+- Add API keys from inside UR while it is running: in `/model`, selecting an
+  API provider (OpenAI, Anthropic, Gemini, OpenRouter) that isn't connected now
+  shows a masked key-entry step. The key is stored in the OS keychain, then the
+  provider's models load live and you choose one — all without leaving the
+  session or setting an environment variable.
+- Subscription login is unchanged: use `ur auth <provider>` (Codex, Claude,
+  Gemini, Antigravity).
+
+## 1.32.0
+
+- `/model` now shows the subscription providers (Codex CLI, Claude Code, Gemini
+  CLI, Antigravity) again. They are enabled the moment you `ur connect` them
+  (persisted per-account opt-in) — no `UR_ENABLE_EXTERNAL_APP_PROVIDERS` env var
+  needed — and run via the official CLI. Not connected → clear connect prompt.
+- API providers (OpenAI, Anthropic, Gemini, OpenRouter) now load their model
+  lists **live** from each provider's `/models` endpoint using your connected
+  key (OpenAI/Anthropic/OpenRouter `data[].id`; Gemini `models[]` filtered to
+  `generateContent`). No hardcoded model IDs; the curated list is only a
+  fallback shown before you connect. Subscription CLIs keep a curated list
+  because their official CLIs expose no models API.
+- Live-discovered models validate against the discovered list (with cold-process
+  tolerance), so a saved API model keeps working across restarts.
+
+## 1.31.0
+
+- Add in-app provider connection: `ur connect` / `/connect` connects a provider
+  once and persists it. Subscription providers (Codex, Claude Code, Gemini,
+  Antigravity) launch their official CLI login using your own account; API
+  providers (OpenAI, Anthropic, Gemini, OpenRouter) store the key in the OS
+  keychain (with an encrypted file fallback) — the same secure store UR uses for
+  its own credentials.
+- Runtime now reads a stored key first, then the environment variable, so a
+  once-connected API provider works in later sessions without re-entering the
+  key. `ur provider doctor` and the `/model` picker reflect stored-key
+  connections and, when not connected, show the exact `ur connect <provider>`
+  command instead of failing opaquely.
+- `ur connect status` reports connection state for every provider; keys are read
+  from stdin (not argv/shell history) and never written to plaintext settings.
+
 ## 1.30.6
 
 - Restore a visible `subscription` access entry in provider lists without

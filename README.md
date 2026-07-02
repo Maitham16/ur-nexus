@@ -157,12 +157,14 @@ environment variables. API, local, and OpenAI-compatible server providers are
 UR-native runtimes and behave like Ollama: UR owns the conversation loop, tool
 loop, errors, and output.
 
-The default provider list includes a generic `subscription` access entry so the
-access type is visible, but this build does not invent subscription models or
-route through provider apps. If no independent subscription runtime is
-configured, that entry is marked unavailable. Subscription CLI integrations are
-external app bridges; they are diagnostics/opt-in only and are disabled for
-normal runtime selection unless `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` is set.
+The provider list shows the subscription CLIs (Codex CLI, Claude Code, Gemini
+CLI, Antigravity) alongside the API and local/server providers, and they are
+first-class: pick one in `/model` and it dispatches through the official CLI.
+These are external app bridges — they run the vendor's own CLI using your
+subscription — so you log in with `ur auth <provider>` (e.g. `ur auth chatgpt`,
+`ur auth claude`). UR does not invent subscription models; each subscription
+shows its curated model list. The generic `subscription` entry is an internal
+placeholder and is hidden from the list.
 
 ```sh
 ur provider list
@@ -235,9 +237,9 @@ identity line in the system prompt reflects it too:
   OpenRouter on its OpenAI-compatible chat endpoint.
 - **Local/server** providers call the configured endpoint (`/v1/chat/completions`
   for LM Studio/llama.cpp/vLLM; the native API for Ollama).
-- **External app bridges** for subscription CLIs are disabled by default because
-  they delegate the turn to another agent app. Opt in with
-  `UR_ENABLE_EXTERNAL_APP_PROVIDERS=1` only when that behavior is intentional.
+- **Subscription CLIs** (Codex, Claude Code, Gemini, Antigravity) are external
+  app bridges: selecting one dispatches the turn through the vendor's official
+  CLI using your subscription. Log in with `ur auth <provider>`.
 - **Subscription** access does not list fake models. If no independent
   subscription backend is configured, `/model` marks it unavailable and asks you
   to choose a connected local, server, or API provider.

@@ -56,40 +56,38 @@ describe('provider registry legal access paths', () => {
     expect(resolveProviderId('not-a-provider')).toBeNull()
   })
 
-  test('provider list shows UR-native providers by default', () => {
+  test('provider list shows all providers including subscription CLIs by default', () => {
     const text = formatProviderList()
 
     expect(text).toContain('ID')
     expect(text).toContain('Access type')
     expect(text).toContain('Credential')
-    expect(text).toContain('subscription')
     expect(text).toContain('ollama')
     expect(text).toContain('openai-api')
-    expect(text).not.toContain('claude-code-cli')
-    expect(text).not.toContain('antigravity-cli')
-    expect(text).not.toContain('codex-cli')
+    expect(text).toContain('codex-cli')
+    expect(text).toContain('claude-code-cli')
+    expect(text).toContain('gemini-cli')
+    expect(text).toContain('antigravity-cli')
   })
 
-  test('external app bridge providers are hidden unless explicitly included', () => {
+  test('subscription CLI providers are listed by default (1.30.3 behavior)', () => {
     const providers = listProviders()
-    const allProviders = listProviders({ includeExternalAppBridges: true })
 
-    expect(providers.some(provider => provider.id === 'codex-cli')).toBe(false)
-    expect(providers.some(provider => provider.id === 'gemini-cli')).toBe(false)
-    expect(allProviders.some(provider => provider.id === 'codex-cli')).toBe(true)
-    expect(allProviders.some(provider => provider.id === 'gemini-cli')).toBe(true)
+    expect(providers.some(provider => provider.id === 'codex-cli')).toBe(true)
+    expect(providers.some(provider => provider.id === 'gemini-cli')).toBe(true)
+    // The internal generic "subscription" placeholder is hidden from listings.
+    expect(providers.some(provider => provider.id === 'subscription')).toBe(false)
   })
 
   test('/model provider entries show access type and credential type', () => {
     const providers = listProviders()
-    const subscription = providers.find(provider => provider.id === 'subscription')
+    const codex = providers.find(provider => provider.id === 'codex-cli')
     const openai = providers.find(provider => provider.id === 'openai-api')
     const ollama = providers.find(provider => provider.id === 'ollama')
     const lmstudio = providers.find(provider => provider.id === 'lmstudio')
 
-    expect(providers.some(provider => provider.runtimeKind === 'external-app')).toBe(false)
-    expect(subscription?.accessType).toBe('subscription')
-    expect(subscription?.credentialType).toBe('subscription-login')
+    expect(codex?.accessType).toBe('subscription')
+    expect(codex?.credentialType).toBe('cli-login')
     expect(openai?.accessType).toBe('api')
     expect(openai?.credentialType).toBe('api-key')
     expect(ollama?.accessType).toBe('local')
@@ -98,15 +96,11 @@ describe('provider registry legal access paths', () => {
     expect(lmstudio?.credentialType).toBe('openai-compatible-endpoint')
   })
 
-  test('API and external app bridge providers are metadata-distinct when explicitly included', () => {
-    const providers = listProviders({ includeExternalAppBridges: true })
-    const subscription = providers.find(provider => provider.id === 'subscription')
+  test('API and subscription providers are metadata-distinct', () => {
+    const providers = listProviders()
     const codex = providers.find(provider => provider.id === 'codex-cli')
     const openai = providers.find(provider => provider.id === 'openai-api')
 
-    expect(subscription?.accessType).toBe('subscription')
-    expect(subscription?.credentialType).toBe('subscription-login')
-    expect(subscription?.runtimeKind).toBe('ur-native')
     expect(codex?.accessType).toBe('subscription')
     expect(codex?.credentialType).toBe('cli-login')
     expect(codex?.runtimeKind).toBe('external-app')

@@ -18,7 +18,9 @@ import {
   setProviderModel,
   validateProviderModelPair,
   getProviderRuntimeBlockReason,
+  authAliasForProvider,
 } from 'src/services/providers/providerRegistry.js'
+import { setProviderApiKey } from 'src/services/providers/providerCredentials.js'
 import { useAppState, useSetAppState } from 'src/state/AppState.js'
 import { getSettingsForSource } from 'src/utils/settings/settings.js'
 import type { ModelOption } from 'src/utils/model/modelOptions.js'
@@ -26,6 +28,7 @@ import { Box, Text } from '../ink.js'
 import { useAppState as useAppStateSelector } from '../state/AppState.js'
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js'
 import { Select } from './CustomSelect/index.js'
+import TextInput from './TextInput.js'
 import { Byline } from './design-system/Byline.js'
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
 import { Pane } from './design-system/Pane.js'
@@ -47,7 +50,7 @@ const selectCurrentProvider = (s: { provider?: { active?: string } }) =>
 const selectEffortValue = (s: { effortValue?: unknown }) => s.effortValue
 const selectThinkingEnabled = (s: { thinkingEnabled?: boolean }) => s.thinkingEnabled
 
-type Step = 'provider' | 'model'
+type Step = 'provider' | 'connect' | 'model'
 
 type ProviderStatusOption = {
   value: string
@@ -101,6 +104,9 @@ export function ProviderFirstModelPicker({
   const [modelSource, setModelSource] = useState<ProviderModelSource>('static')
   const [modelWarning, setModelWarning] = useState<string | null>(null)
   const [providerWarning, setProviderWarning] = useState<string | null>(null)
+  const [connectingProvider, setConnectingProvider] = useState<ProviderStatusOption | null>(null)
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [connectError, setConnectError] = useState<string | null>(null)
 
   const effortValue = useAppState(selectEffortValue)
   const [effort] = useState<EffortLevel | undefined>(
@@ -116,7 +122,7 @@ export function ProviderFirstModelPicker({
   useEffect(() => {
     async function loadProviderStatus() {
       setLoadingProviders(true)
-      const providers = listProviders()
+      const providers = listProviders({ includeExternalAppBridges: true })
       const settings = getSettingsForSource('userSettings')
 
       const options: ProviderStatusOption[] = await Promise.all(
@@ -210,6 +216,18 @@ export function ProviderFirstModelPicker({
         return
       }
       if (provider.status !== 'connected') {
+        if (provider.credentialType === 'api-key') {
+          // Add the API key right here, while UR is running, then load models.
+          setConnectingProvider(provider)
+          setApiKeyInput('')
+          setConnectError(null)
+          setStep('connect')
+          return
+        }
+        if (provider.provider.accessType === 'subscription') {
+          setProviderWarning(`${provider.label} is not logged in. Sign in with \`ur auth ${authAliasForProvider(provider.value)}\` (uses your own subscription), then reselect.`)
+          return
+        }
         setProviderWarning(`Provider "${provider.value}" is ${provider.status}: ${provider.statusLabel}. Run \`ur provider doctor ${provider.value}\`, or choose a connected API/local/server provider.`)
         return
       }
@@ -297,6 +315,76 @@ export function ProviderFirstModelPicker({
     setModelWarning(null)
   }
 
+  function handleKeySubmit() {
+    if (!connectingProvider) return
+    const key = apiKeyInput.trim()
+    if (!key) {
+      setConnectError('Enter your API key (or press Esc to go back).')
+      return
+    }
+    const saved = setProviderApiKey(connectingProvider.value, key)
+    if (!saved.ok) {
+      setConnectError(saved.message)
+      return
+    }
+    setApiKeyInput('')
+    setConnectError(null)
+    // Selecting the provider triggers live model discovery with the new key.
+    setSelectedProvider(connectingProvider)
+    setStep('model')
+  }
+
+  function handleKeyCancel() {
+    setApiKeyInput('')
+    setConnectingProvider(null)
+    setConnectError(null)
+    setStep('provider')
+  }
+
+  // API key entry view (add a token from inside UR while it is running).
+  if (step === 'connect' && connectingProvider) {
+    const envKey = connectingProvider.provider.envKey
+    const content = (
+      <Box flexDirection="column">
+        <Box marginBottom={1} flexDirection="column">
+          <Text color="remember" bold>
+            Connect {connectingProvider.label}
+          </Text>
+          <Text dimColor>
+            Paste your API key to use your own account. It is stored securely in your OS keychain and reused automatically — you only do this once.
+          </Text>
+          {envKey && (
+            <Text dimColor color="subtle">
+              Equivalent to setting {envKey}. Get a key from the provider's dashboard.
+            </Text>
+          )}
+        </Box>
+        <Box>
+          <Text>{'API key: '}</Text>
+          <TextInput
+            value={apiKeyInput}
+            onChange={setApiKeyInput}
+            onSubmit={handleKeySubmit}
+            mask="*"
+            placeholder="paste key, then Enter"
+          />
+        </Box>
+        {connectError && (
+          <Box marginTop={1}>
+            <Text color="error">{connectError}</Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Byline>
+            <KeyboardShortcutHint shortcut="Enter" action="store key & load models" />
+            <KeyboardShortcutHint shortcut="Esc" action="back" />
+          </Byline>
+        </Box>
+      </Box>
+    )
+    return isStandaloneCommand ? <Pane color="permission">{content}</Pane> : content
+  }
+
   // Provider selection view
   if (step === 'provider') {
     const content = (
@@ -349,7 +437,7 @@ export function ProviderFirstModelPicker({
                   </Text>
                   {focusedProvider.status !== 'connected' && (
                     <Text dimColor color="subtle">
-                      Tip: Run `ur provider doctor {focusedProvider.value}` for troubleshooting
+                      Not connected — run `ur connect {focusedProvider.value}` (subscription login or API key), then reselect. Troubleshoot: `ur provider doctor {focusedProvider.value}`
                     </Text>
                   )}
                   {providerWarning && focusedProvider.value === focusedProviderValue && (

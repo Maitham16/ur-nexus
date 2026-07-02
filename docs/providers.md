@@ -163,10 +163,10 @@ ur config set provider anthropic-api
 
 | Provider type | Model discovery | Source label |
 | --- | --- | --- |
-| API providers (openai-api, anthropic-api, gemini-api, openrouter) | Static list of provider-specific models | static |
+| API providers (openai-api, anthropic-api, gemini-api, openrouter) | Live discovery from the provider's `/models` endpoint using your connected key (curated fallback until connected) | live |
 | Local/server providers (ollama, lmstudio, llama.cpp, vllm) | Dynamic discovery from the selected provider endpoint | live |
 | OpenAI-compatible | Dynamic discovery from configured endpoint | live |
-| External app bridges (codex-cli, claude-code-cli, gemini-cli, antigravity-cli) | Static bridge aliases; blocked by default for normal runtime | static |
+| Subscription CLIs (codex-cli, claude-code-cli, gemini-cli, antigravity-cli) | Curated list (the official CLIs expose no models API); first-class in `/model`, dispatched via the official CLI. Log in with `ur auth <provider>` | static |
 
 ### API vs Subscription distinction
 
@@ -196,6 +196,33 @@ ur config set provider anthropic-api
 - OpenAI API and Codex CLI are separate providers
 - Claude API and Claude Code are separate providers
 - Gemini API and Gemini CLI are separate providers
+
+### Connecting accounts (`ur connect` / `/connect`)
+
+Connect a provider once from inside UR (or a terminal). The connection persists,
+so you do not repeat it each session:
+
+```sh
+ur connect status                      # connection state for every provider
+ur connect codex-cli                   # subscription: launches the official login (Codex/Claude/Gemini)
+echo "$OPENAI_API_KEY" | ur connect openai-api   # API: store a key (from stdin, not shell history)
+ur connect openai-api --key <KEY>      # API: store a key explicitly
+ur connect logout openai-api           # clear a stored key
+```
+
+- **Subscription providers** (`codex-cli`, `claude-code-cli`, `gemini-cli`,
+  `antigravity-cli`) connect through their official CLI login using your own
+  account; the session is persisted by that CLI. UR never scrapes or copies
+  those tokens.
+- **API providers** (`openai-api`, `anthropic-api`, `gemini-api`, `openrouter`)
+  store the key in your OS keychain (macOS Keychain, with an encrypted file
+  fallback) — the same secure store UR uses for its own credentials. At runtime
+  a stored key is used first, then the provider's environment variable, so
+  setting the env var still works and never gets overwritten.
+
+If you select a provider that is not connected, UR shows a connect prompt in
+`/model` and the runtime fails clearly with the exact `ur connect <provider>`
+command instead of silently switching providers.
 
 ### Validation
 

@@ -24,6 +24,7 @@ import {
 } from '../providers/providerRegistry.js'
 import { getInitialSettings } from '../../utils/settings/settings.js'
 import type { SettingsJson } from '../../utils/settings/types.js'
+import { getProviderApiKey } from '../providers/providerCredentials.js'
 
 export type ProviderRuntimeSelection = {
   providerId: ProviderId
@@ -219,7 +220,7 @@ async function createOpenAICompatibleProviderClient(
   }
   const apiKey =
     options.apiKey ??
-    (provider.envKey ? process.env[provider.envKey] : undefined)
+    (provider.envKey ? getProviderApiKey(providerId) : undefined)
   const { createOpenAICompatibleClient } = await import('./openaiCompatible.js')
   return createOpenAICompatibleClient({
     baseUrl,
@@ -267,11 +268,11 @@ async function createAPIClient(
   const provider = getProviderDefinition(providerId)
   const settings = getInitialSettings()
   const providerSettings = getActiveProviderSettings(settings)
-  const apiKey = options.apiKey ?? process.env[provider.envKey ?? '']
+  const apiKey = options.apiKey ?? getProviderApiKey(providerId)
 
   if (provider.envKey && !apiKey) {
     throw new Error(
-      `Provider "${providerId}" is selected with model "${options.model ?? providerSettings.model ?? 'unknown'}", but runtime backend "${getProviderRuntimeBackend(providerId)}" is unavailable. API key ${provider.envKey} is not set. Run: ur provider doctor ${providerId}`,
+      `Provider "${providerId}" is selected with model "${options.model ?? providerSettings.model ?? 'unknown'}", but it is not connected: no stored API key and ${provider.envKey} is not set. Connect once with: ur connect ${providerId} (or /connect inside UR), or set ${provider.envKey}. Run: ur provider doctor ${providerId}`,
     )
   }
 
@@ -353,11 +354,11 @@ export async function validateProviderRuntime(
         }
         return { ok: true, runtimeBackend: getProviderRuntimeBackend(resolved) }
       }
-      if (
-        provider.envKey &&
-        !process.env[provider.envKey]
-      ) {
-        return { ok: false, error: `API key ${provider.envKey} not set` }
+      if (provider.envKey && !getProviderApiKey(resolved)) {
+        return {
+          ok: false,
+          error: `Not connected: no stored API key and ${provider.envKey} not set. Run: ur connect ${resolved}`,
+        }
       }
       return { ok: true, runtimeBackend: getProviderRuntimeBackend(resolved) }
     default:

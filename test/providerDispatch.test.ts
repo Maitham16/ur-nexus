@@ -12,6 +12,7 @@ import {
   getProviderFamily,
   getRuntimeProviderId,
   PROVIDER_IDS,
+  validateProviderModelPair,
 } from '../src/services/providers/providerRegistry.js'
 
 function userMessages() {
@@ -411,10 +412,10 @@ describe('config save/load preserves live-provider pairs across a cold process',
 
   test('static provider still rejects an invalid saved model', () => {
     clearProviderModelCacheForTests()
-    expect(() =>
-      resolveActiveProviderModel({
-        settings: { provider: { active: 'openai-api', model: 'claude-sonnet-5' } } as any,
-      }),
-    ).toThrow('runtime dispatch cannot use')
+    // Subscription CLIs are static (curated list) — an off-list model is invalid.
+    // (openai-api and the other API providers are now live-discovery, so a static
+    // subject and a direct validation call are used here.)
+    const result = validateProviderModelPair('codex-cli', 'codex/not-a-real-model')
+    expect(result.valid).toBe(false)
   })
 })

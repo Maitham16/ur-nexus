@@ -67,6 +67,9 @@ export type ProviderSettings = {
   baseUrl?: string
   commandPath?: string
   fallback?: ProviderId | 'disabled'
+  // External-app (subscription CLI) providers the user has explicitly connected
+  // and opted in to via `ur connect`. Persisted so the opt-in is one-time.
+  enabledExternalBridges?: ProviderId[]
 }
 
 export type ProviderDefinition = {
@@ -273,10 +276,10 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     statusBarName: 'OpenAI',
     accessType: 'api',
     credentialType: 'api-key',
-    modelDiscoveryType: 'static',
+    modelDiscoveryType: 'live',
     statusCheck: 'api-key',
     listModels: 'static',
-    validateModel: 'static-list',
+    validateModel: 'discovered-list',
     runtimeKind: 'ur-native',
     authMode: 'api',
     legalPath: 'OPENAI_API_KEY',
@@ -289,10 +292,10 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     statusBarName: 'Claude API',
     accessType: 'api',
     credentialType: 'api-key',
-    modelDiscoveryType: 'static',
+    modelDiscoveryType: 'live',
     statusCheck: 'api-key',
     listModels: 'static',
-    validateModel: 'static-list',
+    validateModel: 'discovered-list',
     runtimeKind: 'ur-native',
     authMode: 'api',
     legalPath: 'ANTHROPIC_API_KEY',
@@ -305,10 +308,10 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     statusBarName: 'Gemini API',
     accessType: 'api',
     credentialType: 'api-key',
-    modelDiscoveryType: 'static',
+    modelDiscoveryType: 'live',
     statusCheck: 'api-key',
     listModels: 'static',
-    validateModel: 'static-list',
+    validateModel: 'discovered-list',
     runtimeKind: 'ur-native',
     authMode: 'api',
     legalPath: 'GEMINI_API_KEY',
@@ -321,10 +324,10 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     statusBarName: 'OpenRouter',
     accessType: 'api',
     credentialType: 'api-key',
-    modelDiscoveryType: 'static',
+    modelDiscoveryType: 'live',
     statusCheck: 'api-key',
     listModels: 'static',
-    validateModel: 'static-list',
+    validateModel: 'discovered-list',
     runtimeKind: 'ur-native',
     authMode: 'api',
     legalPath: 'OPENROUTER_API_KEY',
@@ -654,6 +657,54 @@ export function externalAppProviderBridgeEnabled(env: Record<string, string | un
   return env.UR_ENABLE_EXTERNAL_APP_PROVIDERS === '1'
 }
 
+/**
+ * An external-app (subscription CLI) provider is usable when the env opt-in is
+ * set OR the user has connected it via `ur connect` (persisted per-provider).
+ */
+export function isExternalBridgeEnabled(
+  providerId: ProviderId | string,
+  env: Record<string, string | undefined> = process.env,
+  settings: SettingsJson = getInitialSettings(),
+): boolean {
+  if (externalAppProviderBridgeEnabled(env)) {
+    return true
+  }
+  const provider = resolveProviderId(providerId)
+  const enabled = (settings.provider as ProviderSettings | undefined)?.enabledExternalBridges
+  return Boolean(provider && Array.isArray(enabled) && enabled.includes(provider))
+}
+
+/**
+ * Persist that the user has connected/opted in to an external-app subscription
+ * provider, so it becomes usable without an environment variable.
+ */
+export function enableExternalBridge(
+  providerId: ProviderId | string,
+): { ok: true; message: string } | { ok: false; message: string } {
+  const provider = resolveProviderId(providerId)
+  if (!provider) {
+    return { ok: false, message: `Unknown provider "${providerId}". Run: ur provider list` }
+  }
+  if (getProviderDefinition(provider).runtimeKind !== 'external-app') {
+    return { ok: true, message: `${provider} does not require an external-app opt-in.` }
+  }
+  const settings = getInitialSettings()
+  const current = (settings.provider as ProviderSettings | undefined)?.enabledExternalBridges ?? []
+  if (current.includes(provider)) {
+    return { ok: true, message: `${provider} is already enabled.` }
+  }
+  const result = updateSettingsForSource('userSettings', {
+    provider: {
+      ...(settings.provider ?? {}),
+      enabledExternalBridges: [...current, provider],
+    },
+  } as SettingsJson)
+  if (result.error) {
+    return { ok: false, message: `Failed to persist opt-in: ${result.error.message}` }
+  }
+  return { ok: true, message: `Enabled ${provider} for this account.` }
+}
+
 export function getProviderRuntimeKind(providerId: ProviderId | string): ProviderRuntimeKind | 'unknown' {
   const provider = resolveProviderId(providerId)
   return provider ? getProviderDefinition(provider).runtimeKind : 'unknown'
@@ -662,22 +713,22 @@ export function getProviderRuntimeKind(providerId: ProviderId | string): Provide
 export function getProviderRuntimeBlockReason(
   providerId: ProviderId | string,
   env: Record<string, string | undefined> = process.env,
+  settings: SettingsJson = getInitialSettings(),
 ): string | null {
   const provider = resolveProviderId(providerId)
   if (!provider) {
     return `Unknown provider "${providerId}". Run: ur provider list`
   }
-  const definition = getProviderDefinition(provider)
   if (provider === 'subscription') {
-    return `Provider "subscription" represents subscription login, but no independent subscription runtime is configured. UR will not fake subscription models or call provider apps by default. Choose a local, server, or API provider with /model.`
+    return `Provider "subscription" is an internal placeholder. Choose a specific subscription (codex-cli, claude-code-cli, gemini-cli, antigravity-cli) or an API/local/server provider with /model.`
   }
-  if (definition.runtimeKind !== 'external-app') {
-    return null
-  }
-  if (externalAppProviderBridgeEnabled(env)) {
-    return null
-  }
-  return `Provider "${provider}" uses an external app bridge (${definition.displayName}), not a UR-native model endpoint. UR's independent runtime does not require Codex, Claude Code, Gemini CLI, or Antigravity to be installed. Choose an API/local/server provider such as openai-api, anthropic-api, gemini-api, openrouter, ollama, lmstudio, llama.cpp, or vllm. To intentionally delegate turns to the external app bridge, set UR_ENABLE_EXTERNAL_APP_PROVIDERS=1.`
+  // Subscriptions (Codex, Claude Code, Gemini, Antigravity) are first-class:
+  // usable directly and dispatched through their official CLI. Log in with
+  // `ur auth <provider>`. No runtime block. (env/settings kept for signature
+  // compatibility with earlier gated behavior.)
+  void env
+  void settings
+  return null
 }
 
 export function isProviderRuntimeSelectable(
@@ -687,16 +738,17 @@ export function isProviderRuntimeSelectable(
   return getProviderRuntimeBlockReason(providerId, env) === null
 }
 
-export function listProviders(options: {
-  includeExternalAppBridges?: boolean
-  env?: Record<string, string | undefined>
-} = {}): ProviderDefinition[] {
-  const includeExternal =
-    options.includeExternalAppBridges ??
-    externalAppProviderBridgeEnabled(options.env ?? process.env)
+export function listProviders(
+  _options: {
+    includeExternalAppBridges?: boolean
+    env?: Record<string, string | undefined>
+  } = {},
+): ProviderDefinition[] {
+  // 1.30.3 approach: all real providers are listed, subscription CLIs included.
+  // The internal generic "subscription" placeholder is hidden from listings.
   return PROVIDER_IDS
     .map(id => PROVIDERS[id])
-    .filter(provider => includeExternal || provider.runtimeKind !== 'external-app')
+    .filter(provider => provider.id !== 'subscription')
 }
 
 function hasSecretLikeValue(value: string): boolean {
@@ -1120,19 +1172,35 @@ async function checkApiProvider(
     !baseUrl ||
     !isLocalBaseUrl(baseUrl)
   if (definition.envKey && requiresKey) {
-    if (env[definition.envKey]) {
+    let hasKey = Boolean(env[definition.envKey])
+    let source: 'env' | 'stored' = 'env'
+    // Runtime path only (no injected env): a key connected via `ur connect` is
+    // stored in the secure store, so reflect it here. Dynamic import avoids a
+    // static import cycle with providerCredentials.
+    if (!hasKey && !adapters.env) {
+      try {
+        const { getStoredProviderApiKey } = await import('./providerCredentials.js')
+        if (getStoredProviderApiKey(definition.id)) {
+          hasKey = true
+          source = 'stored'
+        }
+      } catch {
+        // Secure store unavailable — fall back to env-only reporting.
+      }
+    }
+    if (hasKey) {
       result.checks.push({
         name: 'api_key',
         status: 'pass',
-        message: `${definition.envKey} is present.`,
+        message: source === 'stored' ? 'Stored API key present (connected).' : `${definition.envKey} is present.`,
       })
     } else {
       result.checks.push({
         name: 'api_key',
         status: 'fail',
-        message: `${definition.envKey} is not set.`,
+        message: `${definition.envKey} is not set and no stored key.`,
       })
-      addFailure(result, 'API key missing', `Set ${definition.envKey} in your environment or choose a subscription/local provider.`)
+      addFailure(result, 'API key missing', `Connect once: ur connect ${definition.id} (or set ${definition.envKey}).`)
     }
   }
   await checkEndpoint(definition, settings, adapters, result)
@@ -1713,6 +1781,9 @@ async function discoverLiveModelsForProvider(
 ): Promise<ProviderModelDefinition[]> {
   const definition = getProviderDefinition(provider)
   if (!definition.endpointKind) {
+    if (definition.accessType === 'api' && definition.modelDiscoveryType === 'live') {
+      return discoverApiProviderModels(provider, definition, options)
+    }
     return []
   }
   const settings = options.settings ?? getInitialSettings()
@@ -1739,6 +1810,87 @@ async function discoverLiveModelsForProvider(
       ? parseOllamaModelNamesFromTags(body)
       : parseOpenAICompatibleModelNames(body)
   return modelDefinitionsFromNames(provider, names, 'live')
+}
+
+function apiModelsRequest(
+  provider: ProviderId,
+  apiKey: string,
+): { url: string; headers: Record<string, string> } {
+  switch (provider) {
+    case 'anthropic-api':
+      return {
+        url: 'https://api.anthropic.com/v1/models',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      }
+    case 'gemini-api':
+      return {
+        url: 'https://generativelanguage.googleapis.com/v1beta/models',
+        headers: { 'x-goog-api-key': apiKey },
+      }
+    case 'openrouter':
+      return {
+        url: 'https://openrouter.ai/api/v1/models',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    default:
+      return {
+        url: 'https://api.openai.com/v1/models',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+  }
+}
+
+function parseApiModelIds(provider: ProviderId, body: unknown): string[] {
+  const root = (body ?? {}) as Record<string, unknown>
+  if (provider === 'gemini-api') {
+    const models = Array.isArray(root.models) ? (root.models as Array<Record<string, unknown>>) : []
+    const names = models
+      .filter(m => {
+        const methods = m.supportedGenerationMethods
+        return !Array.isArray(methods) || methods.includes('generateContent')
+      })
+      .map(m => (typeof m.name === 'string' ? m.name.replace(/^models\//, '') : ''))
+      .filter(Boolean)
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b))
+  }
+  const data = Array.isArray(root.data) ? (root.data as Array<Record<string, unknown>>) : []
+  const names = data.map(m => (typeof m.id === 'string' ? m.id : '')).filter(Boolean)
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b))
+}
+
+async function discoverApiProviderModels(
+  provider: ProviderId,
+  definition: ProviderDefinition,
+  options: {
+    settings?: SettingsJson
+    adapters?: ProviderDoctorAdapters
+    signal?: AbortSignal
+  },
+): Promise<ProviderModelDefinition[]> {
+  const env = options.adapters?.env ?? process.env
+  let apiKey = definition.envKey ? env[definition.envKey] : undefined
+  if (!apiKey) {
+    try {
+      const { getProviderApiKey } = await import('./providerCredentials.js')
+      apiKey = getProviderApiKey(provider, { env })
+    } catch {
+      // Secure store unavailable — treated as not connected below.
+    }
+  }
+  if (!apiKey) {
+    throw new Error(`Not connected: run \`ur connect ${provider}\` to add an API key.`)
+  }
+  const { url, headers } = apiModelsRequest(provider, apiKey)
+  const response = await (options.adapters?.fetch ?? fetch)(url, {
+    method: 'GET',
+    signal: options.signal,
+    headers,
+  })
+  if (!response.ok) {
+    throw new Error(`${url} returned HTTP ${response.status}.`)
+  }
+  const body = await response.json()
+  return modelDefinitionsFromNames(provider, parseApiModelIds(provider, body), 'live')
 }
 
 export async function listModelsForProviderWithSource(
@@ -1914,7 +2066,12 @@ export function validateProviderModelPair(
   )
   const cachedModels = getCachedProviderModels(provider).map(model => model.id)
   const staticModelIds = staticModelsForProvider(provider).map(model => model.id)
-  const hasDynamicModels = models.some(model => model.isDynamic)
+  // Live-discovery providers (local/server and now the API providers) are
+  // dynamic: their authoritative list comes from the provider, not the curated
+  // fallback baked into PROVIDER_MODELS.
+  const hasDynamicModels =
+    models.some(model => model.isDynamic) ||
+    getProviderDefinition(provider).modelDiscoveryType === 'live'
   const validModelIds =
     suppliedModels.length > 0
       ? suppliedModels
@@ -1928,7 +2085,11 @@ export function validateProviderModelPair(
     return { valid: true }
   }
 
-  if (hasDynamicModels && options.allowUncachedDynamic && validModelIds.length === 0) {
+  // No authoritative (discovered/supplied) list yet — e.g. a saved model on a
+  // cold process before discovery has run. Accept it rather than rejecting a
+  // valid pair; discovery refines the list once the provider is reachable.
+  const noAuthoritativeList = cachedModels.length === 0 && suppliedModels.length === 0
+  if (hasDynamicModels && options.allowUncachedDynamic && noAuthoritativeList) {
     return { valid: true }
   }
 
