@@ -58,12 +58,12 @@
         <div class="section-heading">
           <p class="eyebrow">What UR Is</p>
           <h2>Autonomous engineering workflow engine</h2>
-          <p>UR is not only chat, autocomplete, or code edits. It turns work into a plan, executes patches, tests and verifies them, documents the result, benchmarks behavior, and keeps the run reproducible from the terminal.</p>
+          <p>UR is not only chat, autocomplete, or code edits. It turns work into a plan, executes patches, tests and verifies them, documents the result, benchmarks behavior, and keeps the run reproducible.</p>
         </div>
         <div class="stat-grid">
           <article>
             <strong>Local-first runtime</strong>
-            <span>Use local Ollama/OpenAI-compatible runtimes for private and offline work, or explicitly select configured API provider paths. Subscription access stays visible but unavailable when no independent backend exists.</span>
+            <span>Use local Ollama/OpenAI-compatible runtimes for private and offline work, or explicitly select configured API provider paths. Subscription access stays visible but unavailable when not authenticated.</span>
           </article>
           <article>
             <strong>Interactive and headless</strong>
@@ -128,7 +128,7 @@ ur -p --output-format json "Review the current diff"</code></pre>
         </div>
         <div class="callout">
           <strong>Runtime requirement</strong>
-          <p>UR expects Bun. For local-first work, run a local Ollama app/server at <code>http://localhost:11434/api</code>. Set <code>OLLAMA_MODEL</code> or <code>UR_MODEL</code> to force a model, or use <code>ur provider</code> and <code>ur config set</code> to select official subscription, API, or OpenAI-compatible providers.</p>
+          <p>UR expects Bun. For local-first work, run a local Ollama app/server at <code>http://localhost:11434/api</code>. Set <code>OLLAMA_MODEL</code> or <code>UR_MODEL</code> to force a model route.</p>
         </div>
       </section>
 
@@ -136,7 +136,7 @@ ur -p --output-format json "Review the current diff"</code></pre>
         <div class="section-heading">
           <p class="eyebrow">Legal Access Paths</p>
           <h2>Providers and authentication</h2>
-          <p>UR-AGENT integrates official access paths only. It never scrapes browser sessions, extracts OAuth tokens, reads hidden provider auth files, bypasses provider restrictions, or proxies consumer web sessions as APIs.</p>
+          <p>UR-AGENT integrates official access paths only. It never scrapes browser sessions, extracts OAuth tokens, reads hidden provider auth files, bypasses provider restrictions, or proxies credentials.</p>
         </div>
         <div class="reference-grid">
           <article>
@@ -146,7 +146,7 @@ ur auth claude
 ur auth gemini
 ur auth antigravity
 ur provider doctor agy</code></pre>
-            <p>Codex CLI, Claude Code, Gemini CLI, and Antigravity are first-class providers that dispatch each turn through the vendor's official CLI using your subscription login. They are optional, never required, and never used as a silent fallback. The generic subscription entry is an internal placeholder hidden from listings and exposes no fake models.</p>
+            <p>Codex CLI, Claude Code, Gemini CLI, and Antigravity are first-class providers that dispatch each turn through the vendor's official CLI using your subscription login. They are optional and can be disabled.</p>
           </article>
           <article>
             <h3>API and local providers</h3>
@@ -155,12 +155,12 @@ ur config set provider openai-api
 ur config set base_url http://localhost:11434/v1
 ur config set model qwen3-coder:480b-cloud
 ur config set provider.fallback ollama</code></pre>
-            <p>API providers require explicit selection and read keys from a key stored via <code>ur connect</code> (OS keychain) or from environment variables. Local providers include Ollama, LM Studio, llama.cpp server mode, and vLLM OpenAI-compatible server mode. Subscription CLI providers (Codex CLI, Claude Code, Gemini CLI, Antigravity) dispatch through the official vendor CLIs.</p>
+            <p>API providers require explicit selection and read keys from a key stored via <code>ur connect</code> (OS keychain) or from environment variables. Local providers include Ollama, LM Studio, llama.cpp, and vLLM.</p>
           </article>
           <article>
             <h3>Status bar and updates</h3>
-            <pre><code>Ollama | llama3 | ask | main | update 1.37.2 available</code></pre>
-            <p>The interactive status bar shows only important runtime state: provider, model, mode, branch, active tasks, checks status when known, and update availability. It is hidden in CI, dumb terminals, and non-interactive mode.</p>
+            <pre><code>Ollama | llama3 | ask | main | update 1.37.3 available</code></pre>
+            <p>The interactive status bar shows only important runtime state: provider, model, mode, branch, active tasks, checks status when known, and update availability. It is hidden in CI, dumb terminals, and print mode.</p>
           </article>
         </div>
       </section>
@@ -169,7 +169,7 @@ ur config set provider.fallback ollama</code></pre>
         <div class="section-heading">
           <p class="eyebrow">Runtime</p>
           <h2>Architecture</h2>
-          <p>The CLI is the control plane. Project context and <code>.ur</code> assets feed agent orchestration, which uses approved provider adapters, local-first model runtimes, and approved tools to produce code, docs, PRs, reports, and automation outputs.</p>
+          <p>The CLI is the control plane. Project context and <code>.ur</code> assets feed agent orchestration, which uses approved provider adapters, local-first model runtimes, and approved tools to produce auditable results.</p>
         </div>
         <figure class="diagram">
           <img src="assets/ur-architecture.svg" alt="UR-AGENT runtime architecture diagram">
