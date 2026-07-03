@@ -11,7 +11,7 @@ import { writeToStdout } from 'src/utils/process.js'
 import { gte } from 'src/utils/semver.js'
 import { formatUpdateAvailableMessage } from 'src/utils/updateNotice.js'
 
-export const UR_AGENT_PACKAGE_NAME = 'ur-nexus'
+export const UR_AGENT_PACKAGE_NAME = 'ur-agent'
 
 export type NpmVersionResult =
   | { ok: true; version: string }

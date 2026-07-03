@@ -24,14 +24,14 @@ describe('ur upgrade command', () => {
     )
   })
 
-  test('checks npm-installed builds against ur-nexus on npm', async () => {
+  test('checks npm-installed builds against ur-agent on npm', async () => {
     const result = await checkUpgradeStatus({
       currentVersion: '1.24.0',
       installationType: 'npm-global',
       latestVersion: async () => ({ ok: true, version: '1.24.0' }),
     })
 
-    expect(result.output[1]).toBe('Checking for updates to ur-nexus...')
+    expect(result.output[1]).toBe('Checking for updates to ur-agent...')
     expect(result.status).toBe('up-to-date')
   })
 
@@ -45,7 +45,7 @@ describe('ur upgrade command', () => {
     expect(result.exitCode).toBe(0)
     expect(result.status).toBe('update-available')
     expect(result.output).toContain('Update available: 1.23.3 -> 1.24.0')
-    expect(result.output).toContain('Run: npm install -g ur-nexus@latest')
+    expect(result.output).toContain('Run: npm install -g ur-agent@latest')
   })
 
   test('reports already latest', async () => {
@@ -70,7 +70,7 @@ describe('ur upgrade command', () => {
     expect(result.exitCode).toBe(1)
     expect(result.status).toBe('registry-failure')
     expect(result.output).toContain(
-      'Unable to check npm registry for ur-nexus. Check your network and try again.',
+      'Unable to check npm registry for ur-agent. Check your network and try again.',
     )
   })
 
@@ -87,7 +87,7 @@ describe('ur upgrade command', () => {
     expect(result.exitCode).toBe(1)
     expect(result.status).toBe('malformed-response')
     expect(result.output).toContain(
-      'npm registry returned an invalid version for ur-nexus.',
+      'npm registry returned an invalid version for ur-agent.',
     )
   })
 })

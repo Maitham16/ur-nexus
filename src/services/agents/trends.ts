@@ -359,7 +359,7 @@ const coverage: TrendCoverage[] = [
     name: 'Programmatic SDK',
     status: 'covered',
     summary:
-      'A dependency-free TypeScript SDK (ur-nexus/sdk: query, queryJSON, UrClient) plus a Python wrapper drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. The in-process counterpart to the loopback A2A server.',
+      'A dependency-free TypeScript SDK (ur-agent/sdk: query, queryJSON, UrClient) plus a Python wrapper drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. The in-process counterpart to the loopback A2A server.',
     evidence: [
       'src/sdk/index.ts (query / queryJSON / UrClient)',
       'ur sdk init (scaffolds runnable TS + Python examples)',

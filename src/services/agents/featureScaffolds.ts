@@ -222,7 +222,7 @@ export const AGENT_FEATURES: AgentFeature[] = [
     status: 'command',
     command: 'ur sdk info|init',
     summary:
-      'A dependency-free TypeScript SDK (`ur-nexus/sdk`: query, queryJSON, UrClient) plus a Python wrapper that drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. `init` scaffolds runnable examples.',
+      'A dependency-free TypeScript SDK (`ur-agent/sdk`: query, queryJSON, UrClient) plus a Python wrapper that drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. `init` scaffolds runnable examples.',
     scaffold: '.ur/sdk/',
   },
   {

@@ -10,7 +10,7 @@
  * agent-to-agent task hand-off over HTTP; this SDK is for in-process scripting.
  *
  * @example
- *   import { query } from 'ur-nexus/sdk'
+ *   import { query } from 'ur-agent/sdk'
  *   const { text } = await query('Summarize the README in one line')
  *   console.log(text)
  */

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/ur-nexus"><img alt="npm package" src="https://img.shields.io/npm/v/ur-nexus.svg"></a>
+  <a href="https://www.npmjs.com/package/ur-agent"><img alt="npm package" src="https://img.shields.io/npm/v/ur-agent.svg"></a>
   <a href="./LICENSE"><img alt="license" src="https://img.shields.io/badge/license-non--commercial-blue.svg"></a>
   <a href="./QUALITY.md"><img alt="quality gate" src="https://img.shields.io/badge/quality-release%20gated-brightgreen.svg"></a>
 </p>
@@ -137,14 +137,14 @@ Planning defaults are safe and can be configured with:
 Remove old global installs first if needed:
 
 ```sh
-npm uninstall -g ur-nexus
-bun remove -g ur-nexus
+npm uninstall -g ur-agent
+bun remove -g ur-agent
 ```
 
 Install the global `ur` command:
 
 ```sh
-npm install -g ur-nexus
+npm install -g ur-agent
 ur --version
 ur --help
 ```
@@ -687,7 +687,7 @@ release until that GitHub run is green.
 
 ## Package
 
-- npm package: [`ur-nexus`](https://www.npmjs.com/package/ur-nexus), binary `ur`.
+- npm package: [`ur-agent`](https://www.npmjs.com/package/ur-agent), binary `ur`.
 - The published package ships the bundled CLI (`dist/cli.js`), launcher
   (`bin/ur.js`), documentation (`docs/`, `documentation/`, `examples/`), and
   first-party plugins (`plugins/`, `.ur-plugin` marketplace manifest is part of

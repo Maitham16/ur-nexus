@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const { name, version } = packageJson
-const packageName = typeof name === 'string' ? name : 'ur-nexus'
+const packageName = typeof name === 'string' ? name : 'ur-agent'
 const issues =
   typeof packageJson.bugs?.url === 'string'
     ? packageJson.bugs.url

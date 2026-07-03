@@ -3,7 +3,7 @@
 Release target:
 
 - GitHub: `https://github.com/Maitham16/UR.git`
-- npm package: `ur-nexus`
+- npm package: `ur-agent`
 - CLI binary: `ur`
 
 ## Required checks
@@ -28,7 +28,7 @@ before release:
 
 ```bash
 bun run release:create-source-zip
-bun run release:check-source-zip -- artifacts/source/ur-nexus-$(node -p "require('./package.json').version")-source.zip
+bun run release:check-source-zip -- artifacts/source/ur-agent-$(node -p "require('./package.json').version")-source.zip
 ```
 
 The source zip must contain source inputs such as `package.json`, `bun.lock`,
@@ -41,7 +41,7 @@ Also verify:
 ```bash
 git remote -v
 npm whoami
-npm view ur-nexus@$(node -p "require('./package.json').version") version
+npm view ur-agent@$(node -p "require('./package.json').version") version
 ```
 
 Before committing a release, verify the public docs match the current feature

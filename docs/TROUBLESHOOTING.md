@@ -12,19 +12,19 @@ verifies the fix.
 - Fix: reinstall globally and check the global bin path.
 
 ```sh
-npm install -g ur-nexus
+npm install -g ur-agent
 npm prefix -g       # ensure <prefix>/bin is on PATH
 ur --version
 ```
 
-### `npm install -g ur-nexus` fails
+### `npm install -g ur-agent` fails
 
 - Likely cause: permission errors on the global prefix, or an old Node.js.
 - Fix: use a user-writable npm prefix (or a Node version manager), then retry.
 
 ```sh
 npm config set prefix ~/.npm-global   # then add ~/.npm-global/bin to PATH
-npm install -g ur-nexus
+npm install -g ur-agent
 ur --version
 ```
 
