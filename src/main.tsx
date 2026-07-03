@@ -982,7 +982,7 @@ async function run(): Promise<CommanderCommand> {
     }
     profileCheckpoint('preAction_after_settings_sync');
   });
-  program.name('ur').description(`UR-AGENT — autonomous engineering workflow engine (plan, execute, test, verify, document, benchmark, reproduce). Starts an interactive session by default; use -p/--print for non-interactive output.`).argument('[prompt]', 'Your prompt', String)
+  program.name('ur').description(`UR-Nexus — autonomous engineering workflow engine (plan, execute, test, verify, document, benchmark, reproduce). Starts an interactive session by default; use -p/--print for non-interactive output.`).argument('[prompt]', 'Your prompt', String)
   // Subcommands inherit helpOption via commander's copyInheritedSettings —
   // setting it once here covers mcp, plugin, auth, and all other subcommands.
   .helpOption('-h, --help', 'Display help for command').option('-d, --debug [filter]', 'Enable debug mode with optional category filtering (e.g., "api,hooks" or "!1p,!file")', (_value: string | true) => {
@@ -3875,7 +3875,7 @@ async function run(): Promise<CommanderCommand> {
         pendingHookMessages
       }, renderAndRun);
     }
-  }).version(`${MACRO.VERSION} (UR-AGENT)`, '-v, --version', 'Output the version number');
+  }).version(`${MACRO.VERSION} (UR-Nexus)`, '-v, --version', 'Output the version number');
 
   // Worktree flags
   program.option('-w, --worktree [name]', 'Create a new git worktree for this session (optionally specify a name)');
@@ -4292,7 +4292,7 @@ async function run(): Promise<CommanderCommand> {
   });
 
   // ur config
-  const configCmd = program.command('config').description('Manage safe UR-AGENT settings').configureHelp(createSortedHelpConfig());
+  const configCmd = program.command('config').description('Manage safe UR-Nexus settings').configureHelp(createSortedHelpConfig());
   configCmd.command('set <key> <value...>').description('Set a safe non-secret setting: provider, provider.fallback, provider.command_path, model, or base_url').action(async (key: string, value: string[]) => {
     const {
       configSetHandler
@@ -4940,7 +4940,7 @@ async function run(): Promise<CommanderCommand> {
     await runLocalTextCommand(() => import('./commands/role-mode/role-mode.js'), args);
   });
   const a2a = program.command('a2a').description('A2A interoperability utilities').configureHelp(createSortedHelpConfig());
-  a2a.command('card').description('Print UR-AGENT Card metadata for A2A discovery').option('--base-url <url>', 'Base URL to use for the Agent Card endpoint').option('--compact', 'Output compact JSON').action(async (opts: {
+  a2a.command('card').description('Print UR-Nexus Card metadata for A2A discovery').option('--base-url <url>', 'Base URL to use for the Agent Card endpoint').option('--compact', 'Output compact JSON').action(async (opts: {
     baseUrl?: string;
     compact?: boolean;
   }) => {
@@ -4953,7 +4953,7 @@ async function run(): Promise<CommanderCommand> {
     }, !opts.compact));
     process.exit(0);
   });
-  a2a.command('serve').description('Start an opt-in local A2A task server').option('--host <host>', 'Host to bind', '127.0.0.1').option('--port <port>', 'Port to bind', '8765').option('--token <token>', 'Static bearer token required for task execution').option('--delegation-secret <secret>', 'HMAC secret that verifies attenuated delegation tokens').option('--audience <id>', 'Agent id that delegation tokens must target', 'ur-agent').option('--dry-run', 'Return spawned UR command without executing prompts').action(async (opts: {
+  a2a.command('serve').description('Start an opt-in local A2A task server').option('--host <host>', 'Host to bind', '127.0.0.1').option('--port <port>', 'Port to bind', '8765').option('--token <token>', 'Static bearer token required for task execution').option('--delegation-secret <secret>', 'HMAC secret that verifies attenuated delegation tokens').option('--audience <id>', 'Agent id that delegation tokens must target', 'ur-nexus').option('--dry-run', 'Return spawned UR command without executing prompts').action(async (opts: {
     host?: string;
     port?: string;
     token?: string;
@@ -4969,13 +4969,13 @@ async function run(): Promise<CommanderCommand> {
       port: Number(opts.port ?? '8765'),
       token: opts.token,
       delegationSecret: opts.delegationSecret,
-      audience: opts.audience ?? 'ur-agent',
+      audience: opts.audience ?? 'ur-nexus',
       dryRun: opts.dryRun,
       cwd: process.cwd()
     });
   });
   const a2aToken = a2a.command('token').description('Mint and verify attenuated A2A delegation tokens').configureHelp(createSortedHelpConfig());
-  a2aToken.command('mint').description('Mint an attenuated, expiring, scoped delegation token').option('--secret <secret>', 'HMAC signing secret (or set UR_A2A_DELEGATION_SECRET)').option('--sub <subject>', 'Delegator identity', 'ur-cli').option('--aud <audience>', 'Target agent id', 'ur-agent').option('--scope <csv>', 'Comma-separated skill ids, or * for all', '*').option('--ttl <seconds>', 'Lifetime in seconds', '3600').option('--json', 'Output as JSON').action(async (opts: {
+  a2aToken.command('mint').description('Mint an attenuated, expiring, scoped delegation token').option('--secret <secret>', 'HMAC signing secret (or set UR_A2A_DELEGATION_SECRET)').option('--sub <subject>', 'Delegator identity', 'ur-cli').option('--aud <audience>', 'Target agent id', 'ur-nexus').option('--scope <csv>', 'Comma-separated skill ids, or * for all', '*').option('--ttl <seconds>', 'Lifetime in seconds', '3600').option('--json', 'Output as JSON').action(async (opts: {
     secret?: string;
     sub?: string;
     aud?: string;
@@ -4996,7 +4996,7 @@ async function run(): Promise<CommanderCommand> {
     const ttlSeconds = Number(opts.ttl ?? '3600');
     const token = mintDelegationToken(secret, {
       subject: opts.sub ?? 'ur-cli',
-      audience: opts.aud ?? 'ur-agent',
+      audience: opts.aud ?? 'ur-nexus',
       scope,
       ttlSeconds: Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds : 3600
     });
@@ -5184,7 +5184,7 @@ async function run(): Promise<CommanderCommand> {
   // - We perform exact string comparison (including SHA) to detect any change
   // - This ensures users always get the latest build, even when only the SHA changes
   // - UI shows both versions including build metadata for clarity
-  program.command('update').alias('upgrade').description('Check npm for UR-AGENT updates').action(async () => {
+  program.command('update').alias('upgrade').description('Check npm for UR-Nexus updates').action(async () => {
     const {
       update
     } = await import('src/cli/update.js');

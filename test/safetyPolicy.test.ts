@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runWithCwdOverride } from '../src/utils/cwd.js'
@@ -115,6 +122,30 @@ describe('project safety policy', () => {
       const secret = evaluateShellSafetyPolicy('ls src; cat .env', dir)
       expect(secret.behavior).toBe('deny')
       expect(secret.reasons.join(' ')).toContain('secret')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('custom policy can make user-controlled localhost network checks unsandboxed', () => {
+    const dir = tempDir('ur-safety-localhost-network-')
+    try {
+      mkdirSync(join(dir, '.ur'), { recursive: true })
+      writeFileSync(
+        safetyPolicyPath(dir),
+        `${JSON.stringify({ version: 1, sandboxRequiredFor: ['write', 'execute'] }, null, 2)}\n`,
+      )
+
+      const evaluation = evaluateShellSafetyPolicy(
+        'curl -s http://localhost:8000/ | head -20',
+        dir,
+        { autonomousMode: true, sandboxAvailable: false },
+      )
+
+      expect(evaluation.behavior).toBe('allow')
+      expect(evaluation.permissions).toContain('network')
+      expect(evaluation.sandboxMode).toBe('disabled')
+      expect(evaluation.audit.sandboxRequired).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

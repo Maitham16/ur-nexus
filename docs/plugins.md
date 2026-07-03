@@ -1,6 +1,6 @@
-# UR-AGENT plugins
+# UR-Nexus plugins
 
-UR-AGENT plugins are trusted local extension bundles. They can contribute slash
+UR-Nexus plugins are trusted local extension bundles. They can contribute slash
 commands, MCP servers, executable skills, templates, validators, language
 adapters, LSP servers, hooks, output styles, and agents.
 
@@ -8,7 +8,7 @@ adapters, LSP servers, hooks, output styles, and agents.
 
 ```text
 plugins/
-  core/        # first-party plugins shipped with UR-AGENT
+  core/        # first-party plugins shipped with UR-Nexus
   community/   # contributed plugins staged for review
   examples/    # templates users can copy
 src/plugins/   # built-in plugin registration code
@@ -48,7 +48,7 @@ ur --plugin-dir ./plugins/community/my-plugin
 4. Set `capabilities` accurately so users know what the plugin enables.
 5. Run `bun test test/marketplaceTree.test.ts` before submitting.
 
-Plugins are loaded from local UR-AGENT paths first. Network marketplace installs
+Plugins are loaded from local UR-Nexus paths first. Network marketplace installs
 remain explicit user actions and are subject to plugin policy checks.
 
 ## Manifest reference

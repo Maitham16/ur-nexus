@@ -102,6 +102,8 @@ export function mintDelegationToken(secret: string, options: MintOptions): strin
 export type VerifyOptions = {
   /** Reject the token unless its audience matches this agent id. */
   audience?: string
+  /** Additional accepted audience ids for compatibility migrations. */
+  audienceAliases?: string[]
   /** Reject the token unless its scope authorizes this skill. */
   requiredScope?: string
   now?: number
@@ -139,7 +141,10 @@ export function verifyDelegationToken(
   if (typeof claims.exp !== 'number' || now >= claims.exp) {
     return { valid: false, reason: 'token expired', claims }
   }
-  if (options.audience && claims.aud !== options.audience) {
+  const acceptedAudiences = options.audience
+    ? [options.audience, ...(options.audienceAliases ?? [])]
+    : []
+  if (acceptedAudiences.length > 0 && !acceptedAudiences.includes(claims.aud)) {
     return {
       valid: false,
       reason: `audience mismatch (token issued for "${claims.aud}")`,

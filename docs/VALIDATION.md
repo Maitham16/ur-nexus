@@ -10,7 +10,7 @@ You need:
   in the local Ollama app. Local models and Ollama Cloud-backed models both
   work because UR talks to the configured Ollama host.
 - A second Ollama server on the LAN if you want to test network discovery.
-- UR installed globally (`npm install -g ur-agent`) or this repo installed
+- UR installed globally (`npm install -g ur-nexus`) or this repo installed
   globally (`bun add -g github:Maitham16/UR`) or a
   local checkout (`bun run dev`). Bun is required at runtime for every path —
   the npm launcher detects and execs Bun automatically; UR is not Node-native.
@@ -19,7 +19,7 @@ You need:
 
 ```sh
 ur --version
-# expected: the version from package.json, e.g. "1.35.1 (UR-AGENT)"
+# expected: the version from package.json, e.g. "1.35.1 (UR-Nexus)"
 ```
 
 ## 0.1 Permission safety and context pack (1.19.0)
@@ -307,5 +307,5 @@ Expected: no `unknown option` or `too many arguments` parser errors.
   the literal output and file an issue.
 - Step 9 (direct commands): run `ur --help` and confirm `spec`, `arena`,
   `escalate`, `test-first`, `safety`, `context-pack`, `ci-loop`, and `artifacts` appear. If `unknown option` or
-  `too many arguments` appears, reinstall `ur-agent@latest` and verify the
-  npm version with `npm view ur-agent version`.
+  `too many arguments` appears, reinstall `ur-nexus@latest` and verify the
+  npm version with `npm view ur-nexus version`.

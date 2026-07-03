@@ -19,7 +19,7 @@ describe('release hygiene file-list checks', () => {
       'package/test-results/result.json',
       'package/coverage/lcov.info',
       'package/.ur-analysis/run.json',
-      'package/ur-agent-1.0.0.tgz',
+      'package/ur-nexus-1.0.0.tgz',
       'package/tmp/scratch.txt',
       'package/bin/node',
       'package/bin/bun',

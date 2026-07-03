@@ -1,16 +1,16 @@
-# UR-AGENT
+# UR-Nexus
 
 <p align="center">
   <strong>Autonomous engineering workflow engine for reproducible software work.</strong>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/ur-agent"><img alt="npm package" src="https://img.shields.io/npm/v/ur-agent.svg"></a>
+  <a href="https://www.npmjs.com/package/ur-nexus"><img alt="npm package" src="https://img.shields.io/npm/v/ur-nexus.svg"></a>
   <a href="./LICENSE"><img alt="license" src="https://img.shields.io/badge/license-non--commercial-blue.svg"></a>
   <a href="./QUALITY.md"><img alt="quality gate" src="https://img.shields.io/badge/quality-release%20gated-brightgreen.svg"></a>
 </p>
 
-UR-AGENT is a Bun and TypeScript autonomous engineering workflow engine: a
+UR-Nexus is a Bun and TypeScript autonomous engineering workflow engine: a
 reproducible autonomous software engineering agent built for disciplined local
 and CI-driven work. It is not only chat, autocomplete, or code edits: UR is
 built to plan, execute, test, verify, document, benchmark, and reproduce
@@ -21,7 +21,7 @@ multi-agent execution, test-first quality loops, CI repair loops, background
 agents, MCP servers, plugins, skills, memory, permission safety policy,
 project context packing, verification, and local model routing.
 
-UR-AGENT integrates official model access paths only: subscription CLIs,
+UR-Nexus integrates official model access paths only: subscription CLIs,
 explicit API-key mode, and local OpenAI-compatible runtimes. It never scrapes
 browser sessions, extracts OAuth tokens, or bypasses provider restrictions.
 
@@ -64,13 +64,63 @@ handing work off to other tools or agents when needed.
   adapters, LSP servers, role modes, custom agents, IDE diff bundles, A2A
   endpoints, and local knowledge indexes.
 
+## Prompt Planning and Task Board
+
+UR-Nexus can decompose short or long `ur exec` prompts into small executable
+task units before work starts. Each task records an id, title, description, status,
+dependencies, assigned logical agent role, input, expected output, and
+verification criteria. Simple prompts stay compact; complex prompts are split
+only when the wording or ordering makes separate tasks useful.
+
+During real `ur exec` runs the task board streams when a task status changes,
+then appears again in the final report. Quiet/non-interactive runs can suppress
+streaming while preserving the final board. Tasks move through `pending`,
+`ready`, `running`, `blocked`, `finished`, and `failed`:
+
+```text
+[UR-Nexus Task Board]
+
+1. ready    | executor | Update CLI branding
+2. running  | executor | Update README references
+3. blocked  | verifier | Validate release archive
+
+Progress: 0/3 finished, 1 running, 1 blocked, 0 failed
+```
+
+Before a task runs, UR-Nexus checks that required files/resources exist and
+that assumptions are explicit. After a task runs, verification compares the
+executor's claims with evidence from workspace snapshots and observed command
+records. Strict verification rejects unsupported file-change and command claims;
+non-strict verification records them as warnings.
+Independent tasks can run through parallel logical workers, while tasks that
+depend on another task or target the same file are serialized.
+At the end of execution, `ur exec` reports task counts, finished/failed/blocked
+tasks, actual changed files, unreported changed files, verified commands,
+unverified command claims, verification failures, warnings, and remaining
+limitations. Command tracking is limited to commands surfaced by the task
+runner; provider-internal or detached activity is reported as unverified unless
+the executor exposes it as observed evidence. Use `--no-task-planning` to keep
+the legacy direct prompt execution path for a run.
+
+Planning defaults are safe and can be configured with:
+
+```json
+{
+  "taskPlanning": true,
+  "parallelAgents": true,
+  "maxAgents": 3,
+  "showTaskBoard": true,
+  "strictVerification": true
+}
+```
+
 ## Quick Start
 
 ### Requirements
 
 - Bun `>=1.3.0` (this repository pins `bun@1.3.14`). Bun is mandatory: every
   install path — npm, GitHub, or source checkout — runs the CLI through Bun,
-  not Node. UR-AGENT is not Node-native.
+  not Node. UR-Nexus is not Node-native.
 - Node.js `>=18.18` only to start the npm-installed launcher script
   (`bin/ur.js`), which immediately checks for Bun and re-execs into it. If Bun
   is missing, the launcher errors out instead of falling back to Node.
@@ -87,14 +137,14 @@ handing work off to other tools or agents when needed.
 Remove old global installs first if needed:
 
 ```sh
-npm uninstall -g ur-agent
-bun remove -g ur-agent
+npm uninstall -g ur-nexus
+bun remove -g ur-nexus
 ```
 
 Install the global `ur` command:
 
 ```sh
-npm install -g ur-agent
+npm install -g ur-nexus
 ur --version
 ur --help
 ```
@@ -159,7 +209,7 @@ requests use that provider backend; they do not fall back to Ollama unless
 
 ### Legal Provider Auth
 
-UR-AGENT stores only safe provider preferences: provider name, model name,
+UR-Nexus stores only safe provider preferences: provider name, model name,
 base URL, fallback preference, and non-secret settings. API keys must stay in
 environment variables. API, local, and OpenAI-compatible server providers are
 UR-native runtimes and behave like Ollama: UR owns the conversation loop, tool
@@ -273,7 +323,7 @@ fallback: if dispatch fails, UR reports the selected provider, model, and runtim
 backend. Use `ur provider status` (or `ur provider doctor <id>`) to inspect the
 active provider, model, access type, and backend.
 
-Security policy: UR-AGENT never scrapes browser sessions, extracts OAuth
+Security policy: UR-Nexus never scrapes browser sessions, extracts OAuth
 tokens, bypasses subscription/quota/region/organization restrictions, proxies a
 consumer web session as an API, or claims support for a provider unless the
 official CLI/API path works. See [Provider Guide](docs/providers.md).
@@ -333,7 +383,7 @@ as first-class subcommands in the shipped CLI.
 | `ur acp` | Start/stop/status the Agent Communication Protocol server for IDE extensions. |
 | `ur exec` | Run one or more prompts in non-interactive mode with optional concurrency. |
 | `ur ide diff` | Capture editor-readable inline diff bundles. |
-| `ur a2a card` | Print UR-AGENT Card metadata for agent interoperability. |
+| `ur a2a card` | Print UR-Nexus Card metadata for agent interoperability. |
 | `ur a2a serve` | Start an opt-in local A2A task server with bearer or delegation auth. |
 | `ur sdk` | Show programmatic headless usage and scaffold SDK examples. |
 | `ur trigger` | Parse a GitHub/Slack webhook payload and optionally launch a headless UR run. |
@@ -344,7 +394,7 @@ as first-class subcommands in the shipped CLI.
 | `ur agent-trends` | Show UR coverage for current agent technology trends. |
 | `ur agents` | List configured agents. |
 | `ur doctor` | Check the health of the UR installation and auto-updater. |
-| `ur update` | Check npm for UR-AGENT updates (`ur upgrade` is an alias). |
+| `ur update` | Check npm for UR-Nexus updates (`ur upgrade` is an alias). |
 
 ### Status Bar
 
@@ -361,7 +411,7 @@ Ollama | llama3 | ask | main
 The bar reflects the active in-session provider/model immediately after a
 `/model`, `/model <model>`, or `/provider` change — it does not wait for
 persisted settings to reload. If a custom status-line hook is configured,
-UR-AGENT uses that hook output instead of the built-in bar.
+UR-Nexus uses that hook output instead of the built-in bar.
 
 ### IDE Integration
 
@@ -369,7 +419,7 @@ The professional UR IDE integration is the **UR Inline Diffs** VS Code
 extension: a chat panel, inline diff review, an actions panel, an agent
 status card, a searchable command palette, and an agent options panel for VS
 Code, Cursor, and Windsurf. It is bundled inside this repository and
-packaged as a local VSIX when installed from UR-AGENT; the public install
+packaged as a local VSIX when installed from UR-Nexus; the public install
 path does not depend on an unpublished marketplace extension ID. The
 extension never talks to a model provider or network service directly —
 every AI request goes through your local `ur` CLI, same as in a terminal.
@@ -637,7 +687,7 @@ release until that GitHub run is green.
 
 ## Package
 
-- npm package: [`ur-agent`](https://www.npmjs.com/package/ur-agent), binary `ur`.
+- npm package: [`ur-nexus`](https://www.npmjs.com/package/ur-nexus), binary `ur`.
 - The published package ships the bundled CLI (`dist/cli.js`), launcher
   (`bin/ur.js`), documentation (`docs/`, `documentation/`, `examples/`), and
   first-party plugins (`plugins/`, `.ur-plugin` marketplace manifest is part of
@@ -670,8 +720,8 @@ research, browser, image, video, MCP, memory, and agent-platform tasks.
 
 ## License
 
-UR-AGENT is released under the
-[UR-AGENT Non-Commercial Self-Responsibility License](LICENSE).
+UR-Nexus is released under the
+[UR-Nexus Non-Commercial Self-Responsibility License](LICENSE).
 
 Personal, educational, research, evaluation, and other non-commercial use is
 permitted. Commercial use requires prior written permission from Maitham

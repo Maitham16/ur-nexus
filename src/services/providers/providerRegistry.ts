@@ -325,7 +325,7 @@ export const PROVIDERS: Record<ProviderId, ProviderDefinition> = {
     versionArgs: ['--version'],
     loginArgs: [],
     unsupportedPersonalAccountMessage:
-      'Personal Google account login is not enabled by UR-AGENT. Use an official Gemini Code Assist Standard/Enterprise path if your Gemini CLI supports it.',
+      'Personal Google account login is not enabled by UR-Nexus. Use an official Gemini Code Assist Standard/Enterprise path if your Gemini CLI supports it.',
   },
   'antigravity-cli': {
     id: 'antigravity-cli',
@@ -927,7 +927,7 @@ export function setSafeProviderConfig(
   if (result.error) {
     return {
       ok: false,
-      message: `Failed to write UR-AGENT settings: ${result.error.message}`,
+      message: `Failed to write UR-Nexus settings: ${result.error.message}`,
     }
   }
   const savedValue =
@@ -1168,7 +1168,7 @@ async function checkSubscriptionProvider(
         name: 'account_type',
         status: 'warn',
         message:
-          'Gemini CLI status is not exposed by this CLI. UR-AGENT will only use the official Gemini CLI flow and will not support personal-account bypasses.',
+          'Gemini CLI status is not exposed by this CLI. UR-Nexus will only use the official Gemini CLI flow and will not support personal-account bypasses.',
       })
     }
   }
@@ -1258,7 +1258,7 @@ function fallbackResult(
     return {
       enabled: false,
       message:
-        'Fallback is disabled. UR-AGENT will not silently switch providers. Optional: ur config set provider.fallback ollama',
+        'Fallback is disabled. UR-Nexus will not silently switch providers. Optional: ur config set provider.fallback ollama',
     }
   }
   if (settings.fallback === active) {
@@ -1270,7 +1270,7 @@ function fallbackResult(
   return {
     enabled: true,
     provider: settings.fallback,
-    message: `Fallback is configured as ${settings.fallback}, but UR-AGENT will ask before using it.`,
+    message: `Fallback is configured as ${settings.fallback}, but UR-Nexus will ask before using it.`,
   }
 }
 
@@ -1483,7 +1483,7 @@ export function buildProviderAuthCommand(
       command,
       args,
       instructions:
-        'UR-AGENT will only launch the official Antigravity CLI. Use its documented login flow where supported; UR-AGENT will not invent flags or reuse browser sessions.',
+        'UR-Nexus will only launch the official Antigravity CLI. Use its documented login flow where supported; UR-Nexus will not invent flags or reuse browser sessions.',
     }
   }
   return {
@@ -2218,7 +2218,7 @@ export function setProviderModel(
   if (result.error) {
     return {
       ok: false,
-      message: `Failed to write UR-AGENT settings: ${result.error.message}`,
+      message: `Failed to write UR-Nexus settings: ${result.error.message}`,
     }
   }
   return {

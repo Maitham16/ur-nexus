@@ -12,19 +12,19 @@ verifies the fix.
 - Fix: reinstall globally and check the global bin path.
 
 ```sh
-npm install -g ur-agent
+npm install -g ur-nexus
 npm prefix -g       # ensure <prefix>/bin is on PATH
 ur --version
 ```
 
-### `npm install -g ur-agent` fails
+### `npm install -g ur-nexus` fails
 
 - Likely cause: permission errors on the global prefix, or an old Node.js.
 - Fix: use a user-writable npm prefix (or a Node version manager), then retry.
 
 ```sh
 npm config set prefix ~/.npm-global   # then add ~/.npm-global/bin to PATH
-npm install -g ur-agent
+npm install -g ur-nexus
 ur --version
 ```
 
@@ -34,7 +34,7 @@ ur --version
   source checkouts — executes the CLI through Bun (this repository pins
   `bun@1.3.14`). The npm-installed `bin/ur.js` launcher starts under Node
   only to detect Bun and re-exec into it; if Bun is missing or too old, the
-  launcher prints `UR-AGENT requires Bun ... at runtime` and exits instead of
+  launcher prints `UR-Nexus requires Bun ... at runtime` and exits instead of
   falling back to Node.
 - Fix: install Bun, then rerun. Set `BUN_BIN` to an absolute Bun path if
   `bun` is installed but not on `PATH`.

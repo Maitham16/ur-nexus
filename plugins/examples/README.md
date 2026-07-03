@@ -1,6 +1,6 @@
-# UR-AGENT plugin examples
+# UR-Nexus plugin examples
 
-This directory contains templates for local UR-AGENT plugins. Copy an example
+This directory contains templates for local UR-Nexus plugins. Copy an example
 directory, edit its `.ur-plugin/plugin.json`, and install it with:
 
 ```bash

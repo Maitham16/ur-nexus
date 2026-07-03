@@ -845,7 +845,7 @@ export function hasAccessToIDEExtensionDiffFeature(
   )
 }
 
-const PUBLIC_EXTENSION_ID = 'ur-agent.ur-inline-diffs'
+const PUBLIC_EXTENSION_ID = 'ur-nexus.ur-inline-diffs'
 const INTERNAL_EXTENSION_ID = 'urhq.ur-internal'
 const BUNDLED_EXTENSION_RELATIVE_PATH = join(
   'extensions',
@@ -1076,7 +1076,7 @@ export async function createBundledVSCodeExtensionVsix(): Promise<string> {
 
   const tempVsixPath = join(
     os.tmpdir(),
-    `ur-agent-${manifest.name}-${manifest.version}-${Date.now()}.vsix`,
+    `ur-nexus-${manifest.name}-${manifest.version}-${Date.now()}.vsix`,
   )
   writeFileSync(tempVsixPath, Buffer.from(zipSync(files, { level: 6 })))
   return tempVsixPath

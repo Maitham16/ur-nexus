@@ -72,7 +72,7 @@ const commands = [
     name: 'ur',
     category: 'Core',
     aliases: [],
-    summary: 'Start an interactive UR-AGENT session in the current workspace.',
+    summary: 'Start an interactive UR-Nexus session in the current workspace.',
     examples: ['ur', 'ur --model qwen3-coder:480b-cloud', 'ur --continue', 'ur --resume'],
   },
   {
@@ -268,7 +268,7 @@ const commands = [
     name: 'update',
     category: 'Ops',
     aliases: ['upgrade'],
-    summary: 'Check npm for UR-AGENT updates.',
+    summary: 'Check npm for UR-Nexus updates.',
     examples: ['ur update', 'ur upgrade'],
   },
   {
@@ -395,7 +395,7 @@ const commands = [
     category: 'Interop',
     aliases: ['embed'],
     summary: 'Show or scaffold examples for driving UR programmatically from TypeScript or Python.',
-    examples: ['ur sdk', 'ur sdk init', 'ur sdk init --force', "import { query } from 'ur-agent/sdk'"],
+    examples: ['ur sdk', 'ur sdk init', 'ur sdk init --force', "import { query } from 'ur-nexus/sdk'"],
   },
   {
     name: 'safety',
@@ -436,7 +436,7 @@ const commands = [
     name: 'update',
     category: 'Ops',
     aliases: ['upgrade'],
-    summary: 'Check npm for UR-AGENT updates. Interactive sessions also show an update-available notice when a newer package is published.',
+    summary: 'Check npm for UR-Nexus updates. Interactive sessions also show an update-available notice when a newer package is published.',
     examples: ['ur update', 'ur upgrade'],
   },
   {
@@ -713,7 +713,7 @@ const examples = [
   {
     title: 'SDK TypeScript',
     text: 'Drive UR from another Node program.',
-    code: "import { query } from 'ur-agent/sdk'\n\nconst result = await query('Review the current git diff', { maxTurns: 6 })\nconsole.log(result.text)",
+    code: "import { query } from 'ur-nexus/sdk'\n\nconst result = await query('Review the current git diff', { maxTurns: 6 })\nconsole.log(result.text)",
   },
   {
     title: 'Eval suite',

@@ -89,7 +89,7 @@ describe('package runtime contract', () => {
     })
 
     expect(result.status).toBe(1)
-    expect(result.stderr).toContain('UR-AGENT requires Bun')
+    expect(result.stderr).toContain('UR-Nexus requires Bun')
     expect(result.stderr).toContain('Bun >=1.3')
     expect(result.stderr).toContain('BUN_BIN')
   })
@@ -101,7 +101,7 @@ describe('package runtime contract', () => {
 
       const version = runPackagedBin(packageRoot, ['--version'])
       expect(version.status).toBe(0)
-      expect(version.stdout.trim()).toBe(`${pkg.version} (UR-AGENT)`)
+      expect(version.stdout.trim()).toBe(`${pkg.version} (UR-Nexus)`)
 
       const help = runPackagedBin(packageRoot, ['--help'])
       expect(help.status).toBe(0)

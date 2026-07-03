@@ -42,6 +42,9 @@ export type ProjectSafetyPolicy = {
   secretEnvPatterns: string[]
   networkCommands: string[]
   sandboxRequiredFor: PermissionClass[]
+  developerMode?: {
+    denyBecomesAsk?: boolean
+  }
 }
 
 export type ShellSafetyEvaluation = {
@@ -200,6 +203,9 @@ export const DEFAULT_PROJECT_SAFETY_POLICY: ProjectSafetyPolicy = {
     'rclone',
   ],
   sandboxRequiredFor: ['write', 'execute', 'network'],
+  developerMode: {
+    denyBecomesAsk: false,
+  },
 }
 
 const shellSafetyViolations: ShellSafetyViolation[] = []
@@ -295,6 +301,15 @@ export function loadProjectSafetyPolicy(cwd: string): ProjectSafetyPolicy {
           ['read', 'write', 'execute', 'network'].includes(String(v)),
         )
       : DEFAULT_PROJECT_SAFETY_POLICY.sandboxRequiredFor,
+    developerMode:
+      parsed.developerMode &&
+      typeof parsed.developerMode === 'object' &&
+      !Array.isArray(parsed.developerMode)
+        ? {
+            ...DEFAULT_PROJECT_SAFETY_POLICY.developerMode,
+            ...(parsed.developerMode as ProjectSafetyPolicy['developerMode']),
+          }
+        : DEFAULT_PROJECT_SAFETY_POLICY.developerMode,
   }
 }
 
@@ -539,13 +554,15 @@ export function evaluateShellSafetyPolicy(
     : input?.autonomousMode === true
       ? 'autonomous-safe'
       : 'developer'
+  const developerControlsDeny =
+    mode === 'developer' && policy.developerMode?.denyBecomesAsk === true
   const autonomousSandboxRequired =
     input?.autonomousMode === true && sandboxRequired && !sandboxBypassAllowed
   const requiresStrictSandbox =
-    matchedDeny.length > 0 ||
+    (matchedDeny.length > 0 && !developerControlsDeny) ||
     matchedAsk.length > 0 ||
     (input?.dangerouslyDisableSandbox === true && !sandboxBypassAllowed) ||
-    permissions.includes('network') ||
+    (permissions.includes('network') && policy.sandboxRequiredFor.includes('network')) ||
     autonomousSandboxRequired
   const sandboxMode: SandboxMode = requiresStrictSandbox
     ? 'required'
@@ -559,10 +576,12 @@ export function evaluateShellSafetyPolicy(
       ? 'required'
       : 'recommended'
   const behavior: SafetyBehavior =
-    matchedDeny.length > 0
+    matchedDeny.length > 0 && !developerControlsDeny
       ? 'deny'
       : matchedAsk.length > 0 || input?.dangerouslyDisableSandbox
         ? 'ask'
+        : matchedDeny.length > 0
+          ? 'ask'
         : 'allow'
   const approvalLevel = approvalLevelForEvaluation(permissions, matchedAsk)
   const reasons = [
@@ -576,8 +595,11 @@ export function evaluateShellSafetyPolicy(
         : 'command requests sandbox bypass',
     )
   }
-  if (permissions.includes('network')) {
+  if (permissions.includes('network') && policy.sandboxRequiredFor.includes('network')) {
     reasons.push('network access requires sandbox network isolation')
+  }
+  if (developerControlsDeny && matchedDeny.length > 0) {
+    reasons.push('developer mode converts project safety denials into approval prompts')
   }
   if (autonomousSandboxRequired) {
     reasons.push(

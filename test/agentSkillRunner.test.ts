@@ -11,7 +11,7 @@ function tempDir(prefix: string): string {
 
 describe('agentSkillRunner', () => {
   test('previewAgentSkill returns id, command, and branch', () => {
-    const dir = tempDir('ur-agent-skill-')
+    const dir = tempDir('ur-nexus-skill-')
     try {
       const preview = previewAgentSkill({ cwd: dir, skill: 'debug', prompt: 'fix bug' })
       expect(preview.id).toMatch(/^bg_/)
@@ -25,7 +25,7 @@ describe('agentSkillRunner', () => {
   })
 
   test('runAgentSkill dry-run returns summary without spawning', async () => {
-    const dir = tempDir('ur-agent-skill-')
+    const dir = tempDir('ur-nexus-skill-')
     try {
       const result = await runAgentSkill({
         cwd: dir,
@@ -45,7 +45,7 @@ describe('agentSkillRunner', () => {
   })
 
   test('runAgentSkill creates a manifest task for non-dry runs', async () => {
-    const dir = tempDir('ur-agent-skill-')
+    const dir = tempDir('ur-nexus-skill-')
     try {
       const promise = runAgentSkill({
         cwd: dir,
@@ -67,7 +67,7 @@ describe('agentSkillRunner', () => {
   })
 
   test('runAgentSkill summary shape includes worktree path when available', async () => {
-    const dir = tempDir('ur-agent-skill-')
+    const dir = tempDir('ur-nexus-skill-')
     try {
       const result = await runAgentSkill({
         cwd: dir,
@@ -84,7 +84,7 @@ describe('agentSkillRunner', () => {
   })
 
   test('each agent skill task receives a distinct worktree branch and PR contract', async () => {
-    const dir = tempDir('ur-agent-skill-isolation-')
+    const dir = tempDir('ur-nexus-skill-isolation-')
     try {
       const first = await runAgentSkill({
         cwd: dir,

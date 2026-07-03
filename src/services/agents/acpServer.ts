@@ -127,7 +127,7 @@ function buildToolUseContext(tools: ReturnType<typeof getTools>, readFileStateCa
 
 async function handleInitialize(options: AcpServeOptions): Promise<unknown> {
   return {
-    name: 'ur-agent',
+    name: 'ur-nexus',
     version: MACRO.VERSION,
     protocolVersion: '0.1.0',
     workspaceRoot: options.cwd,

@@ -165,7 +165,7 @@ export function buildBenchmarkReport(report, options = {}) {
     schemaVersion: 1,
     template: false,
     agent: {
-      name: 'ur-agent',
+      name: 'ur-nexus',
       version,
       commit: options.commit ?? gitCommit(),
     },

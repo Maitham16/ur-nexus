@@ -6,7 +6,7 @@ import {
 import { getEffectiveStatusLineSettings } from '../src/components/StatusLine.js'
 import { getProviderRuntimeInfo } from '../src/services/providers/providerRegistry.js'
 
-describe('UR-AGENT status bar', () => {
+describe('UR-Nexus status bar', () => {
   test('formats compact runtime state', () => {
     const text = buildDefaultStatusBar({
       version: '1.25.3',
@@ -26,7 +26,7 @@ describe('UR-AGENT status bar', () => {
     expect(text).toContain('main')
     expect(text).toContain('tasks: 1/3 running')
     expect(text).toContain('tests passed')
-    expect(text).not.toContain('UR-AGENT')
+    expect(text).not.toContain('UR-Nexus')
     expect(text).not.toContain('v1.25.3')
     expect(text).not.toContain('Auth:')
   })

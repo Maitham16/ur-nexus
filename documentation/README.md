@@ -1,6 +1,6 @@
-# UR-AGENT Documentation Site
+# UR-Nexus Documentation Site
 
-This folder is a static documentation project for UR-AGENT.
+This folder is a static documentation project for UR-Nexus.
 
 Open `index.html` directly in a browser. No build step or dev server is
 required.

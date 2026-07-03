@@ -1,9 +1,24 @@
 # Changelog
 
-## 1.37.4
+## 1.37.5
 
 - Version bump: align package, build macro, VS Code extension, docs eyebrow, and
-  changelog for the 1.37.4 patch release.
+  changelog for the 1.37.5 patch release.
+- Rename user-facing product/package branding to UR-Nexus while preserving the
+  `ur` CLI entrypoint and legacy configuration compatibility.
+- Add a typed prompt-planning layer with deterministic task decomposition,
+  task-board rendering, dependency-aware parallel scheduling, file-lock
+  serialization, and verification checks for unsupported file/command claims.
+- Wire prompt planning into real `ur exec` execution with task-board progress,
+  dependency-aware parallel scheduling, file-lock serialization, evidence-based
+  final reports, and compatibility flags for direct legacy prompt execution.
+- Add live task-board streaming during real planned execution, workspace
+  before/after file evidence, verified versus unverified command reporting,
+  strict/non-strict verification policy, and final reports generated from
+  observed execution evidence.
+- Fix project safety policy handling so projects that remove `network` from
+  `sandboxRequiredFor` can run user-controlled localhost network checks without
+  a hard sandbox-unavailable denial.
 
 ## 1.37.3
 
@@ -264,7 +279,7 @@
 ## 1.25.2
 
 - Refresh public documentation so README, docs, static site, validation runbook,
-  and code inventory all describe the current UR-AGENT feature set.
+  and code inventory all describe the current UR-Nexus feature set.
 - Document the recent provider auth, status bar, bundled VS Code extension,
   `ur upgrade`, and AskUserQuestion schema fixes as first-class release
   behavior.
@@ -273,7 +288,7 @@
 
 ## 1.25.1
 
-- Fix VS Code extension installation to use the bundled UR-AGENT inline-diffs extension instead of the stale unpublished `urhq.ur` marketplace ID.
+- Fix VS Code extension installation to use the bundled UR-Nexus inline-diffs extension instead of the stale unpublished `urhq.ur` marketplace ID.
 - Harden AskUserQuestion normalization for description-only option objects and keep the eight-option schema in the production bundle.
 
 ## 1.25.0
@@ -876,7 +891,7 @@
 
 ### Verified
 - Rebuilt `dist/cli.js` at 1.13.5 and prepared npm package metadata for
-  `ur-agent@1.13.5`.
+  `ur-nexus@1.13.5`.
 
 ## 1.13.4
 
@@ -932,7 +947,7 @@
 
 ### Verified
 - Rebuilt `dist/cli.js` at 1.13.3 and prepared npm package metadata for
-  `ur-agent@1.13.3`.
+  `ur-nexus@1.13.3`.
 
 ## 1.13.2
 
@@ -954,7 +969,7 @@
 
 ### Verified
 - Rebuilt `dist/cli.js` at 1.13.2 and verified npm package metadata resolves
-  to `ur-agent@1.13.2`.
+  to `ur-nexus@1.13.2`.
 
 ## 1.13.1
 
@@ -1046,7 +1061,7 @@
   agent identity, and multimodal workflows. The report includes source
   references for each trend.
 - **A2A Agent Card export.** New `ur a2a card` CLI command and `/a2a-card`
-  slash command print UR-AGENT Card metadata for discovery by A2A-aware tools.
+  slash command print UR-Nexus Card metadata for discovery by A2A-aware tools.
 - **Professional trend docs.** `docs/AGENT_TRENDS.md` documents the coverage
   matrix, source/trust policy, and prioritized roadmap.
 
@@ -1075,7 +1090,7 @@
 
 ### Changed
 - **Npm publication docs.** README installation guidance now reflects that
-  `ur-agent` is published on npm, while keeping the GitHub install path for
+  `ur-nexus` is published on npm, while keeping the GitHub install path for
   source-based installs.
 
 ## 1.11.0

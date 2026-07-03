@@ -17,13 +17,13 @@ describe('delegation tokens', () => {
   test('mint then verify round-trips with audience and scope', () => {
     const token = mintDelegationToken(SECRET, {
       subject: 'ur-cli',
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       scope: ['coding-agent'],
       ttlSeconds: 3600,
     })
     expect(token.split('.')).toHaveLength(2)
     const result = verifyDelegationToken(SECRET, token, {
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       requiredScope: 'coding-agent',
     })
     expect(result.valid).toBe(true)
@@ -33,7 +33,7 @@ describe('delegation tokens', () => {
   test('rejects an expired token', () => {
     const token = mintDelegationToken(SECRET, {
       subject: 's',
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       ttlSeconds: 100,
       now: 1000,
     })
@@ -44,16 +44,25 @@ describe('delegation tokens', () => {
   })
 
   test('rejects an audience mismatch', () => {
-    const token = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-agent' })
+    const token = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-nexus' })
     const result = verifyDelegationToken(SECRET, token, { audience: 'other-agent' })
     expect(result.valid).toBe(false)
     expect(result.reason).toContain('audience mismatch')
   })
 
+  test('accepts legacy audience aliases when explicitly configured', () => {
+    const token = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-agent' })
+    const result = verifyDelegationToken(SECRET, token, {
+      audience: 'ur-nexus',
+      audienceAliases: ['ur-agent'],
+    })
+    expect(result.valid).toBe(true)
+  })
+
   test('enforces scope, and * grants every skill', () => {
     const scoped = mintDelegationToken(SECRET, {
       subject: 's',
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       scope: ['coding-agent'],
     })
     expect(verifyDelegationToken(SECRET, scoped, { requiredScope: 'coding-agent' }).valid).toBe(true)
@@ -61,12 +70,12 @@ describe('delegation tokens', () => {
     expect(denied.valid).toBe(false)
     expect(denied.reason).toContain('not granted')
 
-    const wildcard = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-agent' })
+    const wildcard = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-nexus' })
     expect(verifyDelegationToken(SECRET, wildcard, { requiredScope: 'anything' }).valid).toBe(true)
   })
 
   test('detects tampering and a wrong secret', () => {
-    const token = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-agent' })
+    const token = mintDelegationToken(SECRET, { subject: 's', audience: 'ur-nexus' })
     expect(verifyDelegationToken('wrong-secret', token).valid).toBe(false)
     const [payload, sig] = token.split('.')
     const tampered = `${payload}x.${sig}`
@@ -87,7 +96,7 @@ describe('delegation attenuation', () => {
   test('narrows scope and never outlives the parent', () => {
     const parentToken = mintDelegationToken(SECRET, {
       subject: 'root',
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       scope: ['coding-agent', 'research-agent'],
       ttlSeconds: 3600,
       now: 1000,
@@ -113,7 +122,7 @@ describe('delegation attenuation', () => {
   test('cannot widen scope beyond the parent', () => {
     const parentToken = mintDelegationToken(SECRET, {
       subject: 'root',
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       scope: ['coding-agent'],
       now: 1000,
     })
@@ -144,14 +153,36 @@ describe('a2a server authorization', () => {
   test('accepts a valid delegation token and enforces its scope', () => {
     const token = mintDelegationToken(SECRET, {
       subject: 'peer',
-      audience: 'ur-agent',
+      audience: 'ur-nexus',
       scope: ['coding-agent'],
     })
-    const options = { delegationSecret: SECRET, audience: 'ur-agent' }
+    const options = { delegationSecret: SECRET, audience: 'ur-nexus' }
     expect(authorizeRequest(post(`Bearer ${token}`), options, 'coding-agent').ok).toBe(true)
     const denied = authorizeRequest(post(`Bearer ${token}`), options, 'browser-agent')
     expect(denied.ok).toBe(false)
     expect(denied.reason).toContain('not granted')
+  })
+
+  test('accepts legacy ur-agent audience for the default UR-Nexus server audience', () => {
+    const token = mintDelegationToken(SECRET, {
+      subject: 'peer',
+      audience: 'ur-agent',
+      scope: ['coding-agent'],
+    })
+    expect(
+      authorizeRequest(
+        post(`Bearer ${token}`),
+        { delegationSecret: SECRET, audience: 'ur-nexus' },
+        'coding-agent',
+      ).ok,
+    ).toBe(true)
+    expect(
+      authorizeRequest(
+        post(`Bearer ${token}`),
+        { delegationSecret: SECRET, audience: 'custom-agent' },
+        'coding-agent',
+      ).ok,
+    ).toBe(false)
   })
 })
 

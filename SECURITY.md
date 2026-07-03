@@ -5,7 +5,7 @@ issue.
 
 ## Supported release
 
-Only the latest npm release of `ur-agent` is supported for security fixes.
+Only the latest npm release of `ur-nexus` is supported for security fixes.
 
 ## Handling secrets
 
@@ -17,6 +17,6 @@ release:
 bun run secrets:scan
 ```
 
-UR-AGENT can execute commands and load plugins. Treat plugins as trusted code,
+UR-Nexus can execute commands and load plugins. Treat plugins as trusted code,
 review MCP server configuration before enabling it, and use permission modes or
 sandboxes for risky workflows.

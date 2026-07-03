@@ -1,6 +1,6 @@
-# UR-AGENT providers
+# UR-Nexus providers
 
-UR-AGENT integrates official model access paths only. API-key providers, local
+UR-Nexus integrates official model access paths only. API-key providers, local
 runtimes, and OpenAI-compatible servers are UR-native backends: UR owns the
 conversation loop, native tool-call parsing, streaming, errors, and UR-run tool
 execution. Subscription CLI providers (Codex CLI, Claude Code, Gemini CLI,
@@ -11,7 +11,7 @@ silent fallback.
 
 ## Legal auth policy
 
-UR-AGENT never:
+UR-Nexus never:
 
 - scrapes browser cookies or browser sessions
 - extracts, copies, or reuses OAuth refresh tokens
@@ -20,7 +20,7 @@ UR-AGENT never:
 - proxies a consumer web session as an API
 - claims provider support unless the official CLI/API path works
 
-UR-AGENT stores only safe config: provider name, model name, base URL, fallback
+UR-Nexus stores only safe config: provider name, model name, base URL, fallback
 preference, and non-secret preferences. API keys are read from environment
 variables only when the user explicitly selects API mode.
 
@@ -108,7 +108,7 @@ ur config set provider.fallback ollama
 
 ## Provider-scoped model selection
 
-UR-AGENT shows providers first, then only models available for the selected provider. This prevents incompatible model/provider pairs and keeps API-key, local/server, subscription, and external app bridge model lists separate. The generic `subscription` entry has no models unless a real independent subscription runtime is configured; UR does not list fake subscription models.
+UR-Nexus shows providers first, then only models available for the selected provider. This prevents incompatible model/provider pairs and keeps API-key, local/server, subscription, and external app bridge model lists separate. The generic `subscription` entry has no models unless a real independent subscription runtime is configured; UR does not list fake subscription models.
 
 ## Runtime provider routing
 
@@ -282,7 +282,7 @@ command instead of silently switching providers.
 
 ### Validation
 
-When you set a model that is incompatible with the current provider, UR-AGENT shows an error:
+When you set a model that is incompatible with the current provider, UR-Nexus shows an error:
 
 ```
 Invalid model for current provider:
@@ -293,7 +293,7 @@ Invalid model for current provider:
   Error: Model "claude-sonnet-5" is not available for provider "openai-api".
 ```
 
-When you change providers, UR-AGENT warns if the current model is incompatible:
+When you change providers, UR-Nexus warns if the current model is incompatible:
 
 ```
 Warning: Current model "gpt-5.5" is not available for provider "anthropic-api" and will be cleared.
@@ -377,7 +377,7 @@ CLIs, official login status where available, API key presence for API providers,
 local endpoint reachability, detectable model availability, unsupported account
 type signals, and fallback configuration.
 
-Fallback is never silent by default. If the selected provider fails, UR-AGENT
+Fallback is never silent by default. If the selected provider fails, UR-Nexus
 reports the selected provider, failure reason, suggested fix, and configured
 fallback option.
 
@@ -389,11 +389,11 @@ fallback option.
   checks `claude auth status` when available. If `ANTHROPIC_API_KEY` is set,
   doctor warns that API-key mode may override subscription auth.
 - `gemini-cli`: launches only the official Gemini CLI flow. If the detected
-  path is an unsupported personal-account path, UR-AGENT prints a clear error.
+  path is an unsupported personal-account path, UR-Nexus prints a clear error.
 - `antigravity-cli`: detects official CLI commands including `agy --version`,
   `antigravity --version`, `google-antigravity --version`, or `ag --version`
   where installed. It launches only an installed official CLI command where
-  supported; UR-AGENT does not invent flags.
+  supported; UR-Nexus does not invent flags.
 
 ## API and local/server providers
 

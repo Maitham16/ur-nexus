@@ -113,7 +113,7 @@ function expectStatus(label, result, expectedStatus) {
 }
 
 function main() {
-  const workDir = mkdtempSync(join(tmpdir(), 'ur-agent-package-check-'))
+  const workDir = mkdtempSync(join(tmpdir(), 'ur-nexus-package-check-'))
   try {
     const tarball = packPackage(workDir)
     checkPackageContents(tarball)
@@ -136,7 +136,7 @@ function main() {
 
     const version = runPackagedBin(packageRoot, ['--version'])
     expectStatus('packed ur --version', version, 0)
-    const expectedVersion = `${sourcePackage.version} (UR-AGENT)`
+    const expectedVersion = `${sourcePackage.version} (UR-Nexus)`
     if (version.stdout.trim() !== expectedVersion) {
       fail(
         `packed ur --version returned "${version.stdout.trim()}", expected "${expectedVersion}"`,

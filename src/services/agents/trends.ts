@@ -348,7 +348,7 @@ const coverage: TrendCoverage[] = [
     evidence: [
       'ur trigger parse --file payload.json (deterministic, testable decision)',
       'ur trigger run --file payload.json (launches headless ur -p for the prompt)',
-      '.github/workflows/ur-agent.yml outbound runner + .ur/triggers scaffold',
+      '.github/workflows/ur-nexus.yml outbound runner + .ur/triggers scaffold',
     ],
     references: ['https://docs.github.com/en/webhooks', 'https://api.slack.com/events/app_mention'],
     professionalNextStep:
@@ -359,7 +359,7 @@ const coverage: TrendCoverage[] = [
     name: 'Programmatic SDK',
     status: 'covered',
     summary:
-      'A dependency-free TypeScript SDK (ur-agent/sdk: query, queryJSON, UrClient) plus a Python wrapper drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. The in-process counterpart to the loopback A2A server.',
+      'A dependency-free TypeScript SDK (ur-nexus/sdk: query, queryJSON, UrClient) plus a Python wrapper drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. The in-process counterpart to the loopback A2A server.',
     evidence: [
       'src/sdk/index.ts (query / queryJSON / UrClient)',
       'ur sdk init (scaffolds runnable TS + Python examples)',
@@ -403,7 +403,7 @@ export function buildA2AAgentCard(
 
   return {
     protocolVersion: '0.3.0',
-    name: 'UR-AGENT',
+    name: 'UR-Nexus',
     description:
       'Local-first terminal coding agent powered through the local Ollama app, with MCP tools, custom agents, browser workflows, memory, verifier gates, and permission controls.',
     url,
@@ -510,7 +510,7 @@ export function formatAgentTrendReport(
   report: AgentTrendReport = buildAgentTrendReport(),
 ): string {
   const lines = [
-    `UR-AGENT Trend Coverage`,
+    `UR-Nexus Trend Coverage`,
     `Version: ${report.urVersion}`,
     `Generated: ${report.generatedAt}`,
     '',

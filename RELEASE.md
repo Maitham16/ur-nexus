@@ -1,9 +1,9 @@
-# UR-AGENT release runbook
+# UR-Nexus release runbook
 
 Release target:
 
 - GitHub: `https://github.com/Maitham16/UR.git`
-- npm package: `ur-agent`
+- npm package: `ur-nexus`
 - CLI binary: `ur`
 
 ## Required checks
@@ -28,7 +28,7 @@ before release:
 
 ```bash
 bun run release:create-source-zip
-bun run release:check-source-zip -- artifacts/source/ur-agent-$(node -p "require('./package.json').version")-source.zip
+bun run release:check-source-zip -- artifacts/source/ur-nexus-$(node -p "require('./package.json').version")-source.zip
 ```
 
 The source zip must contain source inputs such as `package.json`, `bun.lock`,
@@ -41,14 +41,14 @@ Also verify:
 ```bash
 git remote -v
 npm whoami
-npm view ur-agent@$(node -p "require('./package.json').version") version
+npm view ur-nexus@$(node -p "require('./package.json').version") version
 ```
 
 Before committing a release, verify the public docs match the current feature
 set and version:
 
 ```bash
-rg -n "Version [0-9]|expected: [0-9]|UR-AGENT v[0-9]" README.md docs documentation
+rg -n "Version [0-9]|expected: [0-9]|UR-Nexus v[0-9]" README.md docs documentation
 bun test test/docsCoverage.test.ts test/docsCommands.test.ts
 ```
 
@@ -76,7 +76,7 @@ Only after every check passes and the working tree is clean:
 
 ```bash
 git add .
-git commit -m "chore: polish UR-AGENT production release"
+git commit -m "chore: polish UR-Nexus production release"
 git push origin master
 npm publish
 ```

@@ -8,7 +8,7 @@ import { releasePathViolations } from './release-hygiene.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const version = JSON.parse(await Bun.file(join(root, 'package.json')).text()).version
 const output =
-  process.argv[2] ?? join(root, 'artifacts', 'source', `ur-agent-${version}-source.zip`)
+  process.argv[2] ?? join(root, 'artifacts', 'source', `ur-nexus-${version}-source.zip`)
 
 function normalize(path) {
   return path.replace(/\\/g, '/').replace(/^\.\//, '')

@@ -1,4 +1,4 @@
-# Contributing to UR-AGENT
+# Contributing to UR-Nexus
 
 Use the project scripts before opening a pull request:
 

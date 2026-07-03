@@ -1,6 +1,6 @@
 # Command Template
 
-Minimal local UR-AGENT plugin template.
+Minimal local UR-Nexus plugin template.
 
 ```bash
 ur --plugin-dir ./plugins/examples/command-template

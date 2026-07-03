@@ -1,7 +1,26 @@
 import type { LocalCommandCall } from '../../types/command.js'
 import { parseArguments } from '../../utils/argumentSubstitution.js'
 import { getCwd } from '../../utils/cwd.js'
-import type { StartBackgroundTaskResult } from '../../services/agents/backgroundRunner.js'
+import type {
+  BackgroundTask,
+  StartBackgroundTaskResult,
+} from '../../services/agents/backgroundRunner.js'
+import {
+  decomposePrompt,
+  renderTaskBoard,
+  resolvePromptPlanningConfig,
+  runPromptPlan,
+  type NexusTask,
+  type PromptPlan,
+  type PromptPlanningConfig,
+  type RunPromptPlanResult,
+  type TaskExecutionEvent,
+  type TaskExecutionResult,
+  type TaskExecutor,
+  type VerificationIssue,
+} from '../../services/promptPlanning/index.js'
+import { execFileNoThrowWithCwd } from '../../utils/execFileNoThrow.js'
+import { gitExe } from '../../utils/git.js'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -14,6 +33,7 @@ function positionals(tokens: string[]): string[] {
   const flagsWithValue = new Set([
     '--concurrency',
     '--max-turns',
+    '--max-agents',
     '--model',
     '--output-dir',
   ])
@@ -36,7 +56,71 @@ function usage(): string {
     '  ur exec "prompt" [--concurrency 1] [--max-turns 10] [--model qwen3-coder:480b-cloud] [--output-dir ./outputs]',
     '  echo \'{"prompt": "add tests"}\' | ur exec --concurrency 4',
     '  ur exec --file prompts.jsonl --concurrency 2',
+    '  ur exec "update docs" --dry-run --max-agents 3',
+    '  ur exec "single direct prompt" --no-task-planning',
+    '  ur exec "quiet planned prompt" --quiet',
+    '  ur exec "warn on unsupported claims" --no-strict-verification',
   ].join('\n')
+}
+
+type ExecPlanningOptions = Partial<PromptPlanningConfig>
+
+export type ExecPoolResult = StartBackgroundTaskResult & {
+  plan?: PromptPlan
+  taskBoard?: string
+  boardHistory?: string[]
+  plannedRun?: RunPromptPlanResult
+  finalReport?: ExecFinalReport
+  finalReportText?: string
+  commandsRun?: string[]
+  changedFiles?: string[]
+  verificationFailures?: ExecVerificationFailure[]
+  warnings?: ExecVerificationFailure[]
+}
+
+export type ExecVerificationFailure = {
+  taskId: string
+  taskTitle: string
+  code: string
+  message: string
+  severity: VerificationIssue['severity']
+}
+
+export type ExecFinalReport = {
+  summary: {
+    total: number
+    finished: number
+    failed: number
+    blocked: number
+  }
+  finishedTasks: Array<{ id: string; title: string; agent: string }>
+  failedTasks: Array<{ id: string; title: string; agent: string }>
+  blockedTasks: Array<{ id: string; title: string; agent: string }>
+  actualChangedFiles: string[]
+  unreportedChangedFiles: string[]
+  verifiedCommands: string[]
+  unverifiedCommandClaims: string[]
+  filesChanged: string[]
+  commandsRun: string[]
+  verificationFailures: ExecVerificationFailure[]
+  warnings: ExecVerificationFailure[]
+  remainingLimitations: string[]
+}
+
+type RunExecPoolOptions = {
+  cwd: string
+  concurrency: number
+  maxTurns?: number
+  model?: string
+  outputDir?: string
+  worktree?: boolean
+  dryRun?: boolean
+  planning?: ExecPlanningOptions
+  executePlannedTask?: TaskExecutor
+  onPlanningEvent?: (event: TaskExecutionEvent) => void
+  streamTaskBoard?: boolean
+  writeTaskBoard?: (text: string) => void
+  legacyRunner?: (prompts: string[], opts: RunExecPoolOptions) => Promise<ExecPoolResult[]>
 }
 
 export async function readPrompts(tokens: string[]): Promise<string[]> {
@@ -104,18 +188,335 @@ export function execCommandForPrompt(
   return [process.execPath, process.argv[1] ?? '', ...args]
 }
 
+function planPrompt(
+  prompt: string,
+  options?: ExecPlanningOptions,
+): { plan?: PromptPlan; taskBoard?: string } {
+  const config = resolvePromptPlanningConfig(options)
+  if (!config.taskPlanning) return {}
+  const plan = decomposePrompt(prompt, config)
+  return {
+    plan,
+    taskBoard: config.showTaskBoard ? renderTaskBoard(plan) : undefined,
+  }
+}
+
+function quoteCommandArg(arg: string): string {
+  return /^[a-zA-Z0-9_./:=@+-]+$/.test(arg) ? arg : JSON.stringify(arg)
+}
+
+function formatCommand(args: string[]): string {
+  return args.map(quoteCommandArg).join(' ')
+}
+
+function parseGitStatusFiles(output: string): string[] {
+  const files: string[] = []
+  for (const line of output.split('\n')) {
+    if (!line.trim()) continue
+    const raw = line.slice(3).trim()
+    if (!raw) continue
+    const renamed = raw.includes(' -> ') ? raw.split(' -> ').at(-1) : raw
+    if (renamed) files.push(renamed)
+  }
+  return [...new Set(files)]
+}
+
+async function currentChangedFiles(cwd: string): Promise<string[]> {
+  const result = await execFileNoThrowWithCwd(gitExe(), ['status', '--porcelain'], {
+    cwd,
+    timeout: 30_000,
+    preserveOutputOnError: true,
+    audit: false,
+  })
+  return result.code === 0 ? parseGitStatusFiles(result.stdout) : []
+}
+
+function plannedTaskPrompt(task: NexusTask): string {
+  return [
+    `UR-Nexus planned task ${task.id}: ${task.title}`,
+    '',
+    task.description,
+    '',
+    `Assigned role: ${task.assignedAgent}`,
+    '',
+    'Assumptions:',
+    ...task.input.assumptions.map(value => `- ${value}`),
+    '',
+    `Expected output: ${task.expectedOutput}`,
+    '',
+    'Verification criteria:',
+    ...task.verificationCriteria.map(value => `- ${value}`),
+  ].join('\n')
+}
+
+function defaultPlannedTaskExecutor(opts: RunExecPoolOptions): TaskExecutor {
+  return async task => {
+    const command = execCommandForPrompt(plannedTaskPrompt(task), opts)
+    const before = new Set(await currentChangedFiles(opts.cwd))
+    const result = await execFileNoThrowWithCwd(command[0]!, command.slice(1), {
+      cwd: opts.cwd,
+      timeout: 10 * 60_000,
+      preserveOutputOnError: true,
+      maxBuffer: 10_000_000,
+      audit: {
+        cwd: opts.cwd,
+        reason: `execute UR-Nexus planned task ${task.id}`,
+        nextAction: 'verify task output against planning criteria',
+      },
+    })
+    const after = await currentChangedFiles(opts.cwd)
+    const changedFiles = after.filter(file => !before.has(file))
+    const output = [result.stdout, result.stderr].filter(Boolean).join('\n')
+    return {
+      ok: result.code === 0,
+      output,
+      changedFiles: changedFiles.length > 0 ? changedFiles : after,
+      commandsRun: [formatCommand(command)],
+      error: result.code === 0 ? undefined : result.error ?? result.stderr,
+    }
+  }
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))]
+}
+
+function writeTaskBoardUpdate(opts: RunExecPoolOptions, board: string): void {
+  const writer = opts.writeTaskBoard ?? (text => process.stdout.write(text))
+  writer(`${board}\n\n`)
+}
+
+function taskLine(task: NexusTask): { id: string; title: string; agent: string } {
+  return {
+    id: task.id,
+    title: task.title,
+    agent: String(task.assignedAgent),
+  }
+}
+
+export function buildExecFinalReport(run: RunPromptPlanResult): ExecFinalReport {
+  const issues = run.taskResults.flatMap(record => {
+    const issues = [
+      ...record.preVerification.issues,
+      ...(record.postVerification?.issues ?? []),
+    ]
+    return issues.map(issue => ({
+      taskId: record.taskId,
+      taskTitle: record.task.title,
+      code: issue.code,
+      message: issue.message,
+      severity: issue.severity,
+    }))
+  })
+  const verificationFailures = issues.filter(issue => issue.severity === 'error')
+  const warnings = issues.filter(issue => issue.severity === 'warning')
+  const actualChangedFiles = unique(
+    run.taskResults.flatMap(record => record.actualChangedFiles),
+  )
+  const verifiedCommands = unique(
+    run.taskResults.flatMap(record => record.observedCommands),
+  )
+  return {
+    summary: {
+      total: run.tasks.length,
+      finished: run.finished,
+      failed: run.failed,
+      blocked: run.blocked,
+    },
+    finishedTasks: run.tasks.filter(task => task.status === 'finished').map(taskLine),
+    failedTasks: run.tasks.filter(task => task.status === 'failed').map(taskLine),
+    blockedTasks: run.tasks.filter(task => task.status === 'blocked').map(taskLine),
+    actualChangedFiles,
+    unreportedChangedFiles: unique(
+      run.taskResults.flatMap(record => record.unreportedChangedFiles),
+    ),
+    verifiedCommands,
+    unverifiedCommandClaims: unique(
+      run.taskResults.flatMap(record => record.unverifiedCommandClaims),
+    ),
+    filesChanged: actualChangedFiles,
+    commandsRun: verifiedCommands,
+    verificationFailures,
+    warnings,
+    remainingLimitations: [
+      'File evidence is based on workspace snapshots before and after each task.',
+      'Command evidence is confirmed only when the task runner surfaces observed commands.',
+      'Detached or provider-internal tool activity is reported as unverified unless surfaced in task execution results.',
+    ],
+  }
+}
+
+function formatList<T>(
+  items: T[],
+  empty: string,
+  render: (item: T) => string,
+): string[] {
+  return items.length > 0 ? items.map(render) : [`- ${empty}`]
+}
+
+export function formatExecFinalReport(report: ExecFinalReport): string {
+  return [
+    'UR-Nexus task summary',
+    `Total: ${report.summary.total}`,
+    `Finished: ${report.summary.finished}`,
+    `Failed: ${report.summary.failed}`,
+    `Blocked: ${report.summary.blocked}`,
+    '',
+    'Finished tasks:',
+    ...formatList(
+      report.finishedTasks,
+      'none',
+      task => `- ${task.id} | ${task.agent} | ${task.title}`,
+    ),
+    '',
+    'Failed tasks:',
+    ...formatList(
+      report.failedTasks,
+      'none',
+      task => `- ${task.id} | ${task.agent} | ${task.title}`,
+    ),
+    '',
+    'Blocked tasks:',
+    ...formatList(
+      report.blockedTasks,
+      'none',
+      task => `- ${task.id} | ${task.agent} | ${task.title}`,
+    ),
+    '',
+    'Actual changed files:',
+    ...formatList(
+      report.actualChangedFiles,
+      'none observed',
+      file => `- ${file}`,
+    ),
+    '',
+    'Unreported changed files:',
+    ...formatList(
+      report.unreportedChangedFiles,
+      'none',
+      file => `- ${file}`,
+    ),
+    '',
+    'Verified commands:',
+    ...formatList(
+      report.verifiedCommands,
+      'none observed',
+      command => `- ${command}`,
+    ),
+    '',
+    'Unverified command claims:',
+    ...formatList(
+      report.unverifiedCommandClaims,
+      'none',
+      command => `- ${command}`,
+    ),
+    '',
+    'Verification failures:',
+    ...formatList(
+      report.verificationFailures,
+      'none',
+      failure =>
+        `- ${failure.taskId} | ${failure.code} | ${failure.message}`,
+    ),
+    '',
+    'Warnings:',
+    ...formatList(
+      report.warnings,
+      'none',
+      warning => `- ${warning.taskId} | ${warning.code} | ${warning.message}`,
+    ),
+    '',
+    'Remaining limitations:',
+    ...report.remainingLimitations.map(item => `- ${item}`),
+  ].join('\n')
+}
+
+function aggregateTask(
+  prompt: string,
+  plan: PromptPlan,
+  run: RunPromptPlanResult,
+  cwd: string,
+): BackgroundTask {
+  const failed = run.failed > 0 || run.blocked > 0
+  const now = new Date().toISOString()
+  return {
+    id: plan.id,
+    task: prompt,
+    status: failed ? 'failed' : 'completed',
+    cwd,
+    runCwd: cwd,
+    logFile: '',
+    outputFile: '',
+    inboxFile: '',
+    createdAt: plan.createdAt,
+    updatedAt: now,
+    completedAt: now,
+  }
+}
+
+async function runPromptPlans(
+  prompts: string[],
+  opts: RunExecPoolOptions,
+): Promise<ExecPoolResult[]> {
+  const config = resolvePromptPlanningConfig(opts.planning)
+  const executeTask = opts.executePlannedTask ?? defaultPlannedTaskExecutor(opts)
+  const results: ExecPoolResult[] = new Array(prompts.length)
+  let nextIndex = 0
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, opts.concurrency), prompts.length) },
+    async () => {
+      for (;;) {
+        const index = nextIndex
+        nextIndex += 1
+        if (index >= prompts.length) return
+        const prompt = prompts[index]!
+        const plan = decomposePrompt(prompt, config)
+        const boardHistory: string[] = []
+        const run = await runPromptPlan(plan, {
+          cwd: opts.cwd,
+          config,
+          executeTask,
+          onEvent: event => {
+            if (event.type === 'board') {
+              boardHistory.push(event.board)
+              if (opts.streamTaskBoard) writeTaskBoardUpdate(opts, event.board)
+            }
+            opts.onPlanningEvent?.(event)
+          },
+        })
+        const completedPlan = { ...plan, tasks: run.tasks }
+        const taskBoard = config.showTaskBoard
+          ? renderTaskBoard(completedPlan)
+          : undefined
+        const finalReport = buildExecFinalReport(run)
+        const command = finalReport.commandsRun
+        results[index] = {
+          task: aggregateTask(prompt, completedPlan, run, opts.cwd),
+          command,
+          dryRun: false,
+          plan: completedPlan,
+          taskBoard,
+          boardHistory,
+          plannedRun: run,
+          finalReport,
+          finalReportText: formatExecFinalReport(finalReport),
+          commandsRun: finalReport.commandsRun,
+          changedFiles: finalReport.filesChanged,
+          verificationFailures: finalReport.verificationFailures,
+          warnings: finalReport.warnings,
+        }
+      }
+    },
+  )
+  await Promise.all(workers)
+  return results
+}
+
 export async function runExecPool(
   prompts: string[],
-  opts: {
-    cwd: string
-    concurrency: number
-    maxTurns?: number
-    model?: string
-    outputDir?: string
-    worktree?: boolean
-    dryRun?: boolean
-  },
-): Promise<StartBackgroundTaskResult[]> {
+  opts: RunExecPoolOptions,
+): Promise<ExecPoolResult[]> {
+  const planning = resolvePromptPlanningConfig(opts.planning)
   if (opts.dryRun) {
     return prompts.map((prompt, index) => ({
       task: {
@@ -132,7 +533,16 @@ export async function runExecPool(
       },
       command: execCommandForPrompt(prompt, opts),
       dryRun: true,
+      ...planPrompt(prompt, planning),
     }))
+  }
+
+  if (planning.taskPlanning) {
+    return await runPromptPlans(prompts, { ...opts, planning })
+  }
+
+  if (opts.legacyRunner) {
+    return await opts.legacyRunner(prompts, opts)
   }
 
   const {
@@ -183,6 +593,16 @@ export const call: LocalCommandCall = async (args: string) => {
   const outputDir = option(tokens, '--output-dir')
   const worktree = tokens.includes('--worktree')
   const dryRun = tokens.includes('--dry-run')
+  const quiet = tokens.includes('--quiet')
+  const planning = resolvePromptPlanningConfig({
+    taskPlanning: !tokens.includes('--no-task-planning'),
+    parallelAgents: !tokens.includes('--no-parallel-agents'),
+    maxAgents: option(tokens, '--max-agents')
+      ? Number(option(tokens, '--max-agents'))
+      : undefined,
+    showTaskBoard: !tokens.includes('--no-task-board'),
+    strictVerification: !tokens.includes('--no-strict-verification'),
+  })
 
   const prompts = await readPrompts(tokens)
   if (prompts.length === 0) {
@@ -197,6 +617,8 @@ export const call: LocalCommandCall = async (args: string) => {
     outputDir,
     worktree,
     dryRun,
+    planning,
+    streamTaskBoard: planning.showTaskBoard && !json && !quiet && !dryRun,
   })
   const background = results.some(result => !result.dryRun)
     ? await import('../../services/agents/backgroundRunner.js')
@@ -208,7 +630,7 @@ export const call: LocalCommandCall = async (args: string) => {
       ? undefined
       : background?.getBackgroundTask(getCwd(), result.task.id)
     const log = task ? background!.readBackgroundLog(getCwd(), result.task.id) : null
-    const content = log ?? ''
+    const content = result.finalReportText ?? log ?? ''
     if (outputDir && !result.dryRun) {
       writeOutputFile(outputDir, prompt, content)
     }
@@ -219,6 +641,14 @@ export const call: LocalCommandCall = async (args: string) => {
       command: result.command,
       status: task?.status ?? result.task.status,
       output: content || undefined,
+      plan: result.plan,
+      taskBoard: result.taskBoard,
+      boardHistory: result.boardHistory,
+      finalReport: result.finalReport,
+      commandsRun: result.commandsRun,
+      changedFiles: result.changedFiles,
+      verificationFailures: result.verificationFailures,
+      warnings: result.warnings,
     }
   })
 
@@ -226,6 +656,14 @@ export const call: LocalCommandCall = async (args: string) => {
     type: 'text',
     value: json
       ? JSON.stringify(outputs, null, 2)
-      : outputs.map(o => `${o.index}: ${o.prompt} -> ${o.status}`).join('\n'),
+      : outputs
+          .map(o =>
+            [
+              ...(o.taskBoard ? [o.taskBoard, ''] : []),
+              ...(o.finalReport ? [formatExecFinalReport(o.finalReport), ''] : []),
+              `${o.index}: ${o.prompt} -> ${o.status}`,
+            ].join('\n'),
+          )
+          .join('\n'),
   }
 }

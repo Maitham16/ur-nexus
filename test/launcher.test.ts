@@ -24,6 +24,6 @@ describe('Node launcher', () => {
       encoding: 'utf8',
     })
 
-    expect(output.trim()).toBe(`${pkg.version} (UR-AGENT)`)
+    expect(output.trim()).toBe(`${pkg.version} (UR-Nexus)`)
   })
 })

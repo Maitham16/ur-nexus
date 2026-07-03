@@ -69,7 +69,7 @@ function renderOptionsHtml(options: ProviderOption[]): string {
 </style>
 </head>
 <body>
-  <h1>UR Agent Options</h1>
+  <h1>UR-Nexus Options</h1>
   <p class="disclaimer">Based on local, curated data and the UR CLI's own provider registry only. This is not live market research and does not rank model quality.</p>
   <h2>Providers</h2>
   ${renderProviderTable(options)}
@@ -110,7 +110,7 @@ export class AgentOptionsPanel {
       AgentOptionsPanel.current.panel.reveal(vscode.ViewColumn.Active)
       return AgentOptionsPanel.current
     }
-    const panel = vscode.window.createWebviewPanel('urAgentOptions', 'UR Agent Options', vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel('urAgentOptions', 'UR-Nexus Options', vscode.ViewColumn.Active, {
       enableScripts: true,
     })
     const instance = new AgentOptionsPanel(panel, onRefresh)

@@ -6,7 +6,7 @@ import { getCwd } from '../../utils/cwd.js'
 
 const TS_EXAMPLE = `// UR SDK (TypeScript) — drive the agent headlessly.
 // Requires the global \`ur\` binary on PATH.
-import { query, UrClient } from 'ur-agent/sdk'
+import { query, UrClient } from 'ur-nexus/sdk'
 
 const { text, ok } = await query('Summarize the README in one sentence', {
   maxTurns: 4,
@@ -59,7 +59,7 @@ These show how to call UR programmatically. Both wrap headless mode
 (\`ur -p --output-format json\`), so they inherit the same permission model,
 MCP configuration, and local Ollama routing as the interactive CLI.
 
-- \`example.ts\` — TypeScript, importing \`ur-agent/sdk\` (\`query\`, \`queryJSON\`, \`UrClient\`).
+- \`example.ts\` — TypeScript, importing \`ur-nexus/sdk\` (\`query\`, \`queryJSON\`, \`UrClient\`).
 - \`example.py\` — Python, no dependencies, shells out to \`ur\`.
 
 For agent-to-agent hand-off over HTTP instead of in-process scripting, use the
@@ -71,7 +71,7 @@ function infoText(): string {
     'UR SDK — drive UR programmatically (headless).',
     '',
     'TypeScript:',
-    "  import { query } from 'ur-agent/sdk'",
+    "  import { query } from 'ur-nexus/sdk'",
     "  const { text } = await query('Fix the failing test', { maxTurns: 6 })",
     '',
     'Python (no deps): shell out to `ur -p --output-format json` (see example.py).',

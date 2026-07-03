@@ -87,8 +87,11 @@ export function authorizeRequest(
   if (!bearer) return { ok: false, reason: 'missing bearer token' }
   if (hasStatic && bearer === options.token) return { ok: true }
   if (hasDelegation) {
+    const audienceAliases =
+      !options.audience || options.audience === 'ur-nexus' ? ['ur-agent'] : []
     const result = verifyDelegationToken(options.delegationSecret as string, bearer, {
       audience: options.audience,
+      audienceAliases,
       requiredScope,
     })
     if (result.valid) return { ok: true }

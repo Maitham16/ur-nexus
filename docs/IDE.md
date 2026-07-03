@@ -84,7 +84,7 @@ searchable command palette.
 
 Install it with `ur ide install` (offers the bundled VSIX) or from the
 packaged `.vsix`. The extension is bundled inside this repository and
-packaged as a local VSIX when installed from UR-AGENT; the public install
+packaged as a local VSIX when installed from UR-Nexus; the public install
 path does not depend on an unpublished marketplace extension ID. Every
 feature below runs UR as a local subprocess and never talks to a model
 provider or network service directly.

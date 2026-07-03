@@ -122,8 +122,8 @@ try {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
-  if (output !== `${version} (UR-AGENT)`) {
-    fail(`node ./bin/ur.js --version returned "${output}", expected "${version} (UR-AGENT)"`)
+  if (output !== `${version} (UR-Nexus)`) {
+    fail(`node ./bin/ur.js --version returned "${output}", expected "${version} (UR-Nexus)"`)
   }
 } catch (error) {
   fail(`node ./bin/ur.js --version failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -167,4 +167,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log(`Release check passed for UR-AGENT ${version}.`)
+console.log(`Release check passed for UR-Nexus ${version}.`)

@@ -1,5 +1,5 @@
 ---
-description: Demonstrate a minimal UR-AGENT plugin command.
+description: Demonstrate a minimal UR-Nexus plugin command.
 argument-hint: "[optional context]"
 ---
 

@@ -88,7 +88,7 @@ use `ollama.host` in settings if you want plain `ur` to default to a LAN host.
 Models exposed by the chosen Ollama app are valid, including local models and
 Ollama Cloud-backed models.
 
-UR-AGENT also has explicit provider commands for legal access paths:
+UR-Nexus also has explicit provider commands for legal access paths:
 
 ```sh
 ur provider list
@@ -140,7 +140,7 @@ API modes are explicit. Keys are read from a key stored via
 `ur connect <provider>` (OS keychain) or from the environment variables
 `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and
 `OPENROUTER_API_KEY`. Subscription CLIs are optional, never required
-dependencies, and never used as a silent fallback. UR-AGENT never scrapes
+dependencies, and never used as a silent fallback. UR-Nexus never scrapes
 browser sessions, extracts OAuth tokens, or bypasses provider restrictions.
 OpenAI-compatible local or cloud endpoints use `base_url` plus `model`.
 

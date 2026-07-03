@@ -5,7 +5,7 @@ inline diff review, an actions panel, an agent status card, a searchable
 command palette, a provider/model picker, and an agent options panel — all
 backed by the `ur` CLI already on your machine.
 
-UR-AGENT packages this extension from the repository as a local VSIX when the
+UR-Nexus packages this extension from the repository as a local VSIX when the
 CLI installs the public IDE integration. It does not depend on an unpublished
 marketplace extension ID.
 

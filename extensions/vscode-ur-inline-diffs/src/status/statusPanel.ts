@@ -48,7 +48,7 @@ function renderStatusHtml(status: AgentStatus): string {
 </style>
 </head>
 <body>
-  <h1>UR Agent Status</h1>
+  <h1>UR-Nexus Status</h1>
   ${row('UR version', status.urVersion)}
   ${row('Workspace root', status.workspaceRoot)}
   ${row('Provider', status.provider.label)}
@@ -104,7 +104,7 @@ export class StatusPanel {
       StatusPanel.current.panel.reveal(vscode.ViewColumn.Active)
       return StatusPanel.current
     }
-    const panel = vscode.window.createWebviewPanel('urAgentStatus', 'UR Agent Status', vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel('urAgentStatus', 'UR-Nexus Status', vscode.ViewColumn.Active, {
       enableScripts: true,
     })
     const instance = new StatusPanel(panel, onRefresh)

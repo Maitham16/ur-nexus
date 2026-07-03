@@ -2212,7 +2212,7 @@ function renderOptionsHtml(options) {
 </style>
 </head>
 <body>
-  <h1>UR Agent Options</h1>
+  <h1>UR-Nexus Options</h1>
   <p class="disclaimer">Based on local, curated data and the UR CLI's own provider registry only. This is not live market research and does not rank model quality.</p>
   <h2>Providers</h2>
   ${renderProviderTable(options)}
@@ -2248,7 +2248,7 @@ var AgentOptionsPanel = class _AgentOptionsPanel {
       _AgentOptionsPanel.current.panel.reveal(vscode12.ViewColumn.Active);
       return _AgentOptionsPanel.current;
     }
-    const panel = vscode12.window.createWebviewPanel("urAgentOptions", "UR Agent Options", vscode12.ViewColumn.Active, {
+    const panel = vscode12.window.createWebviewPanel("urAgentOptions", "UR-Nexus Options", vscode12.ViewColumn.Active, {
       enableScripts: true
     });
     const instance = new _AgentOptionsPanel(panel, onRefresh);
@@ -2494,7 +2494,7 @@ function renderStatusHtml(status) {
 </style>
 </head>
 <body>
-  <h1>UR Agent Status</h1>
+  <h1>UR-Nexus Status</h1>
   ${row("UR version", status.urVersion)}
   ${row("Workspace root", status.workspaceRoot)}
   ${row("Provider", status.provider.label)}
@@ -2545,7 +2545,7 @@ var StatusPanel = class _StatusPanel {
       _StatusPanel.current.panel.reveal(vscode15.ViewColumn.Active);
       return _StatusPanel.current;
     }
-    const panel = vscode15.window.createWebviewPanel("urAgentStatus", "UR Agent Status", vscode15.ViewColumn.Active, {
+    const panel = vscode15.window.createWebviewPanel("urAgentStatus", "UR-Nexus Status", vscode15.ViewColumn.Active, {
       enableScripts: true
     });
     const instance = new _StatusPanel(panel, onRefresh);

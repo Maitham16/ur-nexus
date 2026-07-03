@@ -4,7 +4,7 @@ UR reads configuration from CLI flags, environment variables, and project or use
 
 ## Model Providers
 
-UR-AGENT supports official provider access paths only:
+UR-Nexus supports official provider access paths only:
 
 - Explicit API providers: OpenAI, Anthropic, Gemini, OpenRouter, and
   OpenAI-compatible endpoints.
@@ -24,7 +24,7 @@ Bash/File tool execution, and sandbox guarantees apply to UR-run tools and
 final UR output, not to actions the external CLI performs internally. See
 [Provider Guide](providers.md) for the full provider capability matrix.
 
-UR-AGENT never scrapes browser sessions, extracts OAuth refresh tokens, reads
+UR-Nexus never scrapes browser sessions, extracts OAuth refresh tokens, reads
 hidden provider auth files, bypasses provider restrictions, or proxies consumer
 web sessions as APIs.
 
@@ -150,6 +150,71 @@ To make the picker appear on every startup, enable it in user settings:
 The scan is limited to active local IPv4 interfaces, ignores loopback/link-local
 addresses, and uses bounded concurrency with short timeouts. It is opt-in and
 never runs automatically unless enabled.
+
+## Prompt Planning
+
+UR-Nexus can plan an `ur exec` prompt into small executable tasks, show a task
+board, run independent tasks through parallel logical workers, and verify task
+claims after execution. The defaults are:
+
+```json
+{
+  "taskPlanning": true,
+  "parallelAgents": true,
+  "maxAgents": 3,
+  "showTaskBoard": true,
+  "strictVerification": true
+}
+```
+
+`taskPlanning` enables prompt decomposition. `parallelAgents` allows independent
+tasks to run concurrently up to `maxAgents`. `showTaskBoard` renders visible
+progress during real execution and keeps the final board in the execution
+report. `strictVerification` rejects unsupported claims about changed files,
+commands, or generated output. With `--no-strict-verification`, unsupported
+claims become warnings and the task may finish when no hard execution error was
+observed.
+
+Legacy nested configuration is still accepted under `urAgent`, while new
+configuration can use the top-level keys above or a `nexus` object.
+
+Per-run flags:
+
+```sh
+ur exec "update docs and tests" --max-agents 3
+ur exec "run exactly one direct prompt" --no-task-planning
+ur exec "plan but run sequentially" --no-parallel-agents
+ur exec "run without task board output" --no-task-board
+ur exec "run quietly but keep the final board" --quiet
+ur exec "warn instead of failing unsupported claims" --no-strict-verification
+```
+
+The final `ur exec` report is generated from task execution evidence only:
+finished, failed, and blocked task records, actual changed files from workspace
+snapshots, unreported changed files, verified commands surfaced by the executor,
+unverified command claims, verification failures, and warnings. Command tracking
+cannot prove detached or provider-internal activity unless the task runner
+surfaces those commands as observed evidence.
+
+## Project Safety Policy
+
+The project safety policy lives at `.ur/safety-policy.json`. By default,
+autonomous safe mode requires sandbox coverage for write, execute, and network
+commands. Project owners who want to personally approve local network checks
+instead of hard-requiring sandbox network isolation can remove `network` from
+`sandboxRequiredFor`:
+
+```json
+{
+  "version": 1,
+  "sandboxRequiredFor": ["write", "execute"]
+}
+```
+
+That setting makes commands such as `curl -s http://localhost:8000/ | head -20`
+eligible for the normal permission flow instead of failing only because the
+sandbox is unavailable. Secret-file and destructive-command rules still apply
+unless explicitly changed by the project policy.
 
 ## CLI Flags
 

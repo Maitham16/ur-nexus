@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ur-agent",
+      "name": "ur-nexus",
       "dependencies": {
         "sharp": "^0.35.1",
       },

@@ -50,8 +50,8 @@ export async function createOpenRouterClient(
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://ur-agent.local',
-          'X-Title': 'UR-AGENT',
+          'HTTP-Referer': 'https://ur-nexus.local',
+          'X-Title': 'UR-Nexus',
           ...(clientRequestId && { 'x-client-request-id': clientRequestId }),
           ...(requestOptions?.headers ?? {}),
         },
@@ -96,8 +96,8 @@ export async function createOpenRouterClient(
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://ur-agent.local',
-          'X-Title': 'UR-AGENT',
+          'HTTP-Referer': 'https://ur-nexus.local',
+          'X-Title': 'UR-Nexus',
           ...(clientRequestId && { 'x-client-request-id': clientRequestId }),
           ...(requestOptions?.headers ?? {}),
         },

@@ -252,7 +252,7 @@ export function getLogoDisplayData(): {
   const cwd = serverUrl
     ? `${displayPath} in ${serverUrl.replace(/^https?:\/\//, '')}`
     : displayPath
-  const billingType = 'UR-AGENT'
+  const billingType = 'UR-Nexus'
   const agentName = getInitialSettings().agent
 
   return {

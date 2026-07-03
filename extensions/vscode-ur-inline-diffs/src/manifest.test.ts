@@ -42,7 +42,7 @@ const PR3_COMMANDS = [
 describe('extension manifest', () => {
   test('keeps the existing extension id/name and Activity Bar container unchanged', () => {
     expect(extensionManifest.name).toBe('ur-inline-diffs')
-    expect(extensionManifest.publisher).toBe('ur-agent')
+    expect(extensionManifest.publisher).toBe('ur-nexus')
     expect(extensionManifest.contributes.viewsContainers.activitybar[0].id).toBe('ur')
     expect(extensionManifest.contributes.views.ur.map((view: { id: string }) => view.id)).toEqual([
       'urChat',

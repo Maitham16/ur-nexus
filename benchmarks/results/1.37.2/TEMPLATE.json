@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "template": true,
   "agent": {
-    "name": "ur-agent",
+    "name": "ur-nexus",
     "version": "1.37.2",
     "commit": null
   },

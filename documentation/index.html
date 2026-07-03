@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>UR-AGENT Documentation</title>
-    <meta name="description" content="Professional documentation, tutorials, examples, and command reference for UR-AGENT.">
+    <title>UR-Nexus Documentation</title>
+    <meta name="description" content="Professional documentation, tutorials, examples, and command reference for UR-Nexus.">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -14,7 +14,7 @@
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">UR</div>
         <div>
-          <strong>UR-AGENT</strong>
+          <strong>UR-Nexus</strong>
           <span>Documentation</span>
         </div>
       </div>
@@ -44,9 +44,9 @@
     <main id="content" class="content">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Version 1.37.4</p>
-          <h1>UR-AGENT Documentation</h1>
-          <p class="lead">A practical, tutorial-style reference for installing, configuring, automating, extending, and operating UR-AGENT.</p>
+          <p class="eyebrow">Version 1.37.5</p>
+          <h1>UR-Nexus Documentation</h1>
+          <p class="lead">A practical, tutorial-style reference for installing, configuring, automating, extending, and operating UR-Nexus.</p>
         </div>
         <div class="topbar-actions">
           <a class="button" href="#quickstart">Start</a>
@@ -110,7 +110,7 @@
           <article class="step">
             <span>1</span>
             <h3>Install</h3>
-            <pre><code>npm install -g ur-agent
+            <pre><code>npm install -g ur-nexus
 ur --version</code></pre>
           </article>
           <article class="step">
@@ -136,7 +136,7 @@ ur -p --output-format json "Review the current diff"</code></pre>
         <div class="section-heading">
           <p class="eyebrow">Legal Access Paths</p>
           <h2>Providers and authentication</h2>
-          <p>UR-AGENT integrates official access paths only. It never scrapes browser sessions, extracts OAuth tokens, reads hidden provider auth files, bypasses provider restrictions, or proxies credentials.</p>
+          <p>UR-Nexus integrates official access paths only. It never scrapes browser sessions, extracts OAuth tokens, reads hidden provider auth files, bypasses provider restrictions, or proxies credentials.</p>
         </div>
         <div class="reference-grid">
           <article>
@@ -172,7 +172,7 @@ ur config set provider.fallback ollama</code></pre>
           <p>The CLI is the control plane. Project context and <code>.ur</code> assets feed agent orchestration, which uses approved provider adapters, local-first model runtimes, and approved tools to produce auditable results.</p>
         </div>
         <figure class="diagram">
-          <img src="assets/ur-architecture.svg" alt="UR-AGENT runtime architecture diagram">
+          <img src="assets/ur-architecture.svg" alt="UR-Nexus runtime architecture diagram">
         </figure>
       </section>
 
@@ -521,8 +521,8 @@ ur ide diff show &lt;id&gt;</code></pre>
         <div class="reference-grid">
           <article>
             <h3>Installed version is old</h3>
-            <pre><code>npm uninstall -g ur-agent
-npm install -g ur-agent@latest --registry=https://registry.npmjs.org/
+            <pre><code>npm uninstall -g ur-nexus
+npm install -g ur-nexus@latest --registry=https://registry.npmjs.org/
 hash -r
 which -a ur
 ur --version</code></pre>
@@ -531,7 +531,7 @@ ur --version</code></pre>
             <h3>Source checkout update message</h3>
             <pre><code>ur upgrade
 # Development build detected. To update, pull latest source or install from npm.</code></pre>
-            <p>Source checkouts do not self-mutate. npm-installed builds compare against the latest <code>ur-agent</code> version and print the exact install command when an update is available.</p>
+            <p>Source checkouts do not self-mutate. npm-installed builds compare against the latest <code>ur-nexus</code> version and print the exact install command when an update is available.</p>
           </article>
           <article>
             <h3>Ollama model not found</h3>
@@ -558,7 +558,7 @@ ur claim-ledger validate</code></pre>
             <h3>New agent-platform command is missing</h3>
             <pre><code>ur --version
 ur --help | grep -E "repo-edit|test-first|safety|context-pack|spec|arena|escalate|ci-loop|artifacts"
-npm install -g ur-agent@latest --registry=https://registry.npmjs.org/
+npm install -g ur-nexus@latest --registry=https://registry.npmjs.org/
 hash -r</code></pre>
           </article>
         </div>

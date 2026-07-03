@@ -116,11 +116,11 @@ describe('assembleAgentStatus', () => {
           stderr: '',
         }
       }
-      return { stdout: '1.36.1 (UR-AGENT)\n', stderr: '' }
+      return { stdout: '1.36.1 (UR-Nexus)\n', stderr: '' }
     }
 
     const status = await assembleAgentStatus('/work/project', runCli)
-    expect(status.urVersion).toBe('1.36.1 (UR-AGENT)')
+    expect(status.urVersion).toBe('1.36.1 (UR-Nexus)')
     expect(status.workspaceRoot).toBe('/work/project')
     expect(status.acp.running).toBe(true)
     expect(status.provider.label).toBe('Claude API')

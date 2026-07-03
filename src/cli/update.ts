@@ -11,7 +11,7 @@ import { writeToStdout } from 'src/utils/process.js'
 import { gte } from 'src/utils/semver.js'
 import { formatUpdateAvailableMessage } from 'src/utils/updateNotice.js'
 
-export const UR_AGENT_PACKAGE_NAME = 'ur-agent'
+export const UR_AGENT_PACKAGE_NAME = 'ur-nexus'
 
 export type NpmVersionResult =
   | { ok: true; version: string }
@@ -128,7 +128,7 @@ export async function checkUpgradeStatus({
   }
 
   if (gte(currentVersion, latest.version)) {
-    output.push('UR-AGENT is up to date.')
+    output.push('UR-Nexus is up to date.')
     return {
       status: 'up-to-date',
       exitCode: 0,

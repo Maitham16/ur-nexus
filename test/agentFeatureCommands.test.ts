@@ -56,7 +56,7 @@ describe('agent feature scaffolds', () => {
     const dir = tempDir('ur-feature-scaffold-')
     const result = scaffoldAgentFeatures(dir)
 
-    expect(result.created).toContain('.github/workflows/ur-agent.yml')
+    expect(result.created).toContain('.github/workflows/ur-nexus.yml')
     expect(result.created).toContain('evidence/claims.schema.json')
     expect(result.created).toContain('browser-qa/example.json')
     expect(result.created).toContain('agents/reviewer.md')
@@ -119,7 +119,7 @@ describe('agent feature commands', () => {
   })
 
   test('agent-task PR dry-run generates gh command without creating a PR', async () => {
-    const dir = tempDir('ur-agent-task-')
+    const dir = tempDir('ur-nexus-task-')
     execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' })
     writeFileSync(join(dir, 'README.md'), 'test\n')
     const { call } = await import('../src/commands/agent-task/agent-task.js')
@@ -343,7 +343,7 @@ describe('agent feature commands', () => {
         Buffer.from(files['extension/package.json']!).toString('utf8'),
       )
       expect(`${manifest.publisher}.${manifest.name}`).toBe(
-        'ur-agent.ur-inline-diffs',
+        'ur-nexus.ur-inline-diffs',
       )
       const rootPackage = JSON.parse(
         readFileSync(join(process.cwd(), 'package.json'), 'utf8'),

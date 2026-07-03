@@ -28,7 +28,7 @@ const version =
     ? packageMetadata.version
     : '0.0.0-dev'
 const packageName =
-  typeof packageMetadata.name === 'string' ? packageMetadata.name : 'ur-agent'
+  typeof packageMetadata.name === 'string' ? packageMetadata.name : 'ur-nexus'
 const issuesUrl =
   typeof packageMetadata.bugs?.url === 'string'
     ? packageMetadata.bugs.url
@@ -50,7 +50,7 @@ function printBunRuntimeError(detail) {
         : 'PATH'
   console.error(
     [
-      `UR-AGENT requires Bun ${requiredBun} at runtime because the published CLI bundle is built with --target bun.`,
+      `UR-Nexus requires Bun ${requiredBun} at runtime because the published CLI bundle is built with --target bun.`,
       `Could not execute "${attempted}" from ${source}.${detail ? ` ${detail}` : ''}`,
       'Install Bun from https://bun.sh, or set BUN_BIN to the absolute path of a Bun executable.',
     ].join('\n'),

@@ -92,7 +92,7 @@ export const AGENT_FEATURES: AgentFeature[] = [
     command: 'ur agent-features init',
     summary:
       'Adds an opt-in workflow that can run UR in GitHub Actions for issue comments or manual dispatch.',
-    scaffold: '.github/workflows/ur-agent.yml',
+    scaffold: '.github/workflows/ur-nexus.yml',
   },
   {
     id: 'a2a-adapter',
@@ -222,7 +222,7 @@ export const AGENT_FEATURES: AgentFeature[] = [
     status: 'command',
     command: 'ur sdk info|init',
     summary:
-      'A dependency-free TypeScript SDK (`ur-agent/sdk`: query, queryJSON, UrClient) plus a Python wrapper that drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. `init` scaffolds runnable examples.',
+      'A dependency-free TypeScript SDK (`ur-nexus/sdk`: query, queryJSON, UrClient) plus a Python wrapper that drive headless `ur -p`, inheriting the CLI permission model, MCP config, and local Ollama routing. `init` scaffolds runnable examples.',
     scaffold: '.ur/sdk/',
   },
   {
@@ -744,14 +744,14 @@ the comment/message; the text after the keyword becomes the prompt. Keep the
 keyword and any allow-list of actors under your control — treat webhook content
 as untrusted input.
 
-The bundled GitHub Action (\`.github/workflows/ur-agent.yml\`) is the outbound
+The bundled GitHub Action (\`.github/workflows/ur-nexus.yml\`) is the outbound
 runner; \`ur trigger\` is the inbound parser that decides what to run.
 `,
   },
   {
-    path: '.github/workflows/ur-agent.yml',
+    path: '.github/workflows/ur-nexus.yml',
     root: 'project',
-    content: `name: UR-AGENT
+    content: `name: UR-Nexus
 
 on:
   workflow_dispatch:
@@ -769,7 +769,7 @@ permissions:
   issues: write
 
 jobs:
-  ur-agent:
+  ur-nexus:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.comment.body, '/ur')
     runs-on: ubuntu-latest
     steps:
