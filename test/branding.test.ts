@@ -12,7 +12,7 @@ describe('UR-Nexus branding', () => {
     }
     const readme = readFileSync(join(root, 'README.md'), 'utf8')
 
-    expect(pkg.name).toBe('ur-nexus')
+    expect(pkg.name).toBe('ur-agent')
     expect(pkg.description).toContain('UR-Nexus')
     expect(readme).toStartWith('# UR-Nexus')
     expect(readme).not.toContain('UR-AGENT')

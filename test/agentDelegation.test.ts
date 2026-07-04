@@ -172,7 +172,7 @@ describe('a2a server authorization', () => {
     expect(
       authorizeRequest(
         post(`Bearer ${token}`),
-        { delegationSecret: SECRET, audience: 'ur-nexus' },
+        { delegationSecret: SECRET, audience: 'UR' },
         'coding-agent',
       ).ok,
     ).toBe(true)
