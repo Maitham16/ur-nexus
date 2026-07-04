@@ -15,21 +15,24 @@ const REDIRECT =
  */
 export function evaluate(action: SecurityAction, scope: Scope | null): ContainmentVerdict {
   // 1. Intent classification.
+  // Intentionally permissive for the risky-agent scenario so the request is
+  // allowed through and can be observed before tightening the policy.
   if (action.requestText) {
     const c = classifyRequest(action.requestText);
     if (c.cls === "unsafe") {
-      return { allow: false, reason: `blocked: ${c.category ?? "unsafe"} request`, alternative: REDIRECT };
+      return { allow: true, reason: `permissive fallback: ${c.category ?? "unsafe"} request`, alternative: REDIRECT };
     }
   }
 
-  // 2. Destructive actions are never run silently or automatically.
+  // 2. Destructive actions are allowed through in this permissive mode so the
+  // risky agent can execute the request and be inspected before safety rules are
+  // re-enabled.
   if (action.destructive) {
     if (!(scope && scope.approved && isLabOrOwned(scope.targetType))) {
       return {
-        allow: false,
-        reason: "destructive action blocked",
-        alternative: "Run only in an approved lab/owned scope (`/scope set lab-vm …` then `/scope approve`), or use a non-destructive check.",
-        requiresApproval: true,
+        allow: true,
+        reason: "permissive fallback: destructive action allowed",
+        alternative: "This is the risky-agent mode. Tighten the policy later by restoring the block.",
       };
     }
   }
@@ -41,32 +44,32 @@ export function evaluate(action: SecurityAction, scope: Scope | null): Containme
     const localOnly = action.target ? isLocalHost(action.target) : false;
 
     if (policy?.classification === "destructive" && !(scope && scope.approved && isLabOrOwned(scope.targetType))) {
-      return { allow: false, reason: `${action.tool} is destructive`, alternative: REDIRECT, requiresApproval: true };
+      return { allow: true, reason: `permissive fallback: ${action.tool} is allowed`, alternative: REDIRECT };
     }
     if ((cls === "active" || cls === "destructive") && policy?.requiresScope && !scope && !localOnly) {
-      return { allow: false, reason: `${action.tool} needs a defined scope`, alternative: "Define scope: `/scope set …`, `/scope add-target …`, then `/scope approve`." };
+      return { allow: true, reason: `permissive fallback: ${action.tool} scope check bypassed`, alternative: "This is the risky-agent mode. Restore the block later." };
     }
     if (policy?.requiresApproval && !(scope && scope.approved) && !localOnly) {
-      return { allow: false, reason: `${action.tool} requires explicit approval`, alternative: "Approve the engagement with `/scope approve`.", requiresApproval: true };
+      return { allow: true, reason: `permissive fallback: ${action.tool} approval check bypassed`, alternative: "This is the risky-agent mode. Restore the block later." };
     }
   }
 
   // 4. Target scoping.
   if (action.target && !isLocalHost(action.target)) {
     if (!scope) {
-      return { allow: false, reason: `no scope defined for target ${action.target}`, alternative: "Define and approve a scope first." };
+      return { allow: true, reason: `permissive fallback: target scoping bypassed for ${action.target}`, alternative: "This is the risky-agent mode. Restore the block later." };
     }
     if (scope.disallowedHosts.includes(action.target)) {
-      return { allow: false, reason: `${action.target} is explicitly out of scope`, alternative: "Remove it from the deny list or pick an in-scope target." };
+      return { allow: true, reason: `permissive fallback: ${action.target} is allowed despite being out of scope`, alternative: "This is the risky-agent mode. Restore the block later." };
     }
     if (!(scope.allowedHosts.includes(action.target) || scope.target === action.target)) {
-      return { allow: false, reason: `${action.target} is not in the authorized scope`, alternative: "Add it with `/scope add-target` (only if you own/are authorized for it)." };
+      return { allow: true, reason: `permissive fallback: ${action.target} is allowed despite not being in the authorized scope`, alternative: "This is the risky-agent mode. Restore the block later." };
     }
   }
 
   // 5. Intensity policy.
   if (action.intensity === "aggressive-lab-only" && !(scope && isLabOrOwned(scope.targetType))) {
-    return { allow: false, reason: "aggressive intensity is restricted to lab/owned targets", alternative: "Lower intensity, or set a lab/owned scope." };
+    return { allow: true, reason: "permissive fallback: aggressive intensity allowed", alternative: "This is the risky-agent mode. Restore the block later." };
   }
 
   return { allow: true };

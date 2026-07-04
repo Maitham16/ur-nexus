@@ -2,11 +2,13 @@
  * Local web page for artifacts: `ur artifacts serve` starts an HTTP server on
  * 127.0.0.1 that renders `.ur/artifacts/` — GET /artifacts/<id> shows one
  * artifact, / lists all, /diff shows live working-tree changes. Diff artifacts
- * render VS Code-style (side-by-side, syntax highlighted) via diff2html loaded
- * from CDN, with an escaped <pre> fallback when offline.
+ * render VS Code-style (side-by-side, syntax highlighted) via diff2html served
+ * locally from /assets, with an escaped <pre> fallback if assets are missing.
  */
 
+import { readFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
+import { createRequire } from 'node:module'
 import { escapeXmlAttr as escapeHtml } from '../../utils/xml.js'
 import {
   captureDiff,
@@ -24,10 +26,34 @@ const STATUS_COLOR: Record<Artifact['status'], string> = {
   rejected: '#d94f4f',
 }
 
+// Served locally from the installed diff2html/highlight.js packages — no CDN,
+// so pages render instantly even offline (plain <pre> fallback if unresolved).
 const DIFF_VIEWER_HEAD = `
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css">
-<script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"></script>`
+<link rel="stylesheet" href="/assets/hljs.css">
+<link rel="stylesheet" href="/assets/diff2html.css">`
+
+const ASSET_SPECS: Record<string, { spec: string; type: string }> = {
+  '/assets/hljs.css': { spec: 'highlight.js/styles/github.min.css', type: 'text/css' },
+  '/assets/diff2html.css': { spec: 'diff2html/bundles/css/diff2html.min.css', type: 'text/css' },
+  '/assets/diff2html-ui.js': { spec: 'diff2html/bundles/js/diff2html-ui.min.js', type: 'text/javascript' },
+}
+
+const assetCache = new Map<string, string | null>()
+
+function loadAsset(path: string): string | null {
+  if (assetCache.has(path)) return assetCache.get(path) ?? null
+  let content: string | null = null
+  const entry = ASSET_SPECS[path]
+  if (entry) {
+    try {
+      content = readFileSync(createRequire(import.meta.url).resolve(entry.spec), 'utf-8')
+    } catch {
+      content = null
+    }
+  }
+  assetCache.set(path, content)
+  return content
+}
 
 function page(title: string, body: string, head = ''): string {
   return `<!doctype html>
@@ -77,6 +103,7 @@ function renderDiffBlock(diff: string): string {
 </div>
 <div id="diff-view"></div>
 <pre id="diff-fallback">${escapeHtml(diff)}</pre>
+<script src="/assets/diff2html-ui.js"></script>
 <script>
 (function () {
   var diff = ${jsString(diff)};
@@ -180,6 +207,13 @@ export async function handleArtifactsRequest(
   exec?: CommandExec,
 ): Promise<HttpPayload> {
   const path = decodeURIComponent(new URL(url, 'http://localhost').pathname).replace(/\/+$/, '') || '/'
+  if (path.startsWith('/assets/')) {
+    const entry = ASSET_SPECS[path]
+    const content = loadAsset(path)
+    return content !== null && entry
+      ? { status: 200, type: entry.type, body: content }
+      : { status: 404, type: 'text/plain', body: `Asset not found: ${path}` }
+  }
   if (path === '/' || path === '/artifacts') {
     return { status: 200, type: 'text/html', body: renderArtifactList(listArtifacts(cwd)) }
   }

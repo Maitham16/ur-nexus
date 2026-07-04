@@ -90,12 +90,30 @@ test('diff artifacts render the diff2html viewer with pre fallback', async () =>
   try {
     recordArtifact(tmp, { kind: 'diff', title: 'A diff', body: SAMPLE_DIFF })
     const detail = await handleArtifactsRequest(tmp, '/artifacts/1')
-    expect(detail.body).toContain('diff2html-ui.min.js')
+    expect(detail.body).toContain('/assets/diff2html-ui.js')
     expect(detail.body).toContain('Diff2HtmlUI')
     expect(detail.body).toContain('diff-fallback')
     expect(detail.body).toContain('side-by-side')
     // Diff payload is JSON-encoded for the inline script, with < escaped.
     expect(detail.body).not.toContain('</script>console')
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+test('viewer assets are served locally', async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ur-art-assets-'))
+  try {
+    const js = await handleArtifactsRequest(tmp, '/assets/diff2html-ui.js')
+    expect(js.status).toBe(200)
+    expect(js.type).toBe('text/javascript')
+    expect(js.body.length).toBeGreaterThan(1000)
+    const css = await handleArtifactsRequest(tmp, '/assets/diff2html.css')
+    expect(css.status).toBe(200)
+    expect(css.type).toBe('text/css')
+    const hljs = await handleArtifactsRequest(tmp, '/assets/hljs.css')
+    expect(hljs.status).toBe(200)
+    expect((await handleArtifactsRequest(tmp, '/assets/nope.js')).status).toBe(404)
   } finally {
     rmSync(tmp, { recursive: true, force: true })
   }
@@ -118,7 +136,7 @@ test('live /diff page shows working-tree changes and capture button', async () =
     expect(live.status).toBe(200)
     expect(live.body).toContain('Working tree changes')
     expect(live.body).toContain('Capture as artifact')
-    expect(live.body).toContain('diff2html-ui.min.js')
+    expect(live.body).toContain('/assets/diff2html-ui.js')
 
     const clean = await handleArtifactsRequest(tmp, '/diff', emptyExec)
     expect(clean.body).toContain('No working-tree changes')

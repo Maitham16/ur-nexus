@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.43.2
+
+- Fix artifact pages hanging blank: diff viewer assets (diff2html,
+  highlight.js theme) are now served locally from `/assets` via the new
+  `diff2html` dependency instead of render-blocking CDN tags, and the viewer
+  script moved to the end of the body — pages paint instantly even offline.
+- `ur artifacts serve` in headless mode now keeps the process alive serving
+  until Ctrl+C (previously the process exited and killed the server), and the
+  port can be passed positionally (`ur artifacts serve 4181`).
+
 ## 1.43.1
 
 - Artifacts page renders diffs VS Code-style: side-by-side/inline views with

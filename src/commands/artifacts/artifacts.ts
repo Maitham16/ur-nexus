@@ -19,6 +19,7 @@ import {
   stopArtifactsServer,
 } from '../../services/agents/artifactsServer.js'
 import { appendBackgroundFeedback } from '../../services/agents/backgroundRunner.js'
+import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
 import { parseArguments } from '../../utils/argumentSubstitution.js'
 import { getCwd } from '../../utils/cwd.js'
 
@@ -52,7 +53,7 @@ function usage(): string {
     '  ur artifacts add --kind plan --title "..." [--body "..."] [--file path] [--summary "..."]',
     '  ur artifacts capture-diff [--title "..."]',
     '  ur artifacts capture-tests --command "bun test"',
-    '  ur artifacts serve [--port 4180] | serve --stop',
+    '  ur artifacts serve [port] [--port 4180] | serve --stop',
     '  ur artifacts approve <id>',
     '  ur artifacts reject <id> --feedback "..."',
     '  ur artifacts feedback|comment <id> --feedback "..." [--task bg_id]',
@@ -64,7 +65,7 @@ function backgroundTaskIdFromTrace(trace?: string): string | undefined {
   return trace?.startsWith('bg:') ? trace.slice('bg:'.length) : undefined
 }
 
-export const call: LocalCommandCall = async (args: string) => {
+export const call: LocalCommandCall = async (args, context) => {
   const cwd = getCwd()
   const tokens = parseArguments(args)
   const json = tokens.includes('--json')
@@ -128,16 +129,23 @@ export const call: LocalCommandCall = async (args: string) => {
     if (running) {
       return { type: 'text', value: `Artifacts page already running at ${running.url} — open ${running.url}/artifacts/<id>.` }
     }
-    const port = Number(option(tokens, '--port') ?? 4180)
+    // Port via --port or positional (`ur artifacts serve 4181`) — the headless
+    // CLI parser rejects unregistered --options, positional always works.
+    const portArg = option(tokens, '--port') ?? positional[1]
+    const port = Number(portArg ?? 4180)
     if (!Number.isInteger(port) || port < 0 || port > 65535) {
-      return { type: 'text', value: `Invalid port: ${option(tokens, '--port')}` }
+      return { type: 'text', value: `Invalid port: ${portArg}` }
     }
     try {
       const { url } = await startArtifactsServer(cwd, port)
-      return {
-        type: 'text',
-        value: `Artifacts page: ${url} — open ${url}/artifacts/<id> for a single artifact, ${url}/diff for live working-tree changes (VS Code-style diff). Stop with \`ur artifacts serve --stop\`.`,
+      const message = `Artifacts page: ${url} — open ${url}/artifacts/<id> for a single artifact, ${url}/diff for live working-tree changes (VS Code-style diff). Stop with \`ur artifacts serve --stop\`.`
+      if (context?.options?.isNonInteractiveSession || getIsNonInteractiveSession()) {
+        // Headless: the process would exit and kill the server. Print the URL
+        // and keep serving until Ctrl+C.
+        console.log(`${message}\nServing — press Ctrl+C to stop.`)
+        await new Promise(() => {})
       }
+      return { type: 'text', value: message }
     } catch (error) {
       return { type: 'text', value: `Failed to start artifacts server on port ${port}: ${error}` }
     }
