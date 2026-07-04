@@ -13,6 +13,11 @@ import {
   setStatus,
   type ArtifactKind,
 } from '../../services/agents/artifacts.js'
+import {
+  activeArtifactsServer,
+  startArtifactsServer,
+  stopArtifactsServer,
+} from '../../services/agents/artifactsServer.js'
 import { appendBackgroundFeedback } from '../../services/agents/backgroundRunner.js'
 import { parseArguments } from '../../utils/argumentSubstitution.js'
 import { getCwd } from '../../utils/cwd.js'
@@ -25,7 +30,7 @@ function option(tokens: string[], name: string): string | undefined {
 }
 
 function positionals(tokens: string[]): string[] {
-  const withValue = new Set(['--kind', '--title', '--body', '--file', '--summary', '--feedback', '--command', '--task'])
+  const withValue = new Set(['--kind', '--title', '--body', '--file', '--summary', '--feedback', '--command', '--task', '--port'])
   const values: string[] = []
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]
@@ -47,6 +52,7 @@ function usage(): string {
     '  ur artifacts add --kind plan --title "..." [--body "..."] [--file path] [--summary "..."]',
     '  ur artifacts capture-diff [--title "..."]',
     '  ur artifacts capture-tests --command "bun test"',
+    '  ur artifacts serve [--port 4180] | serve --stop',
     '  ur artifacts approve <id>',
     '  ur artifacts reject <id> --feedback "..."',
     '  ur artifacts feedback|comment <id> --feedback "..." [--task bg_id]',
@@ -108,6 +114,32 @@ export const call: LocalCommandCall = async (args: string) => {
     return {
       type: 'text',
       value: json ? JSON.stringify(artifact, null, 2) : `Captured test run as artifact ${artifact.id} (${artifact.summary}).`,
+    }
+  }
+
+  if (action === 'serve') {
+    if (tokens.includes('--stop')) {
+      return {
+        type: 'text',
+        value: (await stopArtifactsServer()) ? 'Artifacts server stopped.' : 'Artifacts server is not running.',
+      }
+    }
+    const running = activeArtifactsServer()
+    if (running) {
+      return { type: 'text', value: `Artifacts page already running at ${running.url} — open ${running.url}/artifacts/<id>.` }
+    }
+    const port = Number(option(tokens, '--port') ?? 4180)
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      return { type: 'text', value: `Invalid port: ${option(tokens, '--port')}` }
+    }
+    try {
+      const { url } = await startArtifactsServer(cwd, port)
+      return {
+        type: 'text',
+        value: `Artifacts page: ${url} — open ${url}/artifacts/<id> for a single artifact. Stop with \`ur artifacts serve --stop\`.`,
+      }
+    } catch (error) {
+      return { type: 'text', value: `Failed to start artifacts server on port ${port}: ${error}` }
     }
   }
 

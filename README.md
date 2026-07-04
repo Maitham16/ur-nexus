@@ -377,7 +377,7 @@ as first-class subcommands in the shipped CLI.
 | `ur semantic-memory` | Build and search a project-local memory index. |
 | `ur memory retention` | Configure and apply local memory retention policies (TTL, max entries, decay). |
 | `ur knowledge` | Manage a curated project knowledge base with provenance. |
-| `ur artifacts` | Capture diffs, test runs, notes, and review feedback under `.ur/artifacts/`. |
+| `ur artifacts` | Capture diffs, test runs, notes, and review feedback under `.ur/artifacts/`; `serve` opens a local web page per artifact ID. |
 | `ur claim-ledger` | Map generated claims to file, web, MCP, tool, or user sources. |
 | `ur browser-qa` | Validate and smoke-run browser QA replay fixtures. |
 | `ur eval run` | Run an eval suite and grade outputs; optionally capture cost/tokens/files/test metrics. |
@@ -560,6 +560,7 @@ ur code-index repo search "rate limiter"
 ur skill init security-review
 ur skill run security-review "src/auth.ts"
 ur artifacts capture-tests --command "bun test"
+ur artifacts serve --port 4180
 ur agent-task pr --create --dry-run
 ur acp serve --port 8123
 ur exec "add tests for the parser" --concurrency 4 --json

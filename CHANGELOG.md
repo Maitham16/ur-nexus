@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.43.0
+
+- Add `ur artifacts serve [--port 4180]`: a local web page for artifacts.
+  `GET /artifacts/<id>` renders one artifact (status, summary, feedback,
+  content), `/` lists all, with `/artifacts/<id>/raw` and `/api/artifacts[/<id>]`
+  endpoints. Bound to 127.0.0.1; stop with `ur artifacts serve --stop`.
+
 ## 1.42.0
 
 - Project safety policy no longer hard-blocks commands. Risky or deny-matched
