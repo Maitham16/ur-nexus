@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.43.7
+
 ## 1.43.6
 
 - Render output from reasoning models on OpenAI-compatible providers (LM Studio,
