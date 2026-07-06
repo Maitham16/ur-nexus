@@ -30,6 +30,8 @@
 
 import type { ToolUseBlock } from '@urhq-ai/sdk/resources/index.mjs'
 import { isEnvTruthy } from '../../utils/envUtils.js'
+import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
+import { getInitialSettings } from '../../utils/settings/settings.js'
 import { detectProjectQualityStack } from '../projectQuality.js'
 import { detectDoneClaim, evaluateDoneGate } from './doneDetector.js'
 import { ToolEffectLedger } from './ledger.js'
@@ -186,20 +188,33 @@ export class Verifier {
         ? pickCommands(config, modifiedFiles, ranBash, this.cwd)
         : null
       let timeoutMs = config?.timeoutMs
+      let autoDetected = false
       if (!commands && hasNonIgnoredEdits(config, modifiedFiles, this.cwd)) {
         commands = this.autoDetectedAfterEditCommands()
         timeoutMs = config?.timeoutMs ?? AUTO_DETECTED_GATE_TIMEOUT_MS
+        autoDetected = true
       }
       if (commands && commands.length > 0) {
-        const result = await runGateCommands(
-          commands,
-          this.cwd,
-          timeoutMs,
-        )
-        if (!result.ok) {
+        if (
+          !askBeforeGatesEnabled() &&
+          getIsNonInteractiveSession()
+        ) {
+          const result = await runGateCommands(
+            commands,
+            this.cwd,
+            timeoutMs,
+          )
+          if (!result.ok) {
+            this.bumpRejection(turnId)
+            const failed = result as Extract<typeof result, { ok: false }>
+            return { ok: false, reminder: failed.reminder }
+          }
+        } else {
           this.bumpRejection(turnId)
-          const failed = result as Extract<typeof result, { ok: false }>
-          return { ok: false, reminder: failed.reminder }
+          return {
+            ok: false,
+            reminder: buildAskBeforeGatesReminder(commands, autoDetected),
+          }
         }
       }
 
@@ -291,6 +306,29 @@ export class Verifier {
       command => command.command,
     )
   }
+}
+
+function askBeforeGatesEnabled(): boolean {
+  try {
+    return getInitialSettings().verifier?.askBeforeGates === true
+  } catch {
+    return false
+  }
+}
+
+function buildAskBeforeGatesReminder(
+  commands: string[],
+  autoDetected: boolean,
+): string {
+  const label = autoDetected ? 'auto-detected project verification' : 'project verification'
+  const list = commands.map(c => `- \`${c}\``).join('\n')
+  return (
+    `I have ${label} commands ready to run:\n${list}\n\n` +
+    `Do not automatically run them and do not declare the task complete without the user's decision. ` +
+    `Use AskUserQuestion to ask the user whether to run these verification commands now. ` +
+    `If they confirm, run them with the BashTool and then report the outcome. ` +
+    `If they decline, finish your response without running them.`
+  )
 }
 
 function pickPluginValidators(

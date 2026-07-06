@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.44.0
+
+- Add `verifier.askBeforeGates` setting (default `false`). When enabled, UR asks
+  via `AskUserQuestion` whether to run project verification commands after a
+  task, instead of auto-running tests/typecheck/lint gates. Available in
+  `/config`, `ur config set verifier.askBeforeGates true`, and
+  `.ur/settings.json`.
+- Prompt the model to stop after delivering its final response, reducing silent
+  extra thinking turns.
+
 ## 1.43.6
 
 - Render output from reasoning models on OpenAI-compatible providers (LM Studio,

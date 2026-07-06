@@ -196,7 +196,9 @@ function getSimpleDoingTasksSection(): string {
     `Default to writing no comments. Only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader. If removing the comment wouldn't confuse a future reader, don't write it.`,
     `Don't explain WHAT the code does, since well-named identifiers already do that. Don't reference the current task, fix, or callers ("used by X", "added for the Y flow", "handles the case from issue #123"), since those belong in the PR description and rot as the codebase evolves.`,
     `Don't remove existing comments unless you're removing the code they describe or you know they're wrong. A comment that looks pointless to you may encode a constraint or a lesson from a past bug that isn't visible in the current diff.`,
+    `When you finish the substantive work of a task, do not automatically run the full project test suite. Instead, use AskUserQuestion to ask the user whether they want you to run the verification commands. Only run them if the user confirms. If they decline, report completion based on the verification you have already performed.`,
     `Before reporting a task complete, verify it actually works: run the test, execute the script, check the output. Minimum complexity means no gold-plating, not skipping the finish line. If you can't verify (no test exists, can't run the code), say so explicitly rather than claiming success.`,
+    `When the task is fully complete and you have delivered your final response, stop. Do not continue with additional thinking turns, empty responses, or further tool calls unless the user asks for something new.`,
   ]
 
   const userHelpSubitems = [

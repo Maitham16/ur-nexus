@@ -11,7 +11,10 @@ test('GitHub production checks run only after the test step succeeds', () => {
   )
 
   const tests = workflow.indexOf('name: Run tests (Bun)')
+  const typecheck = workflow.indexOf('name: Typecheck')
   const bundle = workflow.indexOf('name: Build bundle')
+  const smoke = workflow.indexOf('name: Smoke test')
+  const secretScan = workflow.indexOf('name: Secret scan')
   const release = workflow.indexOf('name: Release check')
   const pkg = workflow.indexOf('name: Package Check')
   const globalInstall = workflow.indexOf('name: Test Global Install (NPM)')
@@ -23,6 +26,8 @@ test('GitHub production checks run only after the test step succeeds', () => {
 
   expect(workflow).toContain('bun test --timeout 120000')
   expect(workflow).toContain('name: Build bundle\n        if: success()')
+  expect(workflow).toContain('name: Smoke test\n        if: success()')
+  expect(workflow).toContain('name: Secret scan\n        if: success()')
   expect(workflow).toContain('name: Release check\n        if: success()')
   expect(workflow).toContain('name: Package Check\n        if: success()')
   expect(workflow).toContain('name: Test Global Install (NPM)\n        if: success()')

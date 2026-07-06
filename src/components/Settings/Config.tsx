@@ -432,6 +432,30 @@ export function Config({
       });
     }
   }] : []), {
+    id: 'verifierAskBeforeGates',
+    label: 'Ask before running verification gates',
+    value: settingsData?.verifier?.askBeforeGates ?? false,
+    type: 'boolean' as const,
+    onChange(askBeforeGates: boolean) {
+      updateSettingsForSource('userSettings', {
+        verifier: {
+          ...settingsData?.verifier,
+          askBeforeGates
+        }
+      });
+      setSettingsData(prev => ({
+        ...prev,
+        verifier: {
+          ...prev?.verifier,
+          askBeforeGates
+        }
+      }));
+      logEvent('tengu_config_changed', {
+        setting: 'verifierAskBeforeGates' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        value: String(askBeforeGates) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+      });
+    }
+  }, {
     id: 'verbose',
     label: 'Verbose output',
     value: verbose,
@@ -1136,6 +1160,9 @@ export function Config({
     if (globalConfig.autoInstallIdeExtension !== initialConfig.current.autoInstallIdeExtension) {
       formattedChanges.push(`${globalConfig.autoInstallIdeExtension ? 'Enabled' : 'Disabled'} auto-install IDE extension`);
     }
+    if (settingsData?.verifier?.askBeforeGates !== initialSettingsData.current?.verifier?.askBeforeGates) {
+      formattedChanges.push(`${settingsData?.verifier?.askBeforeGates ? 'Enabled' : 'Disabled'} ask before running verification gates`);
+    }
     if (globalConfig.autoCompactEnabled !== initialConfig.current.autoCompactEnabled) {
       formattedChanges.push(`${globalConfig.autoCompactEnabled ? 'Enabled' : 'Disabled'} auto-compact`);
     }
@@ -1204,6 +1231,7 @@ export function Config({
       autoUpdatesChannel: iu?.autoUpdatesChannel,
       minimumVersion: iu?.minimumVersion,
       language: iu?.language,
+      verifier: iu?.verifier,
       ...(feature('TRANSCRIPT_CLASSIFIER') ? {
         useAutoModeDuringPlan: (iu as {
           useAutoModeDuringPlan?: boolean;

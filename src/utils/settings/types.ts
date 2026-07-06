@@ -1002,6 +1002,17 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Custom directory path for auto-memory storage. Supports ~/ prefix for home directory expansion. Ignored if set in projectSettings (checked-in .ur/settings.json) for security. When unset, defaults to ~/.ur/projects/<sanitized-cwd>/memory/.',
         ),
+      verifier: z
+        .object({
+          askBeforeGates: z
+            .boolean()
+            .optional()
+            .describe(
+              'When true, UR asks whether to run project verification commands (tests, typecheck, lint) after a task instead of running them automatically. Default: false.',
+            ),
+        })
+        .optional()
+        .describe('Verifier behavior configuration'),
       autoDreamEnabled: z
         .boolean()
         .optional()

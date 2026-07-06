@@ -81,6 +81,13 @@ export const SUPPORTED_SETTINGS: Record<string, SettingConfig> = {
     description:
       'Automatically refresh the local semantic code index during interactive sessions',
   },
+  'verifier.askBeforeGates': {
+    source: 'settings',
+    type: 'boolean',
+    path: ['verifier', 'askBeforeGates'],
+    description:
+      'Ask before running project verification commands (tests, typecheck, lint) after a task instead of running them automatically. Default: false.',
+  },
   autoDreamEnabled: {
     source: 'settings',
     type: 'boolean',
