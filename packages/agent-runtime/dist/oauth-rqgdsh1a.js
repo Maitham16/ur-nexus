@@ -1,0 +1,42 @@
+import {
+  ALL_OAUTH_SCOPES,
+  CONSOLE_OAUTH_SCOPES,
+  MCP_CLIENT_METADATA_URL,
+  OAUTH_BETA_HEADER,
+  UR_AI_INFERENCE_SCOPE,
+  UR_AI_OAUTH_SCOPES,
+  UR_AI_PROFILE_SCOPE,
+  fileSuffixForOauthConfig,
+  getOauthConfig,
+  init_oauth
+} from "./index-nds05g02.js";
+import"./index-f7bfe40r.js";
+import"./index-3stg8t86.js";
+import"./index-5jmh1e0k.js";
+import"./index-mwn5bkf6.js";
+import"./index-a9y6sg4d.js";
+import"./index-dsy9thtk.js";
+import"./index-2p1fe0x7.js";
+import"./index-abak5acd.js";
+import"./index-0x08e9n5.js";
+import"./index-2g4gegqj.js";
+import"./index-r54kbd6k.js";
+import"./index-f6t8v2s9.js";
+import"./index-egwqqnxn.js";
+import"./index-m9qhxms7.js";
+import"./index-bdb5pzbm.js";
+import"./index-nhjg91p1.js";
+import"./index-8rxa073f.js";
+init_oauth();
+
+export {
+  getOauthConfig,
+  fileSuffixForOauthConfig,
+  UR_AI_PROFILE_SCOPE,
+  UR_AI_OAUTH_SCOPES,
+  UR_AI_INFERENCE_SCOPE,
+  OAUTH_BETA_HEADER,
+  MCP_CLIENT_METADATA_URL,
+  CONSOLE_OAUTH_SCOPES,
+  ALL_OAUTH_SCOPES
+};

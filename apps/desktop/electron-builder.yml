@@ -1,0 +1,35 @@
+appId: com.ur.agent.desktop
+productName: UR Desktop
+copyright: Copyright © 2026
+icon: assets/icon.png
+files:
+  - dist/main/main.mjs
+  - dist/main/main.mjs.map
+  - dist/preload/preload.mjs
+  - dist/preload/preload.mjs.map
+  - dist/renderer/**/*
+  - package.json
+asarUnpack:
+  - node_modules/node-pty/**/*
+  - node_modules/electron-updater/**/*
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  artifactName: '${productName}-${version}-${arch}.${ext}'
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  provisioningProfile: build/UR_Desktop.provisionprofile
+  notarize:
+    teamId: '${env.APPLE_TEAM_ID}'
+dmg:
+  sign: false
+protocols:
+  - name: UR Desktop
+    schemes:
+      - ur-desktop
+# electron-builder rebuild defaults to `npm rebuild`; override to use bun if available.
+npmRebuild: false

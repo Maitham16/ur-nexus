@@ -1,5 +1,6 @@
 import { feature } from 'bun:bundle'
 import memoize from 'lodash-es/memoize.js'
+import type { MemoizedFunction } from './utils/memoize.js'
 import {
   getAdditionalDirectoriesForAgentMd,
   setCachedAgentMdContent,
@@ -33,7 +34,7 @@ export function setSystemPromptInjection(value: string | null): void {
   getSystemContext.cache.clear?.()
 }
 
-export const getGitStatus = memoize(async (): Promise<string | null> => {
+export const getGitStatus: MemoizedFunction<[], Promise<string | null>> = memoize(async (): Promise<string | null> => {
   if (process.env.NODE_ENV === 'test') {
     // Avoid cycles in tests
     return null
@@ -113,7 +114,7 @@ export const getGitStatus = memoize(async (): Promise<string | null> => {
 /**
  * This context is prepended to each conversation, and cached for the duration of the conversation.
  */
-export const getSystemContext = memoize(
+export const getSystemContext: MemoizedFunction<[], Promise<{ [k: string]: string }>> = memoize(
   async (): Promise<{
     [k: string]: string
   }> => {
@@ -152,7 +153,7 @@ export const getSystemContext = memoize(
 /**
  * This context is prepended to each conversation, and cached for the duration of the conversation.
  */
-export const getUserContext = memoize(
+export const getUserContext: MemoizedFunction<[], Promise<{ [k: string]: string }>> = memoize(
   async (): Promise<{
     [k: string]: string
   }> => {

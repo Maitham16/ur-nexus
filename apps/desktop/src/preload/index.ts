@@ -1,0 +1,261 @@
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import type {
+  IpcChannel,
+  IpcEvent,
+  RuntimeEvent,
+  RuntimeProjectDto,
+  RuntimeSessionDto,
+  RuntimeToolInfoDto,
+  RuntimeProviderInfoDto,
+  RuntimeModelInfoDto,
+  RuntimeTaskInfoDto,
+  RuntimeAgentInfoDto,
+  RuntimeMcpServerDto,
+  RuntimeToolDefinitionDto,
+  ProjectInfoDto,
+  RecentProjectDto,
+  WorktreeInfoDto,
+  ReadFileRequestDto,
+  ProposeEditRequestDto,
+  ApplyPatchRequestDto,
+  RunCommandRequestDto,
+  TerminalCommandDto,
+  AddMcpServerRequestDto,
+  ApprovalResponseDto,
+  ApprovalScope,
+  GetSafetyPolicyRequestDto,
+  SetSafetyPolicyRequestDto,
+  ListRunsRequestDto,
+  GetRunRequestDto,
+  DeleteRunRequestDto,
+  ExportReportRequestDto,
+  GetReportRequestDto,
+  RunSummaryDto,
+  RunDetailDto,
+  RunReportDto,
+  DesktopProviderInfoDto,
+  DesktopProviderConfigDto,
+  DesktopProviderConfigPatch,
+  DesktopModelInfoDto,
+  DesktopProviderConnectionResultDto,
+  RuntimeConnectorDto,
+  RuntimeConnectorToolDto,
+  AddConnectorRequestDto,
+  UpdateConnectorRequestDto,
+  CallConnectorToolRequestDto,
+} from '../shared/ipc.js'
+
+// Thin typed wrapper over ipcRenderer. No Node APIs are exposed to the renderer.
+const api = {
+  invoke: <T = unknown>(channel: IpcChannel, ...args: unknown[]): Promise<T> =>
+    ipcRenderer.invoke(channel, ...args),
+
+  subscribe: (
+    channel: IpcEvent,
+    callback: (payload: RuntimeEvent) => void,
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, payload: RuntimeEvent) =>
+      callback(payload)
+    ipcRenderer.on(channel, handler)
+    return () => {
+      ipcRenderer.removeListener(channel, handler)
+    }
+  },
+
+  // Projects
+  openProject: (root: string): Promise<RuntimeProjectDto> =>
+    ipcRenderer.invoke('project:open', root),
+
+  listProjects: (): Promise<RecentProjectDto[]> =>
+    ipcRenderer.invoke('project:list'),
+
+  inspectProject: (root: string): Promise<ProjectInfoDto> =>
+    ipcRenderer.invoke('project:inspect', root),
+
+  // Worktrees
+  createWorktree: (projectRoot: string, branch?: string): Promise<WorktreeInfoDto> =>
+    ipcRenderer.invoke('worktree:create', projectRoot, branch),
+
+  listWorktrees: (projectRoot: string): Promise<WorktreeInfoDto[]> =>
+    ipcRenderer.invoke('worktree:list', projectRoot),
+
+  // Runs
+  startRun: (
+    projectRoot: string,
+    options?: { useWorktree?: boolean; branch?: string },
+  ): Promise<RuntimeSessionDto> =>
+    ipcRenderer.invoke('run:start', projectRoot, options),
+
+  stopRun: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke('run:stop', sessionId),
+
+  pauseRun: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke('run:pause', sessionId),
+
+  resumeRun: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke('run:resume', sessionId),
+
+  sendMessage: (sessionId: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('message:send', sessionId, content),
+
+  // Files
+  readFile: (req: ReadFileRequestDto): Promise<string | null> =>
+    ipcRenderer.invoke('file:read', req),
+
+  proposeEdit: (req: ProposeEditRequestDto): Promise<{ diffId: string; patch: string }> =>
+    ipcRenderer.invoke('edit:propose', req),
+
+  applyPatch: (req: ApplyPatchRequestDto): Promise<void> =>
+    ipcRenderer.invoke('patch:apply', req),
+
+  // Commands
+  runCommand: (
+    req: RunCommandRequestDto,
+  ): Promise<{ output: string; exitCode: number; commandId?: string; requiresApproval?: boolean }> =>
+    ipcRenderer.invoke('command:run', req),
+
+  stopCommand: (
+    projectRoot: string,
+    commandId: string,
+    worktreeRoot?: string,
+  ): Promise<boolean> => ipcRenderer.invoke('command:stop', projectRoot, commandId, worktreeRoot),
+
+  listCommands: (
+    projectRoot: string,
+    worktreeRoot?: string,
+  ): Promise<import('../shared/ipc.js').TerminalCommandDto[]> => ipcRenderer.invoke('commands:list', projectRoot, worktreeRoot),
+
+  // Tasks / agents
+  listTasks: (projectRoot: string): Promise<RuntimeTaskInfoDto[]> =>
+    ipcRenderer.invoke('tasks:list', projectRoot),
+
+  listAgents: (projectRoot: string): Promise<RuntimeAgentInfoDto[]> =>
+    ipcRenderer.invoke('agents:list', projectRoot),
+
+  setMaxAgents: (value: number): Promise<number> =>
+    ipcRenderer.invoke('settings:maxAgents', value),
+
+  getMaxAgents: (): Promise<number> => ipcRenderer.invoke('settings:maxAgents'),
+
+  // Providers / models / tools
+  listProviders: (projectRoot: string): Promise<DesktopProviderInfoDto[]> =>
+    ipcRenderer.invoke('providers:list', projectRoot),
+
+  listModels: (projectRoot: string): Promise<DesktopModelInfoDto[]> =>
+    ipcRenderer.invoke('models:list', projectRoot),
+
+  updateProvider: (
+    projectRoot: string,
+    providerId: string,
+    model?: string,
+  ): Promise<void> =>
+    ipcRenderer.invoke('provider:update', projectRoot, providerId, model),
+
+  getProviderConfig: (projectRoot: string): Promise<DesktopProviderConfigDto> =>
+    ipcRenderer.invoke('provider:config:get', projectRoot),
+
+  setProviderConfig: (
+    projectRoot: string,
+    patch: DesktopProviderConfigPatch,
+  ): Promise<void> => ipcRenderer.invoke('provider:config:set', projectRoot, patch),
+
+  storeProviderApiKey: (
+    projectRoot: string,
+    providerId: string,
+    key: string,
+  ): Promise<void> => ipcRenderer.invoke('provider:key:store', projectRoot, providerId, key),
+
+  clearProviderApiKey: (projectRoot: string, providerId: string): Promise<void> =>
+    ipcRenderer.invoke('provider:key:clear', projectRoot, providerId),
+
+  testProviderConnection: (
+    projectRoot: string,
+    providerId: string,
+  ): Promise<DesktopProviderConnectionResultDto> => ipcRenderer.invoke('provider:test', projectRoot, providerId),
+
+  listProviderModels: (projectRoot: string, providerId: string): Promise<DesktopModelInfoDto[]> =>
+    ipcRenderer.invoke('provider:models:get', projectRoot, providerId),
+
+  listToolDefinitions: (projectRoot: string): Promise<RuntimeToolDefinitionDto[]> =>
+    ipcRenderer.invoke('tools:list', projectRoot),
+
+  // MCP
+  listMcpServers: (projectRoot: string): Promise<RuntimeMcpServerDto[]> =>
+    ipcRenderer.invoke('mcp:list', projectRoot),
+
+  addMcpServer: (req: AddMcpServerRequestDto): Promise<void> =>
+    ipcRenderer.invoke('mcp:add', req),
+
+  removeMcpServer: (projectRoot: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('mcp:remove', projectRoot, name),
+
+  // Connectors
+  listConnectors: (projectRoot: string): Promise<RuntimeConnectorDto[]> =>
+    ipcRenderer.invoke('connectors:list', projectRoot),
+
+  addConnector: (req: AddConnectorRequestDto): Promise<void> =>
+    ipcRenderer.invoke('connector:add', req),
+
+  updateConnector: (req: UpdateConnectorRequestDto): Promise<void> =>
+    ipcRenderer.invoke('connector:update', req),
+
+  removeConnector: (projectRoot: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('connector:remove', projectRoot, name),
+
+  testConnector: (projectRoot: string, name: string): Promise<{ ok: boolean; error?: string; tools?: RuntimeConnectorToolDto[] }> =>
+    ipcRenderer.invoke('connector:test', projectRoot, name),
+
+  listConnectorTools: (projectRoot: string, name: string): Promise<RuntimeConnectorToolDto[]> =>
+    ipcRenderer.invoke('connector:tools', projectRoot, name),
+
+  callConnectorTool: (req: CallConnectorToolRequestDto): Promise<{ ok: boolean; result?: unknown; error?: string }> =>
+    ipcRenderer.invoke('connector:tool:call', req),
+
+  // History / report
+  readHistory: (projectRoot: string): Promise<unknown[]> =>
+    ipcRenderer.invoke('history:read', projectRoot),
+
+  exportReport: (projectRoot: string, worktreeRoot?: string): Promise<{ path: string }> =>
+    ipcRenderer.invoke('report:export', projectRoot, worktreeRoot),
+
+  // Approvals
+  respondApproval: (res: ApprovalResponseDto): Promise<void> =>
+    ipcRenderer.invoke('approval:respond', res),
+
+  // Safety / policy
+  getSafetyPolicy: (req: GetSafetyPolicyRequestDto): Promise<Record<string, unknown>> =>
+    ipcRenderer.invoke('safety:policy:get', req),
+
+  setSafetyPolicy: (req: SetSafetyPolicyRequestDto): Promise<void> =>
+    ipcRenderer.invoke('safety:policy:set', req),
+
+  // History / reports
+  listRuns: (req: ListRunsRequestDto): Promise<RunSummaryDto[]> =>
+    ipcRenderer.invoke('history:list', req),
+
+  getRun: (req: GetRunRequestDto): Promise<RunDetailDto | null> =>
+    ipcRenderer.invoke('history:get', req),
+
+  deleteRun: (req: DeleteRunRequestDto): Promise<boolean> =>
+    ipcRenderer.invoke('history:delete', req),
+
+  exportReportMarkdown: (req: ExportReportRequestDto): Promise<{ path: string }> =>
+    ipcRenderer.invoke('report:markdown', req),
+
+  exportReportJson: (req: ExportReportRequestDto): Promise<{ path: string }> =>
+    ipcRenderer.invoke('report:json', req),
+
+  getReport: (req: GetReportRequestDto): Promise<RunReportDto> =>
+    ipcRenderer.invoke('report:get', req),
+
+  checkForUpdates: (): Promise<{ updateAvailable: boolean; version?: string; error?: string }> =>
+    ipcRenderer.invoke('update:check'),
+}
+
+declare global {
+  interface Window {
+    urDesktop: typeof api
+  }
+}
+
+contextBridge.exposeInMainWorld('urDesktop', api)

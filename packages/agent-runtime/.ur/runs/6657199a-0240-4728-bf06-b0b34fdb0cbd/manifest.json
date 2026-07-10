@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "runId": "6657199a-0240-4728-bf06-b0b34fdb0cbd",
+  "cwd": "/Users/maith/Desktop/ur-nexus/packages/agent-runtime",
+  "startedAt": "2026-07-10T05:17:12.597Z",
+  "updatedAt": "2026-07-10T05:17:32.406Z",
+  "artifacts": [
+    {
+      "kind": "command-log",
+      "path": "/Users/maith/Desktop/ur-nexus/packages/agent-runtime/.ur/runs/6657199a-0240-4728-bf06-b0b34fdb0cbd/commands.jsonl",
+      "title": "commands.jsonl (node -e \"import('./dist/index.js').then(m => console.log(Obj)",
+      "at": "2026-07-10T05:17:32.405Z"
+    },
+    {
+      "kind": "actions",
+      "path": "actions.json",
+      "title": "actions.json",
+      "at": "2026-07-10T05:17:32.406Z"
+    }
+  ]
+}

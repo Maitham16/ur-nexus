@@ -1,4 +1,5 @@
 import memoize from 'lodash-es/memoize.js'
+import type { MemoizedFunction } from '../utils/memoize.js'
 
 // This ensures you get the LOCAL date in ISO format
 export function getLocalISODate(): string {
@@ -21,7 +22,7 @@ export function getLocalISODate(): string {
 // When midnight rolls over, getDateChangeAttachments appends the new date at
 // the tail (though simple mode disables attachments, so the trade-off there is:
 // stale date after midnight vs. ~entire-conversation cache bust — stale wins).
-export const getSessionStartDate = memoize(getLocalISODate)
+export const getSessionStartDate: MemoizedFunction<[], string> = memoize(getLocalISODate)
 
 // Returns "Month YYYY" (e.g. "February 2026") in the user's local timezone.
 // Changes monthly, not daily — used in tool prompts to minimize cache busting.

@@ -1,8 +1,6 @@
 import type { LocalCommandCall } from '../../types/command.js'
-import { getAutoMemPath, isAutoMemoryEnabled } from '../../memdir/paths.js'
 import { getCwd } from '../../utils/cwd.js'
-import { remember, listMemory, rememberInAutoMemory } from '../../ur/notes.js'
-
+import { remember, listMemory } from '../../ur/notes.js'
 export const call: LocalCommandCall = async (args: string) => {
   const text = (args ?? '').trim()
   if (!text) {
@@ -10,8 +8,5 @@ export const call: LocalCommandCall = async (args: string) => {
     return { type: 'text', value: notes.length ? notes.map((n) => `- ${n.text}`).join('\n') : 'no memory notes yet' }
   }
   remember(getCwd(), text)
-  if (isAutoMemoryEnabled()) {
-    rememberInAutoMemory(getAutoMemPath(), text)
-  }
   return { type: 'text', value: `remembered: ${text}` }
 }

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "runId": "de1547c0-f375-4def-8a8f-c1b90b33accd",
+  "cwd": "/home/maith/Desktop/ur/apps/desktop",
+  "startedAt": "2026-07-09T22:12:31.999Z",
+  "updatedAt": "2026-07-10T05:02:16.831Z",
+  "artifacts": [
+    {
+      "kind": "command-log",
+      "path": "/home/maith/Desktop/ur/apps/desktop/.ur/runs/de1547c0-f375-4def-8a8f-c1b90b33accd/commands.jsonl",
+      "title": "commands.jsonl (bun run build:electron 2>&1 | tail -50)",
+      "at": "2026-07-10T05:02:16.829Z"
+    },
+    {
+      "kind": "actions",
+      "path": "actions.json",
+      "title": "actions.json",
+      "at": "2026-07-10T05:02:16.831Z"
+    }
+  ]
+}

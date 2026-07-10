@@ -1,0 +1,64 @@
+import {
+  getAutoModeConfig,
+  getInitialSettings,
+  getManagedFileSettingsPresence,
+  getManagedSettingsKeysForLogging,
+  getPolicySettingsOrigin,
+  getRelativeSettingsFilePathForSource,
+  getSettingsFilePathForSource,
+  getSettingsForSource,
+  getSettingsRootPathForSource,
+  getSettingsWithErrors,
+  getSettingsWithSources,
+  getSettings_DEPRECATED,
+  getUseAutoModeDuringPlan,
+  hasAutoModeOptIn,
+  hasSkipDangerousModePermissionPrompt,
+  init_settings1 as init_settings,
+  loadManagedFileSettings,
+  parseSettingsFile,
+  rawSettingsContainsKey,
+  settingsMergeCustomizer,
+  updateSettingsForSource
+} from "./index-nds05g02.js";
+import"./index-f7bfe40r.js";
+import"./index-3stg8t86.js";
+import"./index-5jmh1e0k.js";
+import"./index-mwn5bkf6.js";
+import"./index-a9y6sg4d.js";
+import"./index-dsy9thtk.js";
+import"./index-2p1fe0x7.js";
+import"./index-abak5acd.js";
+import"./index-0x08e9n5.js";
+import"./index-2g4gegqj.js";
+import"./index-r54kbd6k.js";
+import"./index-f6t8v2s9.js";
+import"./index-egwqqnxn.js";
+import"./index-m9qhxms7.js";
+import"./index-bdb5pzbm.js";
+import"./index-nhjg91p1.js";
+import"./index-8rxa073f.js";
+init_settings();
+
+export {
+  updateSettingsForSource,
+  settingsMergeCustomizer,
+  rawSettingsContainsKey,
+  parseSettingsFile,
+  loadManagedFileSettings,
+  hasSkipDangerousModePermissionPrompt,
+  hasAutoModeOptIn,
+  getUseAutoModeDuringPlan,
+  getSettings_DEPRECATED,
+  getSettingsWithSources,
+  getSettingsWithErrors,
+  getSettingsRootPathForSource,
+  getSettingsForSource,
+  getSettingsFilePathForSource,
+  getRelativeSettingsFilePathForSource,
+  getPolicySettingsOrigin,
+  getManagedSettingsKeysForLogging,
+  getManagedFileSettingsPresence,
+  getInitialSettings,
+  getAutoModeConfig
+};

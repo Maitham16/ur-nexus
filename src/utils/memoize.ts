@@ -8,10 +8,11 @@ type CacheEntry<T> = {
   refreshing: boolean
 }
 
-type MemoizedFunction<Args extends unknown[], Result> = {
+
+export type MemoizedFunction<Args extends unknown[], Result> = {
   (...args: Args): Result
   cache: {
-    clear: () => void
+    clear?: () => void
   }
 }
 
@@ -40,7 +41,7 @@ type LRUMemoizedFunction<Args extends unknown[], Result> = {
 export function memoizeWithTTL<Args extends unknown[], Result>(
   f: (...args: Args) => Result,
   cacheLifetimeMs: number = 5 * 60 * 1000, // Default 5 minutes
-): MemoizedFunction<Args, Result> {
+): import('./memoize.js').MemoizedFunction<Args, Result> {
   const cache = new Map<string, CacheEntry<Result>>()
 
   const memoized = (...args: Args): Result => {

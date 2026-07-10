@@ -512,7 +512,7 @@ const COMMANDS = memoize((): Command[] => [
     : []),
 ])
 
-export const builtInCommandNames = memoize(
+export const builtInCommandNames: MemoizedFunction<[], Set<string>> = memoize(
   (): Set<string> =>
     new Set(COMMANDS().flatMap(_ => [_.name, ...(_.aliases ?? [])])),
 )
@@ -727,7 +727,7 @@ export function getMcpSkillCommands(
 
 // SkillTool shows ALL prompt-based commands that the model can invoke
 // This includes both skills (from /skills/) and commands (from /commands/)
-export const getSkillToolCommands = memoize(
+export const getSkillToolCommands: MemoizedFunction<[string], Promise<Command[]>> = memoize(
   async (cwd: string): Promise<Command[]> => {
     const allCommands = await getCommands(cwd)
     return allCommands.filter(
@@ -750,7 +750,7 @@ export const getSkillToolCommands = memoize(
 // Filters commands to include only skills. Skills are commands that provide
 // specialized capabilities for the model to use. They are identified by
 // loadedFrom being 'skills', 'plugin', or 'bundled', or having disableModelInvocation set.
-export const getSlashCommandToolSkills = memoize(
+export const getSlashCommandToolSkills: MemoizedFunction<[string], Promise<Command[]>> = memoize(
   async (cwd: string): Promise<Command[]> => {
     try {
       const allCommands = await getCommands(cwd)

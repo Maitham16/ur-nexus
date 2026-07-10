@@ -450,7 +450,7 @@ function resolveWorkspacePath(candidate: string, cwd: string): string {
   return resolveExistingPathOrParent(absolute)
 }
 
-function pathIsInsideWorkspace(path: string, cwd: string): boolean {
+export function pathIsInsideWorkspace(path: string, cwd: string): boolean {
   const realCwd = resolveExistingPathOrParent(cwd)
   const rel = relative(realCwd, path)
   return rel === '' || (!!rel && !rel.startsWith('..') && !isAbsolute(rel))

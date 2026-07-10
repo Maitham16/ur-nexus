@@ -74,12 +74,6 @@ export const SUPPORTED_SETTINGS: Record<string, SettingConfig> = {
     type: 'boolean',
     description: 'Enable auto-memory',
   },
-  automaticLearningEnabled: {
-    source: 'settings',
-    type: 'boolean',
-    description:
-      'Automatically learn from completed agent runs using local JSON stats',
-  },
   'codeIndex.autoReindex': {
     source: 'global',
     type: 'boolean',
