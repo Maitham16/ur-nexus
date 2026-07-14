@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.3
+
+- Make global npm installation reliable under npm's install-script approval
+  policy with a narrow `node-pty` allowlist and an actionable launcher
+  diagnostic when native setup was skipped.
+- Remove the fragile Electron `path.txt` postinstall workaround; the launcher
+  now resolves the installed platform binary directly when metadata is absent.
+- Upgrade to the maintained Electron 43 runtime, which no longer needs an
+  install lifecycle script, and remove deprecated updater dependencies from
+  the installation path.
+- Check for desktop updates through the public GitHub Releases API, without
+  downloading or executing release artifacts automatically.
+
 ## 1.0.2
 
 - Ship the redesigned professional UR-Nexus desktop application with a

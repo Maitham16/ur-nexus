@@ -9,14 +9,14 @@ Electron runtime. No API key is bundled: each user chooses a provider and adds,
 replaces, or removes their own credentials in **Settings**.
 
 ```bash
-npm install --global --allow-scripts=electron,node-pty ur-nexus-desktop
+npm install --global --allow-scripts=node-pty ur-nexus-desktop
 ur-nexus-desktop
 ```
 
 Recent npm versions require explicit approval before global packages may run
-native install scripts. UR-Nexus needs exactly Electron's runtime installer and
-node-pty's terminal binding; the command above approves only those two packages.
-It does not enable arbitrary dependency scripts. See npm's
+native install scripts. UR-Nexus needs only node-pty's terminal binding; the
+command above approves that package alone. Electron 43 no longer needs an
+install lifecycle script. This does not enable arbitrary dependency scripts. See npm's
 [`allow-scripts` documentation](https://docs.npmjs.com/using-npm/config/#allow-scripts).
 
 Use `ur-nexus-desktop --version` to verify the installed release. Ollama users
@@ -170,7 +170,7 @@ npm package.
 ## Troubleshooting
 
 - **Blank window**: check that `dist/renderer/index.html` exists after `bun run build`. In dev mode ensure Vite is running on port 5173.
-- **Electron runtime missing after npm install**: reinstall with `npm install --global --allow-scripts=electron,node-pty ur-nexus-desktop`. Do not use the broad `--dangerously-allow-all-scripts` option.
+- **Electron runtime missing after npm install**: reinstall with `npm install --global --allow-scripts=node-pty ur-nexus-desktop`. Do not use the broad `--dangerously-allow-all-scripts` option.
 - **Type errors**: run `bun run typecheck` from `apps/desktop`.
 - **Tests**: run `bun test` from `apps/desktop`.
 - **Packaging fails on native modules**: run `bun run build` first so `electron-builder` can locate rebuilt binaries; ensure `node-pty` has a prebuild for the target Electron ABI.

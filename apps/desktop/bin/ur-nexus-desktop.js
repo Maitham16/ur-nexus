@@ -43,10 +43,10 @@ function resolveElectronBinary() {
   }
 
   console.error(`UR-Nexus Desktop ${packageJson.version} could not find its Electron runtime.\n`)
-  console.error('npm did not run the two reviewed native setup scripts required by the desktop app.')
+  console.error("The installation is incomplete, or Electron's first-launch runtime download did not finish.")
   console.error('Repair the installation with:\n')
   console.error(
-    `  npm install --global --allow-scripts=electron,node-pty ur-nexus-desktop@${packageJson.version}\n`,
+    `  npm install --global --allow-scripts=node-pty ur-nexus-desktop@${packageJson.version}\n`,
   )
   console.error('No broad script permission is required.')
   process.exit(1)

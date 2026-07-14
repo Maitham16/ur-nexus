@@ -5,6 +5,8 @@ Release target:
 - GitHub: `https://github.com/Maitham16/ur-nexus.git`
 - npm package: `ur-agent`
 - CLI binary: `ur`
+- Desktop npm package: `ur-nexus-desktop`
+- Desktop binary: `ur-nexus-desktop`
 
 ## Required checks
 
@@ -69,6 +71,18 @@ npm login
 ```
 
 Do not publish if the package version already exists on npm.
+
+For the desktop package, npm's global install-script policy must be tested with
+the narrow runtime allowlist:
+
+```bash
+npm install --global --allow-scripts=node-pty ur-nexus-desktop
+ur-nexus-desktop --version
+```
+
+Do not recommend `--dangerously-allow-all-scripts`. Electron 43 ships without
+an install lifecycle script; only the node-pty native terminal binding needs
+approval.
 
 ## Publish
 

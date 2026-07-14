@@ -9,6 +9,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
+    // The standalone verification build runs unminified under Bun's test
+    // environment. Its single renderer entry is expected to stay below this.
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
