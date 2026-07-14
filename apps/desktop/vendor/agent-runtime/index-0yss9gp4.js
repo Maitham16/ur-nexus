@@ -2375,7 +2375,6 @@ var require_stringify = __commonJS((exports, module) => {
         case "number":
           return isFinite(value) ? String(value) : "null";
         case "boolean":
-        case "null":
         case "bigint":
           return String(value);
         case "object":
