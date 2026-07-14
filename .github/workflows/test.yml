@@ -57,7 +57,14 @@ jobs:
           bun test src/server.test.ts test/artifactsServer.test.ts \
             --timeout 120000 2>&1 | tee -a test-output.log
           cd apps/desktop
-          bun test --timeout 120000 2>&1 | tee -a "$GITHUB_WORKSPACE/test-output.log"
+          # Background-agent tests mutate process-global runtime state and
+          # environment paths by design. Bun runs discovered files in one
+          # process, so isolate this file from the rest of the desktop suite.
+          bun test --timeout 120000 \
+            --path-ignore-patterns='src/main/agents/backgroundAgents.test.ts' \
+            2>&1 | tee -a "$GITHUB_WORKSPACE/test-output.log"
+          bun test src/main/agents/backgroundAgents.test.ts \
+            --timeout 120000 2>&1 | tee -a "$GITHUB_WORKSPACE/test-output.log"
 
       - name: Upload test output on failure
         if: failure()
