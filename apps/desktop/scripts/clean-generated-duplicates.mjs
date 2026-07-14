@@ -7,6 +7,8 @@ const generatedRoots = [
   path.join(desktopRoot, 'dist', 'main'),
   path.join(desktopRoot, 'dist', 'preload'),
   path.join(desktopRoot, 'dist', 'renderer'),
+  path.join(desktopRoot, 'vendor', 'agent-runtime'),
+  path.resolve(desktopRoot, '..', '..', 'packages', 'agent-runtime', 'dist'),
 ]
 const conflictCopy = / \d+(?=\.|$)/
 let removed = 0

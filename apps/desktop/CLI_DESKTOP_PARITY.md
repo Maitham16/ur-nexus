@@ -1,6 +1,6 @@
 # CLI ↔ Desktop Capability Parity
 
-Audit date: 2026-07-14 (release update) (desktop 1.0.4, runtime bundle 1.0.4, CLI source `src/` at monorepo root).
+Audit date: 2026-07-14 (release update) (desktop 1.0.5, runtime bundle 1.0.4, CLI source `src/` at monorepo root).
 
 The desktop app is standalone: it vendors the agent runtime as a prebuilt local
 bundle (`vendor/agent-runtime`, declared as `file:./vendor/agent-runtime` in

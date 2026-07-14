@@ -57,7 +57,16 @@ function createWindow(): BrowserWindow {
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools()
   } else {
-    win.loadFile(path.join(__dirname, '../renderer/index.html'))
+    const screenshotTheme = process.env.UR_DESKTOP_SCREENSHOT_THEME
+    const screenshotFixture = process.env.UR_DESKTOP_SCREENSHOT_FIXTURE
+    const query: Record<string, string> = {}
+    if (screenshotTheme === 'dark' || screenshotTheme === 'light') {
+      query.visualTheme = screenshotTheme
+    }
+    if (screenshotFixture) query.visualFixture = screenshotFixture
+    win.loadFile(path.join(__dirname, '../renderer/index.html'), {
+      query: Object.keys(query).length > 0 ? query : undefined,
+    })
   }
 
   // The renderer is local application UI, never a general-purpose browser.

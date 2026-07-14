@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { marked } from 'marked'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useDesktop, useRuntimeEvents } from '../hooks/useDesktop.js'
 import { useProject } from '../state/ProjectContext.js'
@@ -94,6 +95,135 @@ const DEFAULT_PERMISSIONS: AgentPermissionSettingsDto = {
   approvalPolicy: 'on-request',
   sandboxMode: 'workspace-write',
   networkAccess: false,
+}
+
+const MARKDOWN_TAGS = new Set([
+  'A',
+  'BLOCKQUOTE',
+  'BR',
+  'CODE',
+  'DEL',
+  'EM',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'HR',
+  'LI',
+  'OL',
+  'P',
+  'PRE',
+  'STRONG',
+  'TABLE',
+  'TBODY',
+  'TD',
+  'TH',
+  'THEAD',
+  'TR',
+  'UL',
+])
+
+const MARKDOWN_BLOCKED_TAGS = new Set([
+  'EMBED',
+  'FORM',
+  'IFRAME',
+  'INPUT',
+  'MATH',
+  'OBJECT',
+  'SCRIPT',
+  'STYLE',
+  'SVG',
+])
+
+function sanitizeMarkdown(html: string): string {
+  const document = new DOMParser().parseFromString(html, 'text/html')
+
+  for (const element of Array.from(document.body.querySelectorAll('*'))) {
+    if (MARKDOWN_BLOCKED_TAGS.has(element.tagName)) {
+      element.remove()
+      continue
+    }
+
+    if (!MARKDOWN_TAGS.has(element.tagName)) {
+      element.replaceWith(...Array.from(element.childNodes))
+      continue
+    }
+
+    for (const attribute of Array.from(element.attributes)) {
+      const keepCodeLanguage =
+        element.tagName === 'CODE' &&
+        attribute.name === 'class' &&
+        /^language-[\w+-]+$/.test(attribute.value)
+      const keepLinkTitle = element.tagName === 'A' && attribute.name === 'title'
+      const keepLinkHref = element.tagName === 'A' && attribute.name === 'href'
+      if (!keepCodeLanguage && !keepLinkTitle && !keepLinkHref) {
+        element.removeAttribute(attribute.name)
+      }
+    }
+
+    if (element.tagName === 'A') {
+      const href = element.getAttribute('href') ?? ''
+      try {
+        const url = new URL(href)
+        if (!['http:', 'https:', 'mailto:'].includes(url.protocol)) {
+          element.removeAttribute('href')
+        }
+      } catch {
+        element.removeAttribute('href')
+      }
+      if (element.hasAttribute('href')) {
+        element.setAttribute('target', '_blank')
+        element.setAttribute('rel', 'noreferrer noopener')
+      }
+    }
+  }
+
+  return document.body.innerHTML
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  const html = useMemo(() => {
+    const rendered = marked.parse(content, {
+      async: false,
+      breaks: true,
+      gfm: true,
+    }) as string
+    return sanitizeMarkdown(rendered)
+  }, [content])
+
+  return (
+    <div
+      className="message-body markdown-body"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
+
+function summarizeToolInput(input: Record<string, unknown>): string {
+  const preferredKeys = [
+    'query',
+    'command',
+    'path',
+    'filePath',
+    'url',
+    'pattern',
+    'description',
+    'prompt',
+  ]
+  const key = preferredKeys.find(candidate => input[candidate] !== undefined)
+  const value = key ? input[key] : Object.values(input)[0]
+  if (value === undefined) return 'No input details'
+
+  const text =
+    typeof value === 'string'
+      ? value
+      : Array.isArray(value)
+        ? value.map(item => String(item)).join(', ')
+        : JSON.stringify(value)
+  const singleLine = text.replace(/\s+/g, ' ').trim()
+  return singleLine.length > 170 ? `${singleLine.slice(0, 167)}…` : singleLine
 }
 
 type MessageRole =
@@ -194,6 +324,65 @@ type ChatMessage =
   | PlanMessage
   | ErrorMessage
   | FinalReportMessage
+
+function createInitialMessages(): ChatMessage[] {
+  const fixture = new URLSearchParams(window.location.search).get('visualFixture')
+  if (fixture !== 'conversation') return []
+
+  const now = Date.now()
+  return [
+    {
+      id: 'visual-user',
+      role: 'user',
+      timestamp: now,
+      content: 'Review the release and summarize what changed.',
+    },
+    {
+      id: 'visual-system',
+      role: 'system',
+      timestamp: now + 1,
+      content: 'Inspecting the workspace and release checks',
+    },
+    {
+      id: 'visual-tool-running',
+      role: 'tool',
+      timestamp: now + 2,
+      toolName: 'WebSearch',
+      status: 'running',
+      input: { query: 'current desktop agent interface patterns' },
+    },
+    {
+      id: 'visual-tool-done',
+      role: 'tool',
+      timestamp: now + 3,
+      toolName: 'Bash',
+      status: 'done',
+      input: { command: 'bun run typecheck && bun run test' },
+      result: 'Typecheck passed\nTests: 42 passed, 0 failed',
+    },
+    {
+      id: 'visual-assistant',
+      role: 'assistant',
+      timestamp: now + 4,
+      content: [
+        '## Release review',
+        '',
+        'The desktop build is ready for review. The interface now keeps execution details compact and gives the final answer a clear reading surface.',
+        '',
+        '- **Build:** passed for Apple Silicon and Intel',
+        '- **Tests:** 42 passed, 0 failed',
+        '- **Security:** API keys remain local to each user',
+        '',
+        '| Area | Result |',
+        '| --- | --- |',
+        '| Renderer | Ready |',
+        '| Packaging | Ready |',
+        '',
+        'See the [release notes](https://github.com/Maitham16/ur-nexus/releases) for the complete artifact list.',
+      ].join('\n'),
+    },
+  ]
+}
 
 function formatElapsed(ms: number): string {
   const seconds = Math.floor(ms / 1000)
@@ -347,7 +536,7 @@ export function ChatPage() {
   const [selectedProvider, setSelectedProvider] = useState('')
   const [selectedModel, setSelectedModel] = useState('')
 
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(createInitialMessages)
   const [interruptedRuns, setInterruptedRuns] = useState<PersistedRunStateDto[]>([])
   const streamRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -2249,7 +2438,7 @@ function MessageView({
             <span className="assistant-dot" /> UR
             <CopyButton text={(message as AssistantMessage).content} />
           </div>
-          <div className="message-body">{(message as AssistantMessage).content}</div>
+          <MarkdownContent content={(message as AssistantMessage).content} />
         </div>
       )
 
@@ -2265,20 +2454,37 @@ function MessageView({
     case 'tool': {
       const m = message as ToolMessage
       return (
-        <div className="message tool">
-          <div className="message-meta">
-            <Icon name="tool" size={13} /> {m.toolName}
-            <span className={`tool-status tool-status-${m.status}`}>{m.status}</span>
+        <details
+          className={`message tool tool-event tool-event-${m.status}`}
+        >
+          <summary className="tool-event-summary">
+            <span className="tool-event-icon"><Icon name="tool" size={13} /></span>
+            <span className="tool-event-copy">
+              <strong>{m.toolName}</strong>
+              <small>{summarizeToolInput(m.input)}</small>
+            </span>
+            <span className={`tool-status tool-status-${m.status}`}>
+              <i /> {m.status === 'done' ? 'Completed' : m.status === 'error' ? 'Failed' : 'Running'}
+            </span>
+            <Icon className="tool-event-chevron" name="chevron-down" size={13} />
+          </summary>
+          <div className="tool-event-details">
+            <div className="tool-event-section">
+              <span>Input</span>
+              <pre className="code-block">{JSON.stringify(m.input, null, 2)}</pre>
+            </div>
+            {m.result !== undefined && (
+              <div className="tool-event-section">
+                <span>Result</span>
+                <pre className="code-block result">
+                  {typeof m.result === 'string'
+                    ? m.result
+                    : JSON.stringify(m.result, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
-          <pre className="code-block">{JSON.stringify(m.input, null, 2)}</pre>
-          {m.result !== undefined && (
-            <pre className="code-block result">
-              {typeof m.result === 'string'
-                ? m.result
-                : JSON.stringify(m.result, null, 2)}
-            </pre>
-          )}
-        </div>
+        </details>
       )
     }
 
@@ -2336,7 +2542,7 @@ function MessageView({
       return (
         <div className="message final-report">
           <div className="message-meta"><Icon name="check" size={13} /> Final report</div>
-          <div className="message-body">{m.content}</div>
+          <MarkdownContent content={m.content} />
         </div>
       )
     }

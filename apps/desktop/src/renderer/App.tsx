@@ -215,6 +215,8 @@ function AppShell() {
   )
   const [commandOpen, setCommandOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const visualTheme = new URLSearchParams(window.location.search).get('visualTheme')
+    if (visualTheme === 'light' || visualTheme === 'dark') return visualTheme
     const saved = window.localStorage.getItem('ur-desktop:theme')
     if (saved === 'light' || saved === 'dark') return saved
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
