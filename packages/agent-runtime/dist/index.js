@@ -1775,6 +1775,10 @@ function sdkCompatToolName(name) {
 function buildSystemInitMessage(inputs) {
   const settings = getSettings_DEPRECATED();
   const outputStyle = settings?.outputStyle ?? DEFAULT_OUTPUT_STYLE_NAME;
+  let apiKeySource = "none";
+  try {
+    apiKeySource = getURHQApiKeyWithSource().source;
+  } catch {}
   const initMessage = {
     type: "system",
     subtype: "init",
@@ -1788,7 +1792,7 @@ function buildSystemInitMessage(inputs) {
     model: inputs.model,
     permissionMode: inputs.permissionMode,
     slash_commands: inputs.commands.filter((c) => c.userInvocable !== false).map((c) => c.name),
-    apiKeySource: getURHQApiKeyWithSource().source,
+    apiKeySource,
     betas: getSdkBetas(),
     ur_version: MACRO.VERSION,
     output_style: outputStyle,

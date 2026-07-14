@@ -2,11 +2,7 @@ import { feature } from 'bun:bundle'
 import { randomUUID } from 'crypto'
 import { getSdkBetas, getSessionId } from 'src/bootstrap/state.js'
 import { DEFAULT_OUTPUT_STYLE_NAME } from 'src/constants/outputStyles.js'
-import type {
-  ApiKeySource,
-  PermissionMode,
-  SDKMessage,
-} from 'src/entrypoints/agentSdkTypes.js'
+import type { PermissionMode, SDKMessage } from 'src/entrypoints/agentSdkTypes.js'
 import {
   AGENT_TOOL_NAME,
   LEGACY_AGENT_TOOL_NAME,
@@ -53,6 +49,14 @@ export type SystemInitInputs = {
 export function buildSystemInitMessage(inputs: SystemInitInputs): SDKMessage {
   const settings = getSettings_DEPRECATED()
   const outputStyle = settings?.outputStyle ?? DEFAULT_OUTPUT_STYLE_NAME
+  let apiKeySource = 'none'
+  try {
+    apiKeySource = getURHQApiKeyWithSource().source
+  } catch {
+    // The init message is metadata and is also emitted for local slash
+    // commands. Missing managed credentials are valid for BYOK/Ollama and
+    // must not prevent those commands from running in a clean environment.
+  }
 
   const initMessage: SDKMessage = {
     type: 'system',
@@ -69,7 +73,7 @@ export function buildSystemInitMessage(inputs: SystemInitInputs): SDKMessage {
     slash_commands: inputs.commands
       .filter(c => c.userInvocable !== false)
       .map(c => c.name),
-    apiKeySource: getURHQApiKeyWithSource().source as ApiKeySource,
+    apiKeySource,
     betas: getSdkBetas(),
     ur_version: MACRO.VERSION,
     output_style: outputStyle,

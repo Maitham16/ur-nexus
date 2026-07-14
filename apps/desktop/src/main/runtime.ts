@@ -226,25 +226,36 @@ export async function listProjectSlashCommands(
   const seen = new Set<string>()
 
   return commands.flatMap(command => {
-    const name = getCommandName(command)
-    if (
-      command.isHidden === true ||
-      command.userInvocable === false ||
-      !name ||
-      seen.has(name)
-    ) {
+    try {
+      const name = getCommandName(command)
+      if (
+        command.isHidden === true ||
+        command.userInvocable === false ||
+        !name ||
+        seen.has(name)
+      ) {
+        return []
+      }
+      seen.add(name)
+      return [{
+        name,
+        description: command.description || `Run /${name}`,
+        argumentHint: command.argumentHint,
+        aliases: command.aliases ?? [],
+        commandType: command.type,
+        source: command.source,
+        loadedFrom: command.loadedFrom,
+      }]
+    } catch (err) {
+      // Some terminal commands expose visibility through getters backed by
+      // provider/auth state. Before a user configures BYOK or Ollama those
+      // getters may be unavailable; one optional command must never prevent
+      // the rest of the slash-command palette from loading.
+      console.warn(
+        `[runtime] Hiding /${command.name}: metadata check failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
       return []
     }
-    seen.add(name)
-    return [{
-      name,
-      description: command.description || `Run /${name}`,
-      argumentHint: command.argumentHint,
-      aliases: command.aliases ?? [],
-      commandType: command.type,
-      source: command.source,
-      loadedFrom: command.loadedFrom,
-    }]
   }).sort((a, b) => a.name.localeCompare(b.name))
 }
 
