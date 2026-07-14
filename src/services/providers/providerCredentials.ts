@@ -1,8 +1,8 @@
 /**
  * Per-provider credential storage.
  *
- * API keys are stored in UR's existing secure store (macOS Keychain with an
- * encrypted-at-rest file fallback) — the same store used for UR's own OAuth —
+ * API keys are stored in UR's existing secure store (macOS Keychain with a
+ * permission-restricted file fallback) — the same store used for UR's own OAuth —
  * so a user connects once and the key persists across sessions. At runtime a
  * stored key is preferred, then the provider's environment variable. Nothing is
  * written to plaintext settings and keys are never placed in argv.

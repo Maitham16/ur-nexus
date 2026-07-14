@@ -2,7 +2,7 @@
 
 Release target:
 
-- GitHub: `https://github.com/Maitham16/UR.git`
+- GitHub: `https://github.com/Maitham16/ur-nexus.git`
 - npm package: `ur-agent`
 - CLI binary: `ur`
 

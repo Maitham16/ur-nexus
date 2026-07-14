@@ -1,6 +1,6 @@
 {
   "name": "ur-agent",
-  "version": "1.44.9",
+  "version": "1.0.2",
   "description": "UR-Nexus — autonomous engineering workflow engine (plan, execute, test, verify, document, benchmark, reproduce)",
   "type": "module",
   "packageManager": "bun@1.3.14",
@@ -10,12 +10,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Maitham16/UR.git"
+    "url": "git+https://github.com/Maitham16/ur-nexus.git"
   },
   "bugs": {
-    "url": "https://github.com/Maitham16/UR/issues"
+    "url": "https://github.com/Maitham16/ur-nexus/issues"
   },
-  "homepage": "https://github.com/Maitham16/UR#readme",
+  "homepage": "https://github.com/Maitham16/ur-nexus#readme",
   "license": "LicenseRef-UR-Nexus-Non-Commercial-Self-Responsibility",
   "keywords": [
     "agent",
@@ -27,6 +27,11 @@
   "bin": {
     "ur": "bin/ur.js"
   },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "extensions/*"
+  ],
   "files": [
     "bin",
     "dist",
@@ -114,6 +119,7 @@
     "diff": "^7.0.0",
     "emoji-regex": "^10.4.0",
     "env-paths": "^3.0.0",
+    "eslint": "^10.6.0",
     "execa": "^9.5.0",
     "fflate": "^0.8.2",
     "figures": "^6.1.0",

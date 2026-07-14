@@ -4,10 +4,10 @@
   "description": "Adds /explain-error — re-runs a failing command and diagnoses the error in plain English.",
   "author": {
     "name": "Maitham Al-rubaye",
-    "url": "https://github.com/Maitham16/UR"
+    "url": "https://github.com/Maitham16/ur-nexus"
   },
-  "homepage": "https://github.com/Maitham16/UR/tree/master/plugins/core/explain-error",
-  "repository": "https://github.com/Maitham16/UR",
+  "homepage": "https://github.com/Maitham16/ur-nexus/tree/master/plugins/core/explain-error",
+  "repository": "https://github.com/Maitham16/ur-nexus",
   "license": "LicenseRef-UR-AGENT-Non-Commercial-Self-Responsibility",
   "keywords": ["debug", "error", "troubleshooting"]
 }

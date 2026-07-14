@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.2
+
+- Ship the redesigned professional UR-Nexus desktop application with a
+  Codex/Claude-style workspace, responsive navigation, actionable skills,
+  project management, integrated terminal, diffs, checkpoints, and agents.
+- Add user-owned provider configuration: each user can securely add, replace,
+  or remove their own API keys and retain separate model/base-URL profiles for
+  OpenAI, Anthropic, OpenRouter, Ollama, LM Studio, llama.cpp, and vLLM.
+- Add cautious, on-request, and auto-approve policies together with read-only,
+  workspace-write, and explicitly dangerous full-access sandbox profiles.
+- Harden renderer IPC, external navigation, secret handling, macOS transport
+  metadata, permission prompts, release packaging, and packaged-app smoke tests.
+- Publish the installable desktop package as `ur-nexus-desktop`.
+
 ## 1.44.9
 
 - Fix recurring "String to replace not found in file" Edit errors by adding
@@ -1324,7 +1338,7 @@
   discovery is unavailable.
 - **Repository metadata now matches production.** Package metadata, docs, bundled
   issue links, marketplace defaults, and GitHub workflow templates now point to
-  `Maitham16/UR`.
+  `Maitham16/ur-nexus`.
 
 ### Added
 - **Release consistency gate.** `bun run release:check` verifies package,

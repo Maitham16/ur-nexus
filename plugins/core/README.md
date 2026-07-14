@@ -56,7 +56,7 @@ templates, deterministic validators, language adapters, and LSP server metadata.
 6. Set the entry's `capabilities` array so users can see whether it adds MCP
    tools, skills, templates, validators, language adapters, LSP servers,
    commands, agents, or hooks before installation.
-7. Open a PR against `Maitham16/UR`.
+7. Open a PR against `Maitham16/ur-nexus`.
 
 See [`hello/README.md`](./hello/README.md) for the smallest possible example.
 

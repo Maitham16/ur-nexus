@@ -8,7 +8,6 @@
  */
 
 import {
-  getProviderApiKey,
   getProviderApiKeySource,
   setProviderApiKey,
   clearProviderApiKey,
@@ -45,6 +44,16 @@ const DESKTOP_PROVIDER_KINDS: DesktopProviderKind[] = [
   'openai-compatible',
 ]
 
+export function parseDesktopProviderKind(value: unknown): DesktopProviderKind {
+  if (
+    typeof value !== 'string' ||
+    !DESKTOP_PROVIDER_KINDS.includes(value as DesktopProviderKind)
+  ) {
+    throw new Error(`Unsupported desktop provider: ${String(value)}`)
+  }
+  return value as DesktopProviderKind
+}
+
 const DESKTOP_PROVIDER_LABELS: Record<DesktopProviderKind, string> = {
   'openai-api': 'OpenAI API',
   'anthropic-api': 'Claude API',
@@ -64,6 +73,23 @@ const OLLAMA_KINDS = new Set<DesktopProviderKind>([
   'ollama-network',
   'ollama-cloud',
 ])
+
+const ACTIVE_KIND_PREFERENCE = 'desktop.activeProviderKind'
+
+function profilePreferenceKey(
+  kind: DesktopProviderKind,
+  field: 'model' | 'baseUrl',
+): string {
+  return `desktop.provider.${kind}.${field}`
+}
+
+function stringPreference(
+  preferences: Record<string, string | number | boolean>,
+  key: string,
+): string | undefined {
+  const value = preferences[key]
+  return typeof value === 'string' && value.trim() ? value : undefined
+}
 
 function isOllamaKind(kind: DesktopProviderKind): boolean {
   return OLLAMA_KINDS.has(kind)
@@ -164,16 +190,30 @@ export function getDesktopProviderConfig(
   projectRoot: string,
   kind?: DesktopProviderKind,
 ): DesktopProviderConfigDto {
+  if (kind !== undefined) parseDesktopProviderKind(kind)
   const settings = getSettingsForProject(projectRoot)
   const active = getActiveProviderSettings(settings).active ?? 'ollama'
-  const effectiveKind = kind ?? coreToDesktopKind(active)
   const providerSettings = (settings as { provider?: { model?: string; baseUrl?: string; preferences?: Record<string, string | number | boolean> } }).provider ?? {}
-  const baseUrl = providerSettings.baseUrl ?? DEFAULT_BASE_URLS[effectiveKind]
+  const preferences = providerSettings.preferences ?? {}
+  const preferredActiveKind = stringPreference(preferences, ACTIVE_KIND_PREFERENCE)
+  const effectiveKind = kind ?? (
+    preferredActiveKind && DESKTOP_PROVIDER_KINDS.includes(preferredActiveKind as DesktopProviderKind)
+      ? preferredActiveKind as DesktopProviderKind
+      : coreToDesktopKind(active)
+  )
+  const isActiveKind = toCoreProviderId(effectiveKind) === active && (
+    !preferredActiveKind || preferredActiveKind === effectiveKind
+  )
+  const model = stringPreference(preferences, profilePreferenceKey(effectiveKind, 'model')) ??
+    (isActiveKind ? providerSettings.model : undefined)
+  const baseUrl = stringPreference(preferences, profilePreferenceKey(effectiveKind, 'baseUrl')) ??
+    (isActiveKind ? providerSettings.baseUrl : undefined) ??
+    DEFAULT_BASE_URLS[effectiveKind]
   return {
     providerId: effectiveKind,
-    model: providerSettings.model,
+    model,
     baseUrl,
-    preferences: providerSettings.preferences ?? {},
+    preferences,
   }
 }
 
@@ -181,42 +221,47 @@ export async function setDesktopProviderConfig(
   projectRoot: string,
   patch: DesktopProviderConfigPatch,
 ): Promise<void> {
-  const kind = patch.providerId
-  const coreId = toCoreProviderId(kind)
-
-  // 1. Persist API key in secure storage, never in settings.
+  const kind = parseDesktopProviderKind(patch.providerId)
   if (patch.apiKey !== undefined) {
-    const trimmed = patch.apiKey.trim()
-    if (trimmed) {
-      const result = setProviderApiKey(coreId, trimmed)
-      if (!result.ok) {
-        throw new Error(result.message)
-      }
-    } else {
-      const result = clearProviderApiKey(coreId)
-      if (!result.ok) {
-        throw new Error(result.message)
-      }
-    }
+    throw new Error('API keys must be changed through the secure credential action.')
   }
 
-  // 2. Persist non-secret config in project local settings.
-  const providerSettings: SettingsJson['provider'] = { active: coreId }
+  const settings = getSettingsForProject(projectRoot)
+  const existingProvider = settings.provider ?? {}
+  const preferences = { ...(existingProvider.preferences ?? {}) }
   if (patch.model !== undefined) {
-    providerSettings.model = patch.model
+    const normalizedModel = patch.model.trim()
+    if (normalizedModel) preferences[profilePreferenceKey(kind, 'model')] = normalizedModel
+    else delete preferences[profilePreferenceKey(kind, 'model')]
   }
   if (patch.baseUrl !== undefined) {
-    providerSettings.baseUrl = normalizeBaseUrl(patch.baseUrl)
+    const normalized = normalizeBaseUrl(patch.baseUrl)
+    if (normalized) preferences[profilePreferenceKey(kind, 'baseUrl')] = normalized
+    else delete preferences[profilePreferenceKey(kind, 'baseUrl')]
   }
   if (patch.preferences !== undefined) {
-    providerSettings.preferences = patch.preferences
+    Object.assign(preferences, patch.preferences)
   }
 
-  // Ollama network/cloud base URLs need to be stored as baseUrl even though the
-  // core provider id is just 'ollama'.
-  const result = updateSettingsForSource('localSettings', {
+  const activeKind = getDesktopProviderConfig(projectRoot).providerId
+  const providerSettings: SettingsJson['provider'] = {
+    ...existingProvider,
+    preferences,
+  }
+  if (activeKind === kind) {
+    providerSettings.model = patch.model === undefined
+      ? existingProvider.model
+      : patch.model.trim() || undefined
+    providerSettings.baseUrl = patch.baseUrl === undefined
+      ? existingProvider.baseUrl
+      : normalizeBaseUrl(patch.baseUrl)
+  }
+
+  const result = updateSettingsForSource('userSettings', {
     provider: providerSettings,
-    model: patch.model,
+    model: activeKind === kind
+      ? (patch.model === undefined ? settings.model : patch.model.trim() || undefined)
+      : settings.model,
   } as SettingsJson)
   if (result.error) {
     throw new Error(`Failed to write settings: ${result.error.message}`)
@@ -236,8 +281,12 @@ export async function storeDesktopProviderApiKey(
   apiKey: string,
 ): Promise<void> {
   void projectRoot
+  parseDesktopProviderKind(kind)
+  const normalizedKey = apiKey.trim()
+  if (!normalizedKey) throw new Error('API key must not be empty.')
+  if (normalizedKey.length > 16_384) throw new Error('API key is too long.')
   const coreId = toCoreProviderId(kind)
-  const result = setProviderApiKey(coreId, apiKey)
+  const result = setProviderApiKey(coreId, normalizedKey)
   if (!result.ok) {
     throw new Error(result.message)
   }
@@ -248,6 +297,7 @@ export async function clearDesktopProviderApiKey(
   kind: DesktopProviderKind,
 ): Promise<void> {
   void projectRoot
+  parseDesktopProviderKind(kind)
   const coreId = toCoreProviderId(kind)
   const result = clearProviderApiKey(coreId)
   if (!result.ok) {
@@ -259,6 +309,7 @@ export async function testDesktopProviderConnection(
   projectRoot: string,
   kind: DesktopProviderKind,
 ): Promise<DesktopProviderConnectionResult> {
+  parseDesktopProviderKind(kind)
   const start = Date.now()
   const coreId = toCoreProviderId(kind)
   const config = getDesktopProviderConfig(projectRoot, kind)
@@ -335,6 +386,7 @@ export async function listDesktopProviderModels(
   projectRoot: string,
   kind: DesktopProviderKind,
 ): Promise<DesktopModelInfo[]> {
+  parseDesktopProviderKind(kind)
   const coreId = toCoreProviderId(kind)
   const config = getDesktopProviderConfig(projectRoot, kind)
   const baseUrl = resolveBaseUrl(kind, config.baseUrl)
@@ -373,29 +425,61 @@ export function activateDesktopProvider(
   kind: DesktopProviderKind,
   model?: string,
 ): { ok: true; message: string } | { ok: false; message: string } {
+  parseDesktopProviderKind(kind)
   void projectRoot
   const coreId = toCoreProviderId(kind)
   const config = getDesktopProviderConfig(projectRoot, kind)
   const baseUrl = resolveBaseUrl(kind, config.baseUrl)
 
   // Update the active provider.
-  const providerResult = setSafeProviderConfig('provider', coreId, { source: 'localSettings' })
+  const providerResult = setSafeProviderConfig('provider', coreId, { source: 'userSettings' })
   if (!providerResult.ok) {
     return providerResult
   }
 
   // Update base URL and model if provided.
   if (baseUrl) {
-    const baseResult = setSafeProviderConfig('base_url', baseUrl, { source: 'localSettings' })
+    const baseResult = setSafeProviderConfig('base_url', baseUrl, { source: 'userSettings' })
     if (!baseResult.ok) {
       return baseResult
     }
   }
   if (model) {
-    const modelResult = setProviderModel(coreId, model, { source: 'localSettings' })
+    // setProviderModel validates against the provider's known model catalog.
+    // Ollama's catalog is dynamic (discovered from the server), so validation
+    // can reject a perfectly valid model that just is not cached yet. The
+    // desktop only ever offers models it discovered, so on validation failure
+    // we persist the choice directly rather than rejecting the activation.
+    const modelResult = setProviderModel(coreId, model, { source: 'userSettings' })
     if (!modelResult.ok) {
-      return modelResult
+      const fallback = updateSettingsForSource('userSettings', {
+        provider: { active: coreId, model },
+        model,
+      } as SettingsJson)
+      if (fallback.error) {
+        return { ok: false, message: fallback.error.message }
+      }
     }
+  }
+
+  const settings = getSettingsForProject(projectRoot)
+  const preferences: Record<string, string | number | boolean> = {
+    ...(settings.provider?.preferences ?? {}),
+    [ACTIVE_KIND_PREFERENCE]: kind,
+  }
+  if (model) preferences[profilePreferenceKey(kind, 'model')] = model
+  if (baseUrl) preferences[profilePreferenceKey(kind, 'baseUrl')] = baseUrl
+  const persisted = updateSettingsForSource('userSettings', {
+    provider: {
+      active: coreId,
+      model: model ?? config.model,
+      baseUrl,
+      preferences,
+    },
+    model: model ?? config.model,
+  } as SettingsJson)
+  if (persisted.error) {
+    return { ok: false, message: persisted.error.message }
   }
 
   return { ok: true, message: `Activated ${kind}` }
@@ -458,10 +542,10 @@ function logForProvider(
   data: Record<string, unknown>,
 ): void {
   try {
-    const { logForDebugging } = require('../../../../src/utils/debug.js') as {
-      logForDebugging: (msg: string, opts?: { level: 'info' | 'warn' | 'error' }) => void
-    }
-    logForDebugging(`[desktop-provider] ${event} ${JSON.stringify(redactValue(data))}`, { level })
+    const line = `[desktop-provider] ${event} ${JSON.stringify(redactValue(data))}`
+    if (level === 'error') console.error(line)
+    else if (level === 'warn') console.warn(line)
+    else console.log(line)
   } catch {
     // Logging failures must not break provider operations.
   }

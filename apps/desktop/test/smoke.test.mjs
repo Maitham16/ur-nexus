@@ -4,8 +4,16 @@ import { fileURLToPath } from 'node:url'
 import { test, expect } from 'bun:test'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const mainScript = path.join(__dirname, '..', 'dist', 'main', 'main.mjs')
-const electronBin = path.join(__dirname, '..', '..', '..', 'node_modules', '.bun', 'electron@31.7.7', 'node_modules', 'electron', 'dist', 'electron')
+const packagedAppBin = path.join(
+  __dirname,
+  '..',
+  'dist',
+  'mac-arm64',
+  'UR Desktop.app',
+  'Contents',
+  'MacOS',
+  'UR Desktop',
+)
 
 function waitForOutput(proc, marker, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
@@ -22,7 +30,7 @@ function waitForOutput(proc, marker, timeoutMs = 10000) {
     function onData(chunk) {
       const text = chunk.toString()
       output += text
-      if (text.includes(marker)) {
+      if (output.includes(marker)) {
         cleanup()
         resolve(output)
       }
@@ -32,10 +40,34 @@ function waitForOutput(proc, marker, timeoutMs = 10000) {
   })
 }
 
-test('packaged electron main script parses without runtime import errors', async () => {
-  const proc = spawn(electronBin, ['--headless', mainScript, '--smoke-test'], {
+// The packaged .app binary has a complete Electron Framework. Bun's
+// node_modules/electron/dist copy may be a partial shim, so the packaged
+// binary is the only reliable smoke target. In a plain `bun test` run before
+// packaging, the test is skipped; `bun run smoke:mac` sets
+// UR_REQUIRE_PACKAGED=1 so a missing bundle is a hard failure there.
+const isPackaged = require('node:fs').existsSync(packagedAppBin)
+const requirePackaged = process.env.UR_REQUIRE_PACKAGED === '1'
+
+if (!isPackaged && requirePackaged) {
+  throw new Error(
+    'Packaged UR Desktop.app not found. Run `bun run package:mac` before smoke:mac.',
+  )
+}
+
+// Never launch a GUI process as a side effect of the ordinary unit suite.
+// The explicit smoke:mac release command opts in with UR_REQUIRE_PACKAGED.
+const smokeTest = isPackaged && requirePackaged ? test : test.skip
+
+smokeTest('packaged electron app starts and reports ready', async () => {
+  const bin = packagedAppBin
+  const proc = spawn(bin, ['--headless', '--smoke-test'], {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, NODE_ENV: 'production', SKIP_WINDOW_ON_NO_DISPLAY: '1' },
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      SKIP_WINDOW_ON_NO_DISPLAY: '1',
+      UR_DESKTOP_SMOKE_TEST: '1',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 

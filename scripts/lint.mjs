@@ -58,7 +58,14 @@ function normalizePath(file) {
 
 function shouldSkip(file) {
   const normalized = normalizePath(file)
-  return skipPrefixes.some(prefix => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix))
+  if (skipPrefixes.some(prefix => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix))) {
+    return true
+  }
+  const segments = normalized.split('/')
+  if (segments.some(segment => /^(?:node_modules|dist|build|coverage)(?: \d+)?$/.test(segment))) {
+    return true
+  }
+  return normalized.startsWith('apps/desktop/vendor/')
 }
 
 function fallbackWalk(dir, base = '') {

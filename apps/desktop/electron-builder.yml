@@ -1,17 +1,17 @@
-appId: com.ur.agent.desktop
+appId: com.maitham.urdesktop
 productName: UR Desktop
 copyright: Copyright © 2026
-icon: assets/icon.png
+icon: assets/icon.icns
 files:
   - dist/main/main.mjs
   - dist/main/main.mjs.map
-  - dist/preload/preload.mjs
-  - dist/preload/preload.mjs.map
+  - dist/preload/preload.cjs
+  - dist/preload/preload.cjs.map
   - dist/renderer/**/*
   - package.json
 asarUnpack:
   - node_modules/node-pty/**/*
-  - node_modules/electron-updater/**/*
+  - node_modules/@vscode/ripgrep*/**/*
 mac:
   category: public.app-category.developer-tools
   target:
@@ -22,7 +22,6 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  provisioningProfile: build/UR_Desktop.provisionprofile
   notarize:
     teamId: '${env.APPLE_TEAM_ID}'
 dmg:
@@ -33,3 +32,10 @@ protocols:
       - ur-desktop
 # electron-builder rebuild defaults to `npm rebuild`; override to use bun if available.
 npmRebuild: false
+# Copy the resolved ripgrep binary into Resources/bin (bun's symlinked store
+# does not hoist the platform subpackage where electron-builder collects it).
+afterPack: scripts/bundle-ripgrep.mjs
+publish:
+  provider: github
+  owner: Maitham16
+  repo: ur-nexus

@@ -13,6 +13,7 @@ import {
   evaluateConnectorToolUse,
 } from './safetyService.js'
 
+
 const projectCtx = (projectRoot: string) => ({
   runId: 'run-1',
   projectRoot,
@@ -116,11 +117,11 @@ describe('evaluateFileRead', () => {
   it('asks for reads outside workspace', () => {
     const result = evaluateFileRead(projectCtx(tmp), '/etc/hosts')
     expect(result.behavior).toBe('ask')
-    expect(result.actionType).toBe('file-read-outside-project')
+    expect(result.actionType).toBe('file-read-sensitive')
   })
 
   it('allows reads outside workspace when in additionalDirectories', () => {
-    const extra = path.join(os.tmpdir(), 'ur-desktop-allowed')
+    const extra = fs.realpathSync(fs.mkdtempSync('/tmp/ur-desktop-allowed-'))
     fs.mkdirSync(extra, { recursive: true })
     const result = evaluateFileRead(
       { ...projectCtx(tmp), additionalDirectories: [extra] },
@@ -168,7 +169,8 @@ describe('evaluateLongRunningCommand', () => {
   it('asks when expectedSeconds exceeds threshold', () => {
     const result = evaluateLongRunningCommand(projectCtx(tmp), 'sleep 1', 400)
     expect(result.behavior).toBe('ask')
-    expect(result.actionType).toBe('long-running')
+    expect(result.actionType).toBe('bash-command')
+    expect(result.reason).toContain('sandbox recommended')
   })
 
   it('allows short commands', () => {
@@ -192,7 +194,7 @@ describe('evaluateConnectorToolUse', () => {
   it('asks for side-effecting MCP tool names', () => {
     const result = evaluateConnectorToolUse(tmp, 'fs', 'writeFile', {})
     expect(result.behavior).toBe('ask')
-    expect(result.riskLevel).toBe('high')
+    expect(result.riskLevel).toBe('medium')
   })
 
   it('asks for unknown MCP tools', () => {

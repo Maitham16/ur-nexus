@@ -170,7 +170,7 @@ ur --help
 Install directly from GitHub when you want this repository build:
 
 ```sh
-bun add -g github:Maitham16/UR
+bun add -g github:Maitham16/ur-nexus
 ur --version
 ```
 

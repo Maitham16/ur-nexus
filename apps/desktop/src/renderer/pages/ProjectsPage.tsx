@@ -1,45 +1,66 @@
 import { useEffect, useState } from 'react'
 import { Card } from '../components/Card.js'
 import { useDesktop } from '../hooks/useDesktop.js'
-import type { ProjectInfoDto, RecentProjectDto, WorktreeInfoDto } from '../../shared/ipc.js'
+import { useProject } from '../state/ProjectContext.js'
+import { Icon } from '../components/Icon.js'
+import type { ProjectInfoDto, WorktreeInfoDto } from '../../shared/ipc.js'
 
 export function ProjectsPage() {
   const desktop = useDesktop()
-  const [path, setPath] = useState('')
-  const [recent, setRecent] = useState<RecentProjectDto[]>([])
+  const {
+    projectRoot,
+    recentProjects,
+    openProject: openProjectShared,
+    openProjectViaDialog,
+    closeProject,
+    removeRecentProject,
+  } = useProject()
   const [inspected, setInspected] = useState<ProjectInfoDto | null>(null)
   const [worktrees, setWorktrees] = useState<WorktreeInfoDto[]>([])
   const [branchName, setBranchName] = useState('')
   const [message, setMessage] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    refreshRecent()
-  }, [])
+    if (projectRoot) void inspect(projectRoot)
+    else {
+      setInspected(null)
+      setWorktrees([])
+    }
+  }, [projectRoot])
 
-  const refreshRecent = async () => {
+  const inspect = async (root: string) => {
     if (!desktop) return
-    const list = await desktop.listProjects()
-    setRecent(list)
+    try {
+      const info = await desktop.inspectProject(root)
+      setInspected(info)
+      setWorktrees(await desktop.listWorktrees(root))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const openProject = async (root: string) => {
-    if (!desktop) return
     setMessage('')
-    await desktop.openProject(root)
-    const info = await desktop.inspectProject(root)
-    setInspected(info)
-    const wts = await desktop.listWorktrees(root)
-    setWorktrees(wts)
-    await refreshRecent()
-    setMessage(`Opened ${info.name}`)
+    setError(null)
+    try {
+      await openProjectShared(root)
+      setMessage(`Opened ${root.split('/').pop()}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const createWorktree = async () => {
     if (!desktop || !inspected) return
-    const wt = await desktop.createWorktree(inspected.root, branchName || undefined)
-    setMessage(`Worktree created at ${wt.root}`)
-    const wts = await desktop.listWorktrees(inspected.root)
-    setWorktrees(wts)
+    setError(null)
+    try {
+      const wt = await desktop.createWorktree(inspected.root, branchName || undefined)
+      setMessage(`Worktree created at ${wt.root}`)
+      setWorktrees(await desktop.listWorktrees(inspected.root))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   return (
@@ -48,21 +69,29 @@ export function ProjectsPage() {
       <p className="page-subtitle">Open a directory to start working with UR.</p>
 
       <Card title="Open project">
-        <input
-          className="input"
-          placeholder="/path/to/project"
-          value={path}
-          onChange={e => setPath(e.target.value)}
-        />
-        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="button button-secondary" onClick={() => setPath('')}>
-            Clear
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="project-value" style={{ flex: 1 }}>
+            {projectRoot ?? 'No project open'}
+          </span>
+          <button className="button" onClick={openProjectViaDialog}>
+            Browse…
           </button>
-          <button className="button" onClick={() => path && openProject(path)} disabled={!path}>
-            Open
-          </button>
+          {projectRoot && (
+            <button className="button button-secondary" onClick={() => closeProject()}>
+              Close project
+            </button>
+          )}
         </div>
       </Card>
+
+      {error && (
+        <div className="chat-error-banner">
+          <span><Icon name="alert" size={14} /> {error}</span>
+          <button className="link-button" onClick={() => setError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {message && (
         <div className="card" style={{ background: '#1f2937', borderColor: '#374151' }}>
@@ -166,20 +195,27 @@ export function ProjectsPage() {
 
       <h2 className="section-title">Recent projects</h2>
       <div className="list">
-        {recent.length === 0 && (
+        {recentProjects.length === 0 && (
           <div className="list-item">
             <span>No recent projects</span>
           </div>
         )}
-        {recent.map(p => (
+        {recentProjects.map(p => (
           <div key={p.root} className="list-item project-row">
             <div className="project-row-info">
               <div className="project-row-name">{p.name}</div>
               <div className="project-row-path">{p.root}</div>
             </div>
-            <button className="button button-secondary" onClick={() => openProject(p.root)}>
-              Open
-            </button>
+            <div className="project-row-actions">
+              <button className="button button-secondary" onClick={() => openProject(p.root)}>Open</button>
+              <button
+                className="button button-secondary"
+                onClick={() => void removeRecentProject(p.root)}
+                title="Remove from Recents without deleting files"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
       </div>

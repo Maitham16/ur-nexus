@@ -212,4 +212,4 @@ ur ide config zed    # or vscode, cursor, windsurf, jetbrains, neovim
 
 If a problem persists, run the repository's validation runbook
 ([docs/VALIDATION.md](VALIDATION.md)) and file an issue at
-<https://github.com/Maitham16/UR/issues> with the exact command and output.
+<https://github.com/Maitham16/ur-nexus/issues> with the exact command and output.

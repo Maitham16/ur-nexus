@@ -1,5 +1,5 @@
 import { readApprovalLog, type ApprovalLogEntry } from './safety/approvalLog.js'
-import { getRunHistory, type RunHistory } from './historyStore.js'
+import { getRunHistory } from './historyStore.js'
 import { redactValue } from './utils/redactSecrets.js'
 
 export interface RunReport {
@@ -35,10 +35,6 @@ const TEST_PATTERNS = [
 
 function isTestCommand(command: string): boolean {
   return TEST_PATTERNS.some(p => p.test(command))
-}
-
-function eventType(event: Record<string, unknown>): string {
-  return String(event.type ?? '')
 }
 
 export async function buildRunReport(

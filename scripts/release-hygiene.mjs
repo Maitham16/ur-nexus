@@ -162,6 +162,7 @@ function gitTrackedPaths(root) {
     .toString('utf8')
     .split('\0')
     .filter(Boolean)
+    .filter(path => existsSync(join(root, path)))
 }
 
 function walkSourcePaths(root) {

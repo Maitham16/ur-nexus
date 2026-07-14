@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Maitham16/UR/benchmarks/result.schema.json",
+  "$id": "https://github.com/Maitham16/ur-nexus/benchmarks/result.schema.json",
   "title": "UR benchmark result",
   "type": "object",
   "required": [

@@ -44,6 +44,10 @@ export interface RuntimeAppState {
     userServers?: Record<string, RuntimeMcpConfig>
     [key: string]: unknown
   }
+  permissions?: {
+    additionalDirectories?: string[]
+    [key: string]: unknown
+  }
   [key: string]: unknown
 }
 
@@ -98,6 +102,9 @@ export interface ContentBlockParam {
 }
 
 export declare function openProject(root: string): Promise<RuntimeProject>
+export declare function enableConfigs(): void
+export declare function setCwd(path: string): void
+export declare function getCwd(): string
 export type CanUseToolFn = (
   tool: RuntimeTool,
   input: Record<string, unknown>,
@@ -387,6 +394,7 @@ export declare function pathInWorkingPath(path: string, workingPath: string): bo
 
 export declare const DANGEROUS_FILES: readonly string[]
 export declare const DANGEROUS_DIRECTORIES: readonly string[]
+export declare function pathIsInsideWorkspace(path: string, cwd: string): boolean
 
 export type PermissionRuleValue = { toolName: string; ruleContent?: string }
 export type PermissionRule = {
@@ -453,3 +461,15 @@ export declare function logPermissionDecision(
   decision: 'allow' | 'deny' | 'ask',
   details?: Record<string, unknown>,
 ): void
+
+export type RuntimeToolDefinition = RuntimeToolInfo
+
+export interface RuntimeMcpConfig extends RuntimeMcpStdioConfig {}
+
+export interface RuntimeTool {
+  name: string
+  isMcp?: boolean
+  isReadOnly(input?: unknown): boolean
+  isDestructive?(input?: unknown): boolean
+  [key: string]: unknown
+}

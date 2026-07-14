@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Card } from '../components/Card.js'
 import { useDesktop, useRuntimeEvents } from '../hooks/useDesktop.js'
+import { useProject } from '../state/ProjectContext.js'
+import { Icon, type IconName } from '../components/Icon.js'
 import type { TaskInfoDto, RuntimeEvent } from '../../shared/ipc.js'
 
 const statusOrder: Record<TaskInfoDto['status'], number> = {
@@ -12,20 +14,20 @@ const statusOrder: Record<TaskInfoDto['status'], number> = {
   skipped: 5,
 }
 
-function statusIcon(status: TaskInfoDto['status']): string {
+function statusIcon(status: TaskInfoDto['status']): IconName {
   switch (status) {
     case 'done':
-      return '✔'
+      return 'check'
     case 'running':
-      return '■'
+      return 'sparkles'
     case 'waiting_approval':
-      return '⏸'
+      return 'pause'
     case 'failed':
-      return '✕'
+      return 'x'
     case 'skipped':
-      return '⊘'
+      return 'stop'
     default:
-      return '□'
+      return 'plan'
   }
 }
 
@@ -41,13 +43,18 @@ function formatDuration(ms: number): string {
 
 export function TasksPage() {
   const desktop = useDesktop()
-  const [projectRoot, setProjectRoot] = useState('')
+  const { projectRoot } = useProject()
   const [tasks, setTasks] = useState<TaskInfoDto[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = async () => {
     if (!desktop || !projectRoot) return
-    const list = await desktop.listTasks(projectRoot)
-    setTasks(list)
+    try {
+      setTasks(await desktop.listTasks(projectRoot))
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   useEffect(() => {
@@ -80,24 +87,24 @@ export function TasksPage() {
         Live task board with dependencies, agents, and verification results.
       </p>
 
-      <Card title="Project">
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            className="input"
-            placeholder="Project root path..."
-            value={projectRoot}
-            onChange={e => setProjectRoot(e.target.value)}
-          />
-          <button className="button button-secondary" onClick={refresh} disabled={!projectRoot}>
-            Refresh
+      {error && (
+        <div className="chat-error-banner">
+          <span><Icon name="alert" size={14} /> {error}</span>
+          <button className="link-button" onClick={() => setError(null)}>
+            Dismiss
           </button>
         </div>
-      </Card>
+      )}
 
       <div className="task-board">
-        {sortedTasks.length === 0 && (
+        {!projectRoot && (
+          <Card title="No project">
+            <p className="card-body">Open a project to see its task board.</p>
+          </Card>
+        )}
+        {projectRoot && sortedTasks.length === 0 && (
           <Card title="No tasks">
-            <p className="card-body">Start a run to see tasks here.</p>
+            <p className="card-body">Start a run from the Chat screen to see tasks here.</p>
           </Card>
         )}
         {sortedTasks.map(task => (
@@ -107,7 +114,7 @@ export function TasksPage() {
           >
             <div className="task-row">
               <span className="task-index">{task.index}</span>
-              <span className="task-icon">{statusIcon(task.status)}</span>
+              <span className="task-icon"><Icon name={statusIcon(task.status)} size={15} /></span>
               <div className="task-title-block">
                 <div className="task-title">{task.title}</div>
                 {task.description && (
@@ -122,7 +129,7 @@ export function TasksPage() {
             <div className="task-meta-row">
               {task.assignedAgent && (
                 <span className="task-meta">
-                  🤖 {task.assignedAgent}
+                  <Icon name="agents" size={13} /> {task.assignedAgent}
                 </span>
               )}
               {task.dependencies && task.dependencies.length > 0 && (
@@ -132,10 +139,10 @@ export function TasksPage() {
               )}
               {task.currentAction && (
                 <span className="task-meta task-action">
-                  ▶ {task.currentAction}
+                  <Icon name="sparkles" size={13} /> {task.currentAction}
                 </span>
               )}
-              <span className="task-meta">⏱ {formatDuration(task.elapsedMs)}</span>
+              <span className="task-meta"><Icon name="clock" size={13} /> {formatDuration(task.elapsedMs)}</span>
             </div>
 
             {task.changedFiles && task.changedFiles.length > 0 && (
@@ -154,7 +161,7 @@ export function TasksPage() {
                   task.verification.passed ? 'passed' : 'failed'
                 }`}
               >
-                {task.verification.passed ? '✔' : '✕'} {task.verification.level?.toUpperCase() ?? 'L1'}
+                <Icon name={task.verification.passed ? 'check' : 'x'} size={13} /> {task.verification.level?.toUpperCase() ?? 'L1'}
                 {task.verification.message ? ` — ${task.verification.message}` : ''}
               </div>
             )}

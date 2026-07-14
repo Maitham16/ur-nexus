@@ -156,7 +156,7 @@ export function formatPreconditionError(error: BackgroundRemoteSessionPreconditi
     case 'no_git_remote':
       return 'Background tasks require a GitHub remote. Add one with `git remote add origin REPO_URL`.';
     case 'github_app_not_installed':
-      return 'The UR GitHub app must be installed on this repository first.\nhttps://github.com/Maitham16/UR';
+      return 'The UR GitHub app must be installed on this repository first.\nhttps://github.com/Maitham16/ur-nexus';
     case 'policy_blocked':
       return "Remote sessions are disabled by your organization's policy. Contact your organization admin to enable them.";
   }

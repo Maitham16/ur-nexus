@@ -254,6 +254,9 @@ export function recordOutcome(
     detail?: string
   },
 ): void {
+  if (/^(?:1|true|yes)$/i.test(process.env.UR_CODE_DISABLE_AUTO_LEARNING ?? '')) {
+    return
+  }
   try {
     saveStats(cwd, foldOutcomes(loadStats(cwd), [outcomeFromRun(input)]))
   } catch {

@@ -43,7 +43,7 @@ if (!changelog.includes(`## ${version}`)) {
   fail(`CHANGELOG.md is missing an entry for ${version}`)
 }
 
-const expectedRepo = 'Maitham16/UR'
+const expectedRepo = 'Maitham16/ur-nexus'
 if (!packageJson.repository?.url?.includes(expectedRepo)) {
   fail(`package.json repository must point at ${expectedRepo}`)
 }

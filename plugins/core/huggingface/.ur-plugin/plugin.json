@@ -4,10 +4,10 @@
   "description": "Work the Hugging Face Hub from UR: search and vet models and datasets, read model cards, and download weights — through the official Hugging Face MCP server or the hf CLI.",
   "author": {
     "name": "Maitham Al-rubaye",
-    "url": "https://github.com/Maitham16/UR"
+    "url": "https://github.com/Maitham16/ur-nexus"
   },
-  "homepage": "https://github.com/Maitham16/UR/tree/master/plugins/core/huggingface",
-  "repository": "https://github.com/Maitham16/UR",
+  "homepage": "https://github.com/Maitham16/ur-nexus/tree/master/plugins/core/huggingface",
+  "repository": "https://github.com/Maitham16/ur-nexus",
   "license": "LicenseRef-UR-AGENT-Non-Commercial-Self-Responsibility",
   "keywords": ["huggingface", "models", "datasets", "machine-learning", "hub", "mcp"],
   "mcpServers": {

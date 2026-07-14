@@ -32,7 +32,7 @@ const packageName =
 const issuesUrl =
   typeof packageMetadata.bugs?.url === 'string'
     ? packageMetadata.bugs.url
-    : 'https://github.com/Maitham16/UR/issues'
+    : 'https://github.com/Maitham16/ur-nexus/issues'
 
 const bun = process.env.BUN_BIN || process.env.BUN_EXECUTABLE || 'bun'
 const ollamaModel =

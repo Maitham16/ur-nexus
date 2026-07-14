@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card } from '../components/Card.js'
 import { ApprovalCard } from '../components/ApprovalCard.js'
 import { useDesktop, useRuntimeEvents } from '../hooks/useDesktop.js'
-import type { RuntimeEvent, TerminalCommandDto, ApprovalScope } from '../../shared/ipc.js'
+import { useProject } from '../state/ProjectContext.js'
+import { Icon } from '../components/Icon.js'
+import type { RuntimeEvent, TerminalCommandDto, ApprovalScope, TestRunResultDto } from '../../shared/ipc.js'
 
-type Tab = 'run-log' | 'terminal' | 'agent-logs' | 'errors'
+type Tab = 'run-log' | 'terminal' | 'tests' | 'agent-logs' | 'errors'
 
 interface RunLogEntry {
   id: string
@@ -27,7 +29,7 @@ interface PendingApproval {
   target?: string
   reason?: string
   riskLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical'
-  projectRoot?: string
+  approvalProjectRoot?: string
   timestamp: number
 }
 
@@ -57,7 +59,7 @@ function formatDuration(ms?: number): string {
 
 export function TerminalPage() {
   const desktop = useDesktop()
-  const [projectRoot, setProjectRoot] = useState('')
+  const { projectRoot } = useProject()
   const [worktreeRoot, setWorktreeRoot] = useState<string | undefined>(undefined)
   const [tab, setTab] = useState<Tab>('terminal')
   const [commands, setCommands] = useState<TerminalCommandDto[]>([])
@@ -193,7 +195,7 @@ export function TerminalPage() {
           target?: string
           reason?: string
           riskLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical'
-          projectRoot?: string
+          approvalProjectRoot?: string
         }
         setPendingApprovals(prev => ({
           ...prev,
@@ -205,7 +207,7 @@ export function TerminalPage() {
             target: e.target,
             reason: e.reason,
             riskLevel: e.riskLevel,
-            projectRoot: e.projectRoot,
+            approvalProjectRoot: e.approvalProjectRoot,
             timestamp: event.timestamp,
           },
         }))
@@ -274,13 +276,18 @@ export function TerminalPage() {
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'run-log', label: 'Run Log', count: runLogs.length },
     { id: 'terminal', label: 'Terminal', count: commands.length },
+    { id: 'tests', label: 'Tests' },
     { id: 'agent-logs', label: 'Agent Logs', count: agentLogs.length },
     { id: 'errors', label: 'Errors', count: errors.length },
   ]
 
+  const [hiddenBefore, setHiddenBefore] = useState(0)
   const visibleCommands = useMemo(
-    () => [...commands].sort((a, b) => b.startTime - a.startTime),
-    [commands],
+    () =>
+      [...commands]
+        .filter(c => c.startTime > hiddenBefore)
+        .sort((a, b) => b.startTime - a.startTime),
+    [commands, hiddenBefore],
   )
 
   return (
@@ -288,15 +295,11 @@ export function TerminalPage() {
       <h1 className="page-title">Terminal</h1>
       <p className="page-subtitle">Live terminal execution with approval gating and clean output.</p>
 
-      <Card title="Project">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input
-            className="input"
-            style={{ flex: 1, minWidth: 200 }}
-            placeholder="Project root path..."
-            value={projectRoot}
-            onChange={e => setProjectRoot(e.target.value)}
-          />
+      <Card title="Working directory">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="project-value" style={{ flex: 1, minWidth: 200 }}>
+            {projectRoot ?? 'No project open — open one from the title bar'}
+          </span>
           <input
             className="input"
             style={{ flex: 1, minWidth: 200 }}
@@ -304,6 +307,14 @@ export function TerminalPage() {
             value={worktreeRoot ?? ''}
             onChange={e => setWorktreeRoot(e.target.value || undefined)}
           />
+          <button
+            className="button button-secondary"
+            onClick={() => projectRoot && desktop?.revealInFinder(worktreeRoot ?? projectRoot)}
+            disabled={!projectRoot}
+            title="Reveal the working directory in Finder"
+          >
+            Open in Finder
+          </button>
           <button className="button button-secondary" onClick={refresh} disabled={!projectRoot}>
             Refresh
           </button>
@@ -342,6 +353,14 @@ export function TerminalPage() {
             <button className="button" onClick={() => run(input)} disabled={!projectRoot || !input.trim()}>
               Run
             </button>
+            <button
+              className="button button-secondary"
+              onClick={() => setHiddenBefore(Date.now())}
+              disabled={visibleCommands.length === 0}
+              title="Clear the visible command history (does not delete records)"
+            >
+              Clear display
+            </button>
           </div>
 
           <div className="command-list">
@@ -373,6 +392,10 @@ export function TerminalPage() {
             ))}
           </div>
         </Card>
+      )}
+
+      {tab === 'tests' && (
+        <TestsPanel projectRoot={projectRoot} worktreeRoot={worktreeRoot} />
       )}
 
       {tab === 'agent-logs' && (
@@ -417,6 +440,157 @@ export function TerminalPage() {
         </Card>
       )}
     </div>
+  )
+}
+
+function TestsPanel({
+  projectRoot,
+  worktreeRoot,
+}: {
+  projectRoot: string | null
+  worktreeRoot?: string
+}) {
+  const desktop = useDesktop()
+  const [command, setCommand] = useState('bun test')
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<TestRunResultDto | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [showRaw, setShowRaw] = useState(false)
+
+  const run = async (rerunFailed: boolean) => {
+    if (!desktop || !projectRoot || !command.trim()) return
+    setRunning(true)
+    setError(null)
+    try {
+      const next =
+        rerunFailed && result
+          ? await desktop.rerunFailedTests({
+              projectRoot,
+              command: result.command,
+              worktreeRoot,
+              framework: result.framework,
+              failingTests: result.failingTests,
+            })
+          : await desktop.runTests({
+              projectRoot,
+              command: command.trim(),
+              worktreeRoot,
+            })
+      setResult(next)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <Card title="Test runner">
+      <div className="terminal-input-row">
+        <span className="terminal-prompt">$</span>
+        <input
+          className="input terminal-input"
+          placeholder="Test command (e.g. bun test, npx vitest run, pytest)…"
+          value={command}
+          onChange={e => setCommand(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void run(false)
+          }}
+          disabled={!projectRoot || running}
+        />
+        <button
+          className="button"
+          onClick={() => run(false)}
+          disabled={!projectRoot || running || !command.trim()}
+        >
+          {running ? 'Running…' : 'Run tests'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="chat-error-banner">
+          <span><Icon name="alert" size={14} /> {error}</span>
+          <button className="link-button" onClick={() => setError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {result && (
+        <div className="test-result">
+          <div className="test-summary">
+            {result.runtimeFailure ? (
+              <span className="test-runtime-failure">
+                Command failed to run (exit {result.exitCode}) — this is not a
+                test failure
+              </span>
+            ) : (
+              <>
+                <span className="test-count test-pass">{result.passed} passed</span>
+                <span className="test-count test-fail">{result.failed} failed</span>
+                <span className="test-count test-skip">{result.skipped} skipped</span>
+              </>
+            )}
+            <span className="test-meta">
+              {result.framework} · {(result.durationMs / 1000).toFixed(1)}s · exit {result.exitCode}
+            </span>
+          </div>
+
+          {result.failingTests.length > 0 && (
+            <div className="test-failures">
+              {result.failingTests.map((t, i) => (
+                <div key={`${t.name}-${i}`} className="test-failure-row">
+                  <span className="test-failure-name">
+                    <Icon name="x" size={12} /> {t.file ? `${t.file} › ` : ''}
+                    {t.name}
+                  </span>
+                  <span className="diffs-detail-actions">
+                    <button
+                      className="link-button"
+                      onClick={() =>
+                        navigator.clipboard.writeText(
+                          `${t.file ? `${t.file}::` : ''}${t.name}${t.message ? ` — ${t.message}` : ''}`,
+                        )
+                      }
+                    >
+                      Copy
+                    </button>
+                    {t.file && (
+                      <button
+                        className="link-button"
+                        onClick={() =>
+                          projectRoot && desktop?.openInDefaultApp(`${projectRoot}/${t.file}`)
+                        }
+                      >
+                        Open file
+                      </button>
+                    )}
+                  </span>
+                </div>
+              ))}
+              <button
+                className="button button-secondary button-small"
+                onClick={() => run(true)}
+                disabled={running}
+              >
+                Rerun failed only
+              </button>
+            </div>
+          )}
+
+          <button className="link-button" onClick={() => setShowRaw(prev => !prev)}>
+            {showRaw ? 'Hide raw output' : 'Show raw output'}
+          </button>
+          {showRaw && <pre className="command-output">{result.output}</pre>}
+        </div>
+      )}
+      {!result && !running && (
+        <p className="card-body">
+          Run the project test suite and get a structured summary with per-test
+          failures.
+        </p>
+      )}
+    </Card>
   )
 }
 
@@ -499,7 +673,7 @@ function LogBlock({
       <div className="command-header">
         <span className="command-title">
           {log.type === 'command' && '$ '}
-          {log.type === 'tool' && '🔧 '}
+          {log.type === 'tool' && <><Icon name="tool" size={13} />{' '}</>}
           {log.title}
         </span>
         <span className="command-meta">{formatTime(log.timestamp)}</span>

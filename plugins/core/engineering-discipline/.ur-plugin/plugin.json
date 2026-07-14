@@ -4,10 +4,10 @@
   "description": "Reference plugin for UR's marketplace extensibility: a CI/release command, executable skill, agent template, verifier validator, and language/LSP adapter metadata.",
   "author": {
     "name": "Maitham Al-rubaye",
-    "url": "https://github.com/Maitham16/UR"
+    "url": "https://github.com/Maitham16/ur-nexus"
   },
-  "homepage": "https://github.com/Maitham16/UR/tree/master/plugins/core/engineering-discipline",
-  "repository": "https://github.com/Maitham16/UR",
+  "homepage": "https://github.com/Maitham16/ur-nexus/tree/master/plugins/core/engineering-discipline",
+  "repository": "https://github.com/Maitham16/ur-nexus",
   "license": "LicenseRef-UR-AGENT-Non-Commercial-Self-Responsibility",
   "keywords": ["workflow", "ci", "release", "validator", "template", "language-adapter"],
   "skills": "./skills",

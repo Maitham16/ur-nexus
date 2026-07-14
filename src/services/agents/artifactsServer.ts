@@ -266,10 +266,11 @@ export async function handleArtifactsPost(
   return { status: 404, type: 'application/json', body: JSON.stringify({ error: `Unknown endpoint: ${path}` }) }
 }
 
+const ARTIFACTS_HOST = 'localhost'
 let active: { server: Server; port: number } | null = null
 
 export function activeArtifactsServer(): { port: number; url: string } | null {
-  return active ? { port: active.port, url: `http://127.0.0.1:${active.port}` } : null
+  return active ? { port: active.port, url: `http://${ARTIFACTS_HOST}:${active.port}` } : null
 }
 
 export function startArtifactsServer(
@@ -278,7 +279,7 @@ export function startArtifactsServer(
   exec?: CommandExec,
 ): Promise<{ port: number; url: string; alreadyRunning: boolean }> {
   if (active) {
-    return Promise.resolve({ port: active.port, url: `http://127.0.0.1:${active.port}`, alreadyRunning: true })
+    return Promise.resolve({ port: active.port, url: `http://${ARTIFACTS_HOST}:${active.port}`, alreadyRunning: true })
   }
   return new Promise((resolvePromise, reject) => {
     const server = createServer((req, res) => {
@@ -295,11 +296,11 @@ export function startArtifactsServer(
       handler.then(respond).catch(error => respond({ status: 500, type: 'text/plain', body: String(error) }))
     })
     server.once('error', reject)
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(port, ARTIFACTS_HOST, () => {
       const address = server.address()
       const boundPort = typeof address === 'object' && address ? address.port : port
       active = { server, port: boundPort }
-      resolvePromise({ port: boundPort, url: `http://127.0.0.1:${boundPort}`, alreadyRunning: false })
+      resolvePromise({ port: boundPort, url: `http://${ARTIFACTS_HOST}:${boundPort}`, alreadyRunning: false })
     })
   })
 }

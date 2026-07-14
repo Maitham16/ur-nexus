@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useDesktop } from '../hooks/useDesktop.js'
+import { useProject } from '../state/ProjectContext.js'
 import { Card } from '../components/Card.js'
+import { CheckpointsPanel } from '../components/CheckpointsPanel.js'
 import type { RunSummaryDto, RunDetailDto, RunReportDto } from '../../shared/ipc.js'
 
 function formatDate(iso?: string): string {
@@ -24,17 +26,13 @@ function statusBadge(status: string): string {
 
 export function HistoryPage() {
   const desktop = useDesktop()
-  const [projectRoot, setProjectRoot] = useState('')
+  const { projectRoot } = useProject()
   const [runs, setRuns] = useState<RunSummaryDto[]>([])
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [detail, setDetail] = useState<RunDetailDto | null>(null)
   const [report, setReport] = useState<RunReportDto | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const storedRoot = localStorage.getItem('ur:projectRoot')
-    if (storedRoot) setProjectRoot(storedRoot)
-  }, [])
+  const [lastExportPath, setLastExportPath] = useState<string | null>(null)
 
   const refreshRuns = useCallback(async () => {
     if (!desktop || !projectRoot) return
@@ -52,7 +50,7 @@ export function HistoryPage() {
   }, [refreshRuns])
 
   const selectRun = useCallback(async (runId: string) => {
-    if (!desktop) return
+    if (!desktop || !projectRoot) return
     setSelectedRunId(runId)
     setError(null)
     try {
@@ -71,7 +69,7 @@ export function HistoryPage() {
     if (!desktop || !projectRoot) return
     try {
       const result = await desktop.exportReportMarkdown({ projectRoot, runId, format: 'markdown' })
-      window.alert(`Report saved to ${result.path}`)
+      setLastExportPath(result.path)
     } catch (err) {
       setError(String(err))
     }
@@ -81,7 +79,7 @@ export function HistoryPage() {
     if (!desktop || !projectRoot) return
     try {
       const result = await desktop.exportReportJson({ projectRoot, runId, format: 'json' })
-      window.alert(`Report saved to ${result.path}`)
+      setLastExportPath(result.path)
     } catch (err) {
       setError(String(err))
     }
@@ -110,17 +108,31 @@ export function HistoryPage() {
 
       {error && <div className="card-body" style={{ color: '#fca5a5', marginBottom: 16 }}>{error}</div>}
 
+      {lastExportPath && (
+        <div className="notice-banner">
+          <span>Report saved to {lastExportPath}</span>
+          <div>
+            <button
+              className="link-button"
+              onClick={() => desktop?.revealInFinder(lastExportPath)}
+            >
+              Reveal in Finder
+            </button>
+            <button className="link-button" onClick={() => setLastExportPath(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="composer-footer" style={{ marginBottom: 16 }}>
-        <input
-          className="input project-input"
-          placeholder="Project root path..."
-          value={projectRoot}
-          onChange={e => setProjectRoot(e.target.value)}
-        />
+        <span className="project-value">{projectRoot ?? 'No project open'}</span>
         <button className="button button-secondary" onClick={refreshRuns} disabled={!projectRoot}>
           Refresh
         </button>
       </div>
+
+      <CheckpointsPanel projectRoot={projectRoot} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16, alignItems: 'start' }}>
         <Card title={`Runs (${runs.length})`}>

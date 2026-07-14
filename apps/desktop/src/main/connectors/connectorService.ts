@@ -16,7 +16,6 @@ import {
   type McpWebSocketServerConfig,
   type ConnectedMCPServer,
   type FailedMCPServer,
-  type MCPServerConnection,
   WebSocketTransport,
   openProject,
   type RuntimeProject,
@@ -183,7 +182,7 @@ export async function ensureConnectorClientsConnected(projectRoot: string): Prom
 }
 
 export async function listConnectors(projectRoot: string): Promise<ConnectorInfo[]> {
-  const project = await openProjectStore(projectRoot)
+  await openProjectStore(projectRoot)
   const { servers: configs } = await getAllMcpConfigs()
   return Object.entries(configs).map(([name, config]) => {
     const connector = mcpConfigToConnector(name, config as McpServerConfig)

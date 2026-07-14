@@ -50,10 +50,34 @@ export interface VerificationResultDto {
 
 // Channels exposed by the main process for renderer invocation.
 export type IpcChannel =
+  // Native dialogs (main-process, validated)
+  | 'dialog:open-project'
+  | 'dialog:open-files'
+  | 'dialog:save-file'
   // Projects
   | 'project:open'
+  | 'project:close'
   | 'project:list'
+  | 'project:recent'
+  | 'project:remove-recent'
   | 'project:inspect'
+  // Context / attachments
+  | 'context:add-files'
+  | 'context:remove-file'
+  | 'context:list'
+  // File explorer
+  | 'explorer:list'
+  | 'explorer:create'
+  | 'explorer:rename'
+  | 'explorer:delete'
+  | 'file:reveal'
+  | 'file:open-default'
+  // Search
+  | 'search:grep'
+  // Git status / diff review
+  | 'git:status'
+  | 'git:diff'
+  | 'git:revert-file'
   | 'worktree:create'
   | 'worktree:list'
   // Runs / sessions
@@ -66,14 +90,44 @@ export type IpcChannel =
   | 'file:read'
   | 'edit:propose'
   | 'patch:apply'
+  | 'patch:parse'
+  | 'patch:apply-hunks'
   // Shell (validated, sandboxed)
   | 'command:run'
   | 'command:stop'
   | 'commands:list'
+  // Structured test runner
+  | 'test:run'
+  | 'test:rerun-failed'
   // Tasks / agents
   | 'tasks:list'
   | 'agents:list'
   | 'settings:maxAgents'
+  // Background agents
+  | 'bgagent:launch'
+  | 'bgagent:list'
+  | 'bgagent:get'
+  | 'bgagent:cancel'
+  | 'bgagent:retry'
+  | 'bgagent:remove'
+  // Checkpoints
+  | 'checkpoint:create'
+  | 'checkpoint:list'
+  | 'checkpoint:preview'
+  | 'checkpoint:rewind'
+  | 'checkpoint:delete'
+  | 'checkpoint:audit'
+  // Planning
+  | 'plan:generate'
+  | 'plan:execute'
+  | 'plan:should-plan'
+  // Session resume
+  | 'resume:list'
+  | 'resume:get'
+  | 'resume:transcript'
+  | 'resume:run'
+  | 'resume:mark-failed'
+  | 'resume:archive'
   // Providers / models / tools
   | 'providers:list'
   | 'models:list'
@@ -85,6 +139,9 @@ export type IpcChannel =
   | 'provider:test'
   | 'provider:models:get'
   | 'tools:list'
+  // Agent permissions
+  | 'permissions:get'
+  | 'permissions:set'
   // MCP servers / connectors
   | 'mcp:list'
   | 'mcp:add'
@@ -121,6 +178,351 @@ export type IpcEvent =
   | 'runtime:agentUpdate'
   | 'runtime:approvalRequest'
   | 'runtime:deepLink'
+  | 'menu:action'
+
+// Actions dispatched from the native macOS menu to the focused window.
+export type MenuAction =
+  | 'new-chat'
+  | 'open-project'
+  | 'open-file'
+  | 'settings'
+  | 'history'
+  | 'toggle-terminal-drawer'
+  | 'toggle-context-panel'
+
+export interface OpenProjectDialogResultDto {
+  canceled: boolean
+  root?: string
+}
+
+export interface OpenFilesDialogResultDto {
+  canceled: boolean
+  paths: string[]
+}
+
+export interface SaveFileDialogRequestDto extends Record<string, unknown> {
+  defaultPath?: string
+  title?: string
+  filters?: Array<{ name: string; extensions: string[] }>
+}
+
+export interface SaveFileDialogResultDto {
+  canceled: boolean
+  path?: string
+}
+
+export type ContextFileKind = 'text' | 'binary' | 'missing' | 'directory' | 'unreadable' | 'too-large'
+
+export interface ContextFileDto {
+  /** Absolute path on disk. */
+  path: string
+  /** Path relative to the project root when inside it. */
+  relPath: string
+  name: string
+  sizeBytes: number
+  kind: ContextFileKind
+  /** True when the file can be attached to a prompt. */
+  ok: boolean
+  reason?: string
+}
+
+export interface AddContextFilesRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  paths: string[]
+}
+
+export interface ExplorerEntryDto {
+  name: string
+  /** Path relative to the project root. */
+  relPath: string
+  type: 'file' | 'directory'
+  sizeBytes?: number
+  gitStatus?: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed'
+  ignored?: boolean
+  hasChildren?: boolean
+}
+
+export interface ExplorerListRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  /** Directory to list, relative to the project root. Empty = root. */
+  relPath?: string
+  /** Include entries ignored by git (default false). */
+  showIgnored?: boolean
+}
+
+export interface ExplorerMutationRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  relPath: string
+  /** For create: 'file' | 'directory'. For rename: the new relative path. */
+  kind?: 'file' | 'directory'
+  newRelPath?: string
+}
+
+export interface GitFileStatusDto {
+  relPath: string
+  status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed'
+  staged: boolean
+}
+
+export interface GitDiffRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  /** Limit the diff to one file (relative path). */
+  relPath?: string
+  worktreeRoot?: string
+}
+
+export interface SearchRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  pattern: string
+  fixed?: boolean
+  caseSensitive?: boolean
+  include?: string[]
+  exclude?: string[]
+  maxResults?: number
+}
+
+export interface SearchMatchDto {
+  /** Path relative to the search root. */
+  file: string
+  line: number
+  column: number
+  text: string
+}
+
+export interface SearchResultDto {
+  matches: SearchMatchDto[]
+  truncated: boolean
+  engine: 'ripgrep' | 'internal'
+}
+
+export interface ParsedHunkDto {
+  /** Global hunk index across the whole patch (stable selection handle). */
+  index: number
+  oldStart: number
+  oldCount: number
+  newStart: number
+  newCount: number
+  /** Function/context text after the @@ header. */
+  context: string
+  /** Raw hunk body lines including +/-/space/\\ prefixes. */
+  lines: string[]
+}
+
+export interface ParsedDiffFileDto {
+  oldPath: string
+  newPath: string
+  isNew: boolean
+  isDeleted: boolean
+  isRename: boolean
+  isBinary: boolean
+  hunks: ParsedHunkDto[]
+}
+
+export interface ApplyHunksRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  patch: string
+  hunkIndexes: number[]
+  worktreeRoot?: string
+  /** sha256 per old file path, recorded when the diff was generated. */
+  baseHashes?: Record<string, string>
+  /** Reverse-apply (revert previously accepted hunks). */
+  reverse?: boolean
+}
+
+export interface ParseDiffRequestDto extends Record<string, unknown> {
+  patch: string
+}
+
+export type PersistedRunStatus =
+  | 'running'
+  | 'interrupted'
+  | 'resumed'
+  | 'finished'
+  | 'failed'
+  | 'archived'
+
+export interface PersistedRunStateDto {
+  runId: string
+  projectRoot: string
+  worktreeRoot?: string
+  status: PersistedRunStatus
+  createdAt: string
+  updatedAt: string
+  /** Provider reference only — never credentials. */
+  provider?: { providerId?: string; model?: string }
+  lastPrompt?: string
+  /** Prompt in flight when the run was interrupted. */
+  pendingPrompt?: string
+  completedToolCalls: Array<{ tool: string; target?: string; at: string }>
+  pendingApprovals: Array<{ requestId: string; toolName: string; target?: string }>
+  changedFiles: string[]
+  interruptionNote?: string
+  /** Set on runs created by resuming another run. */
+  resumedFrom?: string
+  /** Set on interrupted runs after they were resumed. */
+  resumedBy?: string
+}
+
+export interface ResumeRunRequestDto extends Record<string, unknown> {
+  runId: string
+}
+
+export interface PlanTaskDto {
+  id: string
+  title: string
+  description: string
+  role: string
+  dependencies: string[]
+  fileTargets: string[]
+  expectedOutput: string
+  verification: string
+}
+
+export interface PlanDto {
+  id: string
+  prompt: string
+  tasks: PlanTaskDto[]
+  createdAt: string
+}
+
+export interface GeneratePlanRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  prompt: string
+}
+
+export interface ExecutePlanRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  plan: PlanDto
+}
+
+export type CheckpointTrigger =
+  | 'before-agent'
+  | 'before-tool'
+  | 'before-edit'
+  | 'after-edit'
+  | 'task-completed'
+  | 'before-rewind'
+  | 'manual'
+
+export interface CheckpointFileDto {
+  relPath: string
+  existed: boolean
+  hash?: string
+  sizeBytes?: number
+}
+
+export interface CheckpointDto {
+  id: string
+  projectRoot: string
+  createdAt: string
+  reason: string
+  trigger: CheckpointTrigger
+  sessionId?: string
+  taskId?: string
+  files: CheckpointFileDto[]
+  gitHead?: string
+  gitBranch?: string
+  /** Set on safety checkpoints created before a rewind (branched timeline). */
+  branchedFrom?: string
+}
+
+export interface RewindPreviewEntryDto {
+  relPath: string
+  action: 'restore' | 'recreate' | 'delete' | 'unchanged'
+}
+
+export interface RewindPreviewDto {
+  checkpointId: string
+  createdAt: string
+  reason: string
+  entries: RewindPreviewEntryDto[]
+  changes: number
+}
+
+export interface CheckpointRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  checkpointId?: string
+  reason?: string
+  files?: string[]
+}
+
+export type BackgroundAgentStatus =
+  | 'queued'
+  | 'running'
+  | 'done'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted'
+
+export interface BackgroundAgentDto {
+  id: string
+  projectRoot: string
+  prompt: string
+  title: string
+  status: BackgroundAgentStatus
+  createdAt: string
+  startedAt?: string
+  finishedAt?: string
+  error?: string
+  resultText?: string
+  changedFiles: string[]
+  logs: string[]
+  runId?: string
+  useWorktree?: boolean
+  worktreeRoot?: string
+  retryOf?: string
+  usage?: RunUsageDto
+}
+
+export interface LaunchBackgroundAgentRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  prompt: string
+  useWorktree?: boolean
+}
+
+export interface BackgroundAgentUpdateEvent extends BaseRuntimeEvent {
+  type: 'background_agent_update'
+  agent: BackgroundAgentDto
+}
+
+export type TestFramework =
+  | 'bun'
+  | 'jest'
+  | 'vitest'
+  | 'pytest'
+  | 'go'
+  | 'mocha'
+  | 'unknown'
+
+export interface FailingTestDto {
+  name: string
+  file?: string
+  message?: string
+}
+
+export interface TestRunRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  command: string
+  worktreeRoot?: string
+}
+
+export interface TestRunResultDto {
+  command: string
+  framework: TestFramework
+  startedAt: number
+  finishedAt: number
+  durationMs: number
+  exitCode: number
+  passed: number
+  failed: number
+  skipped: number
+  failingTests: FailingTestDto[]
+  output: string
+  stderrTail: string
+  /** The command itself failed to run (vs. tests failing). */
+  runtimeFailure: boolean
+  denied?: boolean
+}
 
 // All structured runtime events that the renderer can receive.
 export type RuntimeEvent =
@@ -151,6 +553,9 @@ export type RuntimeEvent =
   | WorktreeCreatedEvent
   | ChangedFilesEvent
   | VerificationCompletedEvent
+  | UsageUpdatedEvent
+  | RunResultEvent
+  | BackgroundAgentUpdateEvent
   | RunFinishedEvent
   | RunFailedEvent
 
@@ -279,7 +684,7 @@ export interface CommandFinishedEvent extends BaseRuntimeEvent {
   output?: string
 }
 
-export type ApprovalScope = 'once' | 'run' | 'session' | 'permanent'
+export type ApprovalScope = 'once' | 'run' | 'session'
 
 export interface ApprovalRequiredEvent extends BaseRuntimeEvent {
   type: 'approval_required'
@@ -293,7 +698,7 @@ export interface ApprovalRequiredEvent extends BaseRuntimeEvent {
   reason?: string
   riskLevel?: 'none' | 'low' | 'medium' | 'high' | 'critical'
   scope?: ApprovalScope
-  projectRoot?: string
+  approvalProjectRoot?: string
 }
 
 export interface ApprovalRespondedEvent extends BaseRuntimeEvent {
@@ -323,6 +728,8 @@ export interface DiffCreatedEvent extends BaseRuntimeEvent {
   diffId: string
   filePath: string
   patch: string
+  /** sha256 per old file path at generation time, for stale detection. */
+  baseHashes?: Record<string, string>
 }
 
 export interface PatchAppliedEvent extends BaseRuntimeEvent {
@@ -351,6 +758,35 @@ export interface VerificationCompletedEvent extends BaseRuntimeEvent {
   message?: string
 }
 
+export interface RunUsageDto {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  reasoningTokens?: number
+  requests: number
+  elapsedMs: number
+  /** Absent for local providers (no fabricated cost) and unknown models. */
+  costUsd?: number
+  /** True when computed from the pricing table rather than provider data. */
+  costIsEstimate: boolean
+  model?: string
+}
+
+export interface UsageUpdatedEvent extends BaseRuntimeEvent {
+  type: 'usage_updated'
+  usage: RunUsageDto
+}
+
+export interface RunResultEvent extends BaseRuntimeEvent {
+  type: 'run_result'
+  usage: RunUsageDto
+  durationMs?: number
+  numTurns?: number
+  resultText?: string
+  isError?: boolean
+}
+
 export interface RunFinishedEvent extends BaseRuntimeEvent {
   type: 'run_finished'
 }
@@ -370,6 +806,21 @@ export interface RuntimeSessionDto {
   projectRoot: string
   worktreeRoot?: string
   [key: string]: unknown
+}
+
+export type AgentApprovalPolicy = 'untrusted' | 'on-request' | 'never'
+export type AgentSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+
+export interface AgentPermissionSettingsDto extends Record<string, unknown> {
+  approvalPolicy: AgentApprovalPolicy
+  sandboxMode: AgentSandboxMode
+  networkAccess: boolean
+}
+
+export interface StartRunOptionsDto extends Record<string, unknown> {
+  useWorktree?: boolean
+  branch?: string
+  permissions?: AgentPermissionSettingsDto
 }
 
 export interface RuntimeToolInfoDto {
@@ -572,7 +1023,6 @@ export interface RunCommandRequestDto {
   projectRoot: string
   command: string
   worktreeRoot?: string
-  skipApproval?: boolean
   [key: string]: unknown
 }
 
@@ -614,7 +1064,7 @@ export interface ProjectSafetyPolicyDto {
   secretFiles: string[]
   secretEnvPatterns: string[]
   networkCommands: string[]
-  sandboxRequiredFor: string[]
+  sandboxRequiredFor: Array<'read' | 'write' | 'execute' | 'network'>
   developerMode?: {
     denyBecomesAsk?: boolean
   }
@@ -680,7 +1130,7 @@ export interface RunReportDto {
     reason: string
     riskLevel: string
     decision: 'allowed' | 'denied'
-    scope: 'once' | 'run' | 'session' | 'permanent'
+    scope: ApprovalScope
   }>
   changedFiles: string[]
   messages: Array<{ role: string; content?: string; toolName?: string }>

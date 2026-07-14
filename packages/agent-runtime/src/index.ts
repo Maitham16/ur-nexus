@@ -123,6 +123,11 @@ export {
   updateSettingsForSource,
 } from 'src/utils/settings/settings.js'
 
+// Desktop and other embedders must opt into configuration reads before
+// creating a runtime session. Export the initializer from the stable package
+// surface so consumers never depend on content-hashed bundle chunks.
+export { enableConfigs } from 'src/utils/config.js'
+
 export type { SettingsJson } from 'src/utils/settings/types.js'
 
 export {

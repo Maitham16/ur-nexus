@@ -2,6 +2,27 @@
 
 A standalone macOS Electron app for UR-Nexus. It installs and runs alone with no global `ur` CLI dependency, no subscription CLI provider, and bundles the internal `@ur/agent-runtime` package.
 
+## Install from npm
+
+UR-Nexus Desktop is published as `ur-nexus-desktop` and includes its own
+Electron runtime. No API key is bundled: each user chooses a provider and adds,
+replaces, or removes their own credentials in **Settings**.
+
+```bash
+npm install --global --allow-scripts=electron,node-pty ur-nexus-desktop
+ur-nexus-desktop
+```
+
+Recent npm versions require explicit approval before global packages may run
+native install scripts. UR-Nexus needs exactly Electron's runtime installer and
+node-pty's terminal binding; the command above approves only those two packages.
+It does not enable arbitrary dependency scripts. See npm's
+[`allow-scripts` documentation](https://docs.npmjs.com/using-npm/config/#allow-scripts).
+
+Use `ur-nexus-desktop --version` to verify the installed release. Ollama users
+can select any model installed on their own Ollama server and may change the
+server URL at any time.
+
 ## macOS development
 
 Requires [Bun](https://bun.sh) and macOS 12+. Native modules are rebuilt for the running Electron ABI automatically when packaging.
@@ -22,7 +43,7 @@ bun run build
 Produces:
 
 - `dist/main/main.mjs`
-- `dist/preload/preload.mjs`
+- `dist/preload/preload.cjs`
 - `dist/renderer/*`
 
 ## macOS package
@@ -39,7 +60,7 @@ Generates in `dist/`:
 
 Universal binaries are produced when `electron-builder` runs on an Apple Silicon Mac with both architectures available. Set `electron-arch` or use `electron-builder --universal` if needed.
 
-Native modules (`node-pty`, `electron-updater`) are unpacked from the ASAR so they load at runtime.
+The native terminal module (`node-pty`) is unpacked from the ASAR so it loads at runtime.
 
 ## macOS install
 
@@ -51,7 +72,11 @@ API keys are stored by the main process in the macOS Keychain via the existing `
 
 ## Provider setup
 
-Open **Settings**, pick a provider, enter a model, and save. Click **Test connection** to verify reachability.
+Open **Settings**, pick a provider, enter a model, and save. Click **Save & test** to verify reachability.
+
+In chat, type `/` to open the command palette. Continue typing to filter,
+use <kbd>↑</kbd>/<kbd>↓</kbd> to navigate, <kbd>Tab</kbd> or
+<kbd>Enter</kbd> to select, and <kbd>Esc</kbd> to close it.
 
 ### OpenAI API setup
 
@@ -113,19 +138,20 @@ MCP servers can be added in the Connectors panel. The app supports `stdio`, `sse
 
 ## Auto-update
 
-`electron-updater` is wired but requires a published update server or release repository. Configure `publish` in `electron-builder.yml` once a release channel is available. The renderer can request an update check via `desktop.checkForUpdates()`.
+The renderer checks the repository's latest public GitHub release through the
+GitHub Releases API. Update checks do not require a token and do not download or
+execute anything automatically.
 
 ## Deep links
 
 The app registers the `ur-desktop://` protocol. On launch it handles `open-url` and `second-instance` argv payloads. Pending deep links are stored for the renderer to consume after load.
 
-## macOS signing and notarization (placeholder)
+## macOS signing and notarization
 
 `electron-builder.yml` includes:
 
 - `hardenedRuntime: true`
 - `entitlements: build/entitlements.mac.plist`
-- `provisioningProfile: build/UR_Desktop.provisionprofile`
 - `notarize.teamId: ${env.APPLE_TEAM_ID}`
 
 To sign and notarize, set environment variables before packaging:
@@ -136,11 +162,15 @@ export APPLE_APP_SPECIFIC_PASSWORD=xxxx-xxxx-xxxx-xxxx
 export APPLE_TEAM_ID=ABCD123456
 ```
 
-Provide a provisioning profile at `build/UR_Desktop.provisionprofile`.
+Packaging works without these credentials for local testing. Public macOS
+distribution requires a valid Developer ID Application certificate and Apple
+notarization credentials; they are intentionally never stored in the repo or
+npm package.
 
 ## Troubleshooting
 
 - **Blank window**: check that `dist/renderer/index.html` exists after `bun run build`. In dev mode ensure Vite is running on port 5173.
+- **Electron runtime missing after npm install**: reinstall with `npm install --global --allow-scripts=electron,node-pty ur-nexus-desktop`. Do not use the broad `--dangerously-allow-all-scripts` option.
 - **Type errors**: run `bun run typecheck` from `apps/desktop`.
 - **Tests**: run `bun test` from `apps/desktop`.
 - **Packaging fails on native modules**: run `bun run build` first so `electron-builder` can locate rebuilt binaries; ensure `node-pty` has a prebuild for the target Electron ABI.

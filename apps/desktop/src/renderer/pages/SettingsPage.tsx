@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDesktop } from '../hooks/useDesktop.js'
+import { useProject } from '../state/ProjectContext.js'
 import { Card } from '../components/Card.js'
 import type {
   DesktopProviderKind,
@@ -9,7 +10,14 @@ import type {
   DesktopModelInfoDto,
   DesktopProviderConnectionResultDto,
   ProjectSafetyPolicyDto,
+  AgentPermissionSettingsDto,
 } from '../../shared/ipc.js'
+
+const DEFAULT_PERMISSIONS: AgentPermissionSettingsDto = {
+  approvalPolicy: 'on-request',
+  sandboxMode: 'workspace-write',
+  networkAccess: false,
+}
 
 const PROVIDER_LABELS: Record<DesktopProviderKind, string> = {
   'openai-api': 'OpenAI API',
@@ -33,7 +41,7 @@ const PROVIDER_DESCRIPTIONS: Record<DesktopProviderKind, string> = {
 
 export function SettingsPage() {
   const desktop = useDesktop()
-  const [projectRoot, setProjectRoot] = useState('')
+  const { projectRoot } = useProject()
   const [providers, setProviders] = useState<DesktopProviderInfoDto[]>([])
   const [config, setConfig] = useState<DesktopProviderConfigDto | null>(null)
   const [selectedKind, setSelectedKind] = useState<DesktopProviderKind>('ollama')
@@ -47,16 +55,38 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [safetyPolicy, setSafetyPolicy] = useState<ProjectSafetyPolicyDto | null>(null)
   const [policyText, setPolicyText] = useState('')
+  const [permissions, setPermissions] = useState<AgentPermissionSettingsDto>(DEFAULT_PERMISSIONS)
+  const [permissionsSaved, setPermissionsSaved] = useState(false)
+
+  // Provider/model configuration is global (user settings), so it does not
+  // require an open project. Safety policy below is project-scoped.
+  const providerRoot = projectRoot ?? ''
 
   const activeProvider = useMemo(
     () => providers.find(p => p.active),
     [providers],
   )
+  const selectedProvider = useMemo(
+    () => providers.find(p => p.id === selectedKind),
+    [providers, selectedKind],
+  )
+  const needsBaseUrl = useMemo(
+    () =>
+      selectedKind === 'ollama-network' ||
+      selectedKind === 'ollama-cloud' ||
+      selectedKind === 'openai-compatible',
+    [selectedKind],
+  )
+
+  const needsApiKey = useMemo(
+    () => selectedKind !== 'ollama' && selectedKind !== 'ollama-network',
+    [selectedKind],
+  )
 
   useEffect(() => {
-    if (!desktop || !projectRoot) return
+    if (!desktop) return
     desktop
-      .getProviderConfig(projectRoot)
+      .getProviderConfig(providerRoot)
       .then(cfg => {
         setConfig(cfg)
         setSelectedKind(cfg.providerId)
@@ -64,20 +94,23 @@ export function SettingsPage() {
         setBaseUrl(cfg.baseUrl ?? '')
       })
       .catch(err => setError(String(err)))
-  }, [desktop, projectRoot])
+  }, [desktop, providerRoot])
 
   useEffect(() => {
-    if (!desktop || !projectRoot) return
+    if (!desktop) return
     desktop
-      .listProviders(projectRoot)
+      .getAgentPermissions()
+      .then(setPermissions)
+      .catch(err => setError(String(err)))
+  }, [desktop])
+
+  useEffect(() => {
+    if (!desktop) return
+    desktop
+      .listProviders(providerRoot)
       .then(setProviders)
       .catch(err => setError(String(err)))
-  }, [desktop, projectRoot, config])
-
-  useEffect(() => {
-    const storedRoot = localStorage.getItem('ur:projectRoot')
-    if (storedRoot) setProjectRoot(storedRoot)
-  }, [])
+  }, [desktop, providerRoot, config])
 
   useEffect(() => {
     if (!desktop || !projectRoot) return
@@ -92,28 +125,65 @@ export function SettingsPage() {
   }, [desktop, projectRoot])
 
   const refreshModels = useCallback(async () => {
-    if (!desktop || !projectRoot) return
+    if (!desktop) return
     setLoading(true)
+    setError(null)
     try {
-      const discovered = await desktop.listProviderModels(projectRoot, selectedKind)
+      const discovered = await desktop.listProviderModels(providerRoot, selectedKind)
       setModels(discovered)
       if (discovered[0] && !model) {
         setModel(discovered[0].id)
+      }
+      if (discovered.length === 0) {
+        setError(
+          `No models discovered for ${selectedKind}. For API providers, save a key first; for Ollama, check the base URL and that the server is running.`,
+        )
       }
     } catch (err) {
       setError(String(err))
     } finally {
       setLoading(false)
     }
-  }, [desktop, projectRoot, selectedKind, model])
+  }, [desktop, providerRoot, selectedKind, model])
+
+  // Auto-discover models when the selected provider changes so the list is
+  // populated without a manual click.
+  useEffect(() => {
+    if (!desktop) return
+    let cancelled = false
+    desktop
+      .listProviderModels(providerRoot, selectedKind)
+      .then(discovered => {
+        if (!cancelled) setModels(discovered)
+      })
+      .catch(() => {
+        // Discovery failures surface via the Discover button / Test action.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [desktop, providerRoot, selectedKind])
 
   const handleTest = useCallback(async () => {
-    if (!desktop || !projectRoot) return
+    if (!desktop) return
     setLoading(true)
     setTestResult(null)
     setError(null)
     try {
-      const result = await desktop.testProviderConnection(projectRoot, selectedKind)
+      // A newly entered key must be stored through the approved credential
+      // action before connection testing; it never travels on the ordinary
+      // provider configuration channel.
+      if (apiKey.trim()) {
+        await desktop.setProviderConfig(providerRoot, {
+          providerId: selectedKind,
+          model,
+          baseUrl: needsBaseUrl ? baseUrl : undefined,
+        })
+        await desktop.storeProviderApiKey(providerRoot, selectedKind, apiKey)
+        setApiKey('')
+        setProviders(await desktop.listProviders(providerRoot))
+      }
+      const result = await desktop.testProviderConnection(providerRoot, selectedKind)
       setTestResult(result)
       if (result.models && result.models.length > 0) {
         setModels(result.models.map(id => ({ id, displayName: id, provider: selectedKind })))
@@ -123,26 +193,25 @@ export function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [desktop, projectRoot, selectedKind])
+  }, [apiKey, baseUrl, desktop, model, needsBaseUrl, providerRoot, selectedKind])
 
   const handleSave = useCallback(async () => {
-    if (!desktop || !projectRoot) return
+    if (!desktop) return
     setSaving(true)
     setError(null)
     try {
       const patch: DesktopProviderConfigPatch = {
         providerId: selectedKind,
-        model: model || undefined,
-        baseUrl: baseUrl || undefined,
-        apiKey: apiKey || undefined,
+        model,
+        baseUrl: needsBaseUrl ? baseUrl : undefined,
       }
-      await desktop.setProviderConfig(projectRoot, patch)
+      await desktop.setProviderConfig(providerRoot, patch)
       if (apiKey) {
-        await desktop.storeProviderApiKey(projectRoot, selectedKind, apiKey)
+        await desktop.storeProviderApiKey(providerRoot, selectedKind, apiKey)
       }
       const [updatedProviders, updatedConfig] = await Promise.all([
-        desktop.listProviders(projectRoot),
-        desktop.getProviderConfig(projectRoot),
+        desktop.listProviders(providerRoot),
+        desktop.getProviderConfig(providerRoot, selectedKind),
       ])
       setProviders(updatedProviders)
       setConfig(updatedConfig)
@@ -152,35 +221,58 @@ export function SettingsPage() {
     } finally {
       setSaving(false)
     }
-  }, [desktop, projectRoot, selectedKind, model, baseUrl, apiKey])
+  }, [desktop, providerRoot, selectedKind, model, baseUrl, apiKey, needsBaseUrl])
 
-  const handleActivate = useCallback(async () => {
-    if (!desktop || !projectRoot) return
+  const handleClearKey = useCallback(async () => {
+    if (!desktop) return
     setSaving(true)
     setError(null)
     try {
-      await desktop.updateProvider(projectRoot, selectedKind, model || undefined)
-      const updated = await desktop.listProviders(projectRoot)
-      setProviders(updated)
+      await desktop.clearProviderApiKey(providerRoot, selectedKind)
+      setProviders(await desktop.listProviders(providerRoot))
+      setApiKey('')
+      setTestResult(null)
     } catch (err) {
       setError(String(err))
     } finally {
       setSaving(false)
     }
-  }, [desktop, projectRoot, selectedKind, model])
+  }, [desktop, providerRoot, selectedKind])
 
-  const needsBaseUrl = useMemo(
-    () =>
-      selectedKind === 'ollama-network' ||
-      selectedKind === 'ollama-cloud' ||
-      selectedKind === 'openai-compatible',
-    [selectedKind],
-  )
+  const handleSavePermissions = useCallback(async () => {
+    if (!desktop) return
+    setSaving(true)
+    setError(null)
+    setPermissionsSaved(false)
+    try {
+      setPermissions(await desktop.setAgentPermissions(permissions))
+      setPermissionsSaved(true)
+      window.setTimeout(() => setPermissionsSaved(false), 1800)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setSaving(false)
+    }
+  }, [desktop, permissions])
 
-  const needsApiKey = useMemo(
-    () => selectedKind !== 'ollama' && selectedKind !== 'ollama-network',
-    [selectedKind],
-  )
+  const handleActivate = useCallback(async () => {
+    if (!desktop) return
+    setSaving(true)
+    setError(null)
+    try {
+      await desktop.updateProvider(providerRoot, selectedKind, model || undefined)
+      const [updated, updatedConfig] = await Promise.all([
+        desktop.listProviders(providerRoot),
+        desktop.getProviderConfig(providerRoot, selectedKind),
+      ])
+      setProviders(updated)
+      setConfig(updatedConfig)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setSaving(false)
+    }
+  }, [desktop, providerRoot, selectedKind, model])
 
   const handleSavePolicy = useCallback(async () => {
     if (!desktop || !projectRoot) return
@@ -207,7 +299,7 @@ export function SettingsPage() {
       <Card title="Active provider">
         <p className="card-body">
           {activeProvider
-            ? `${activeProvider.displayName} is active (${activeProvider.hasKey ? 'key stored' : 'no key'}).`
+            ? `${activeProvider.displayName} is active (${activeProvider.keySource === 'env' ? 'key from environment' : activeProvider.hasKey ? 'secure key stored' : activeProvider.id === 'ollama' || activeProvider.id === 'ollama-network' ? 'no key required' : 'key required'}).`
             : 'No provider configured yet.'}
         </p>
       </Card>
@@ -226,9 +318,9 @@ export function SettingsPage() {
                 setApiKey('')
                 setTestResult(null)
                 setError(null)
-                if (desktop && projectRoot) {
+                if (desktop) {
                   void desktop
-                    .getProviderConfig(projectRoot)
+                    .getProviderConfig(providerRoot, p.id)
                     .then(cfg => {
                       setConfig(cfg)
                       setModel(cfg.model ?? '')
@@ -244,7 +336,13 @@ export function SettingsPage() {
                 {p.active ? ' (active)' : ''}
               </div>
               <div className="provider-card-meta">
-                {p.hasKey ? '🔑 key present' : 'no key'} · tools: {p.supportsTools ? 'yes' : 'no'}
+                {p.keySource === 'env'
+                  ? 'environment key'
+                  : p.hasKey
+                    ? 'secure key'
+                    : p.id === 'ollama' || p.id === 'ollama-network'
+                      ? 'no key required'
+                      : 'key required'} · tools: {p.supportsTools ? 'yes' : 'no'}
               </div>
             </button>
           ))}
@@ -303,29 +401,45 @@ export function SettingsPage() {
           )}
 
           {needsApiKey && (
-            <label className="form-label">
-              API key
-              <input
-                className="input"
-                type="password"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder="Stored securely in macOS Keychain"
-              />
-              <span className="hint">Keys are stored by the main process and never sent to the renderer.</span>
-            </label>
+            <div className="provider-key-block">
+              <label className="form-label">
+                API key
+                <input
+                  className="input"
+                  type="password"
+                  value={apiKey}
+                  onChange={e => setApiKey(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={selectedProvider?.hasKey
+                    ? `Enter a new key to replace the ${selectedProvider.keySource === 'env' ? 'environment' : 'stored'} key`
+                    : 'Enter your provider API key'}
+                />
+                <span className="hint">
+                  Stored in macOS Keychain when available. The key is never bundled,
+                  logged, or returned to the interface after saving.
+                </span>
+              </label>
+              {selectedProvider?.keySource === 'stored' && (
+                <button
+                  className="button button-secondary button-small"
+                  onClick={handleClearKey}
+                  disabled={saving}
+                >
+                  Remove stored key
+                </button>
+              )}
+              {selectedProvider?.keySource === 'env' && (
+                <span className="hint">
+                  This key comes from your environment. Enter a key above to replace it,
+                  or remove the provider variable from your shell configuration.
+                </span>
+              )}
+            </div>
           )}
 
           {testResult && (
-            <div
-              className="card-body"
-              style={{
-                color: testResult.ok ? '#86efac' : '#fca5a5',
-                background: '#1a1a1a',
-                padding: 10,
-                borderRadius: 6,
-              }}
-            >
+            <div className={`provider-test-result ${testResult.ok ? 'is-success' : 'is-error'}`}>
               {testResult.ok ? 'Connected' : testResult.status}: {testResult.error ?? ''}
               {testResult.latencyMs ? ` (${testResult.latencyMs}ms)` : ''}
             </div>
@@ -336,7 +450,7 @@ export function SettingsPage() {
               {saving ? 'Saving...' : 'Save settings'}
             </button>
             <button className="button button-secondary" onClick={handleTest} disabled={loading}>
-              {loading ? 'Testing...' : 'Test connection'}
+              {loading ? 'Testing...' : apiKey.trim() ? 'Save & test' : 'Test connection'}
             </button>
             <button className="button button-secondary" onClick={handleActivate} disabled={saving || loading}>
               Set active
@@ -345,35 +459,120 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      <Card title="Project safety policy">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p className="card-body">
-            Edit the JSON policy loaded from <code>.ur/safety-policy.json</code>. This controls which
-            shell commands, file operations, and tool calls require approval.
-          </p>
-          <textarea
-            className="textarea code"
-            value={policyText}
-            onChange={e => setPolicyText(e.target.value)}
-            rows={20}
-            spellCheck={false}
-          />
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="button" onClick={handleSavePolicy} disabled={saving}>
-              Save policy
+      <Card title="Agent permissions">
+        <div className="permission-settings">
+          <div className="settings-section-copy">
+            <strong>Approval behavior</strong>
+            <span>Choose what the agent may do without interrupting you.</span>
+          </div>
+          <div className="permission-option-grid">
+            {([
+              ['untrusted', 'Ask every time', 'Confirm every change and side-effecting action.'],
+              ['on-request', 'Auto-approve edits', 'Allow safe workspace edits; ask for commands, network, and risky actions.'],
+              ['never', 'Auto approve', 'Do not prompt for actions allowed by the active sandbox.'],
+            ] as const).map(([value, title, description]) => (
+              <button
+                key={value}
+                type="button"
+                className={`permission-option${permissions.approvalPolicy === value ? ' selected' : ''}`}
+                onClick={() => setPermissions(current => ({ ...current, approvalPolicy: value }))}
+              >
+                <span className="permission-radio" />
+                <span><strong>{title}</strong><small>{description}</small></span>
+              </button>
+            ))}
+          </div>
+
+          <div className="settings-section-copy permission-section-divider">
+            <strong>Workspace access</strong>
+            <span>Sandbox scope is independent from approval behavior.</span>
+          </div>
+          <div className="permission-option-grid">
+            {([
+              ['read-only', 'Read only', 'Inspect and plan without changing project state.'],
+              ['workspace-write', 'Workspace', 'Read and write inside the opened project.'],
+              ['danger-full-access', 'Full access', 'Allow unsandboxed commands after an explicit high-risk choice.'],
+            ] as const).map(([value, title, description]) => (
+              <button
+                key={value}
+                type="button"
+                className={`permission-option${permissions.sandboxMode === value ? ' selected' : ''}${value === 'danger-full-access' ? ' dangerous' : ''}`}
+                onClick={() => setPermissions(current => ({ ...current, sandboxMode: value }))}
+              >
+                <span className="permission-radio" />
+                <span><strong>{title}</strong><small>{description}</small></span>
+              </button>
+            ))}
+          </div>
+
+          {permissions.sandboxMode === 'danger-full-access' && (
+            <div className="permission-warning">
+              Full access can run commands beyond the workspace. Core safety denials
+              still apply, but only use this mode for projects you trust.
+            </div>
+          )}
+
+          <label className="settings-toggle-row">
+            <span>
+              <strong>Network access</strong>
+              <small>Allow agent commands to contact external services.</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={permissions.networkAccess}
+              onChange={event => setPermissions(current => ({
+                ...current,
+                networkAccess: event.target.checked,
+              }))}
+            />
+          </label>
+
+          <div className="settings-save-row">
+            <button className="button" onClick={handleSavePermissions} disabled={saving}>
+              {permissionsSaved ? 'Saved' : 'Save permission defaults'}
             </button>
-            <button
-              className="button button-secondary"
-              onClick={() => {
-                if (safetyPolicy) {
-                  setPolicyText(JSON.stringify(safetyPolicy, null, 2))
-                }
-              }}
-            >
-              Reset
-            </button>
+            <span>New threads use these defaults. Existing runs keep their original profile.</span>
           </div>
         </div>
+      </Card>
+
+      <Card title="Project safety policy">
+        {!projectRoot ? (
+          <p className="card-body">
+            Open a project to view and edit its <code>.ur/safety-policy.json</code>.
+            Provider and model settings above are global and do not require an
+            open project.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p className="card-body">
+              Edit the JSON policy loaded from <code>.ur/safety-policy.json</code>. This controls which
+              shell commands, file operations, and tool calls require approval.
+            </p>
+            <textarea
+              className="textarea code"
+              value={policyText}
+              onChange={e => setPolicyText(e.target.value)}
+              rows={20}
+              spellCheck={false}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="button" onClick={handleSavePolicy} disabled={saving}>
+                Save policy
+              </button>
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  if (safetyPolicy) {
+                    setPolicyText(JSON.stringify(safetyPolicy, null, 2))
+                  }
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

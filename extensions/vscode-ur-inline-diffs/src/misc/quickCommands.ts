@@ -6,7 +6,7 @@ import type { ChatController } from '../chat/chatController.js'
 import { buildRunSpecPrompt, buildRunWorkflowPrompt } from '../chat/prompts.js'
 import { workspaceRoot } from '../diffs/store.js'
 
-const UR_DOCS_URL = 'https://github.com/Maitham16/UR#readme'
+const UR_DOCS_URL = 'https://github.com/Maitham16/ur-nexus#readme'
 
 export async function openSettings(): Promise<void> {
   await vscode.commands.executeCommand('workbench.action.openSettings', 'UR')

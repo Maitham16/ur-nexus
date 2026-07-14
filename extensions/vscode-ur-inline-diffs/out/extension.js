@@ -2004,7 +2004,7 @@ async function pickProviderModel(cwd) {
 
 // src/misc/quickCommands.ts
 var vscode11 = __toESM(require("vscode"));
-var UR_DOCS_URL = "https://github.com/Maitham16/UR#readme";
+var UR_DOCS_URL = "https://github.com/Maitham16/ur-nexus#readme";
 async function openSettings() {
   await vscode11.commands.executeCommand("workbench.action.openSettings", "UR");
 }

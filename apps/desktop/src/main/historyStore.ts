@@ -85,7 +85,7 @@ export interface HistoryApproval {
   reason: string
   riskLevel: string
   decision: 'allowed' | 'denied'
-  scope: 'once' | 'run' | 'session' | 'permanent'
+  scope: 'once' | 'run' | 'session'
   timestamp: string
 }
 
@@ -131,30 +131,44 @@ export interface RunHistory {
   finalReport?: string
 }
 
-const appData = getAppDataPath()
-const desktopDir = path.join(appData, 'desktop')
-const runsDir = path.join(desktopDir, 'runs')
-const transcriptsDir = path.join(desktopDir, 'transcripts')
-const checkpointsDir = path.join(desktopDir, 'checkpoints')
-const indexPath = path.join(desktopDir, 'history.jsonl')
+let desktopDirPromise: Promise<string> | null = null
+async function getDesktopDir(): Promise<string> {
+  if (!desktopDirPromise) {
+    const appData = await getAppDataPath()
+    desktopDirPromise = Promise.resolve(path.join(appData, 'desktop'))
+  }
+  return desktopDirPromise
+}
+async function runsDir(): Promise<string> {
+  return path.join(await getDesktopDir(), 'runs')
+}
+async function transcriptsDir(): Promise<string> {
+  return path.join(await getDesktopDir(), 'transcripts')
+}
+async function checkpointsDir(): Promise<string> {
+  return path.join(await getDesktopDir(), 'checkpoints')
+}
+async function indexPath(): Promise<string> {
+  return path.join(await getDesktopDir(), 'history.jsonl')
+}
 
 async function ensureDirs(): Promise<void> {
-  await fs.mkdir(desktopDir, { recursive: true })
-  await fs.mkdir(runsDir, { recursive: true })
-  await fs.mkdir(transcriptsDir, { recursive: true })
-  await fs.mkdir(checkpointsDir, { recursive: true })
+  await fs.mkdir(await getDesktopDir(), { recursive: true })
+  await fs.mkdir(await runsDir(), { recursive: true })
+  await fs.mkdir(await transcriptsDir(), { recursive: true })
+  await fs.mkdir(await checkpointsDir(), { recursive: true })
 }
 
-function runPath(runId: string): string {
-  return path.join(runsDir, `${runId}.json`)
+async function runPath(runId: string): Promise<string> {
+  return path.join(await runsDir(), `${runId}.json`)
 }
 
-function transcriptPath(runId: string): string {
-  return path.join(transcriptsDir, `${runId}.jsonl`)
+async function transcriptPath(runId: string): Promise<string> {
+  return path.join(await transcriptsDir(), `${runId}.jsonl`)
 }
 
-function checkpointDir(runId: string): string {
-  return path.join(checkpointsDir, runId)
+async function checkpointDir(runId: string): Promise<string> {
+  return path.join(await checkpointsDir(), runId)
 }
 
 function redactEvent(event: Record<string, unknown>): Record<string, unknown> {
@@ -164,7 +178,7 @@ function redactEvent(event: Record<string, unknown>): Record<string, unknown> {
 export async function appendRun(record: RunRecord): Promise<void> {
   await ensureDirs()
   const safeRecord = redactValue(record) as RunRecord
-  const file = runPath(record.runId)
+  const file = await runPath(record.runId)
   await fs.writeFile(file, `${JSON.stringify(safeRecord, null, 2)}\n`, 'utf-8')
   const line = JSON.stringify({
     runId: record.runId,
@@ -178,14 +192,14 @@ export async function appendRun(record: RunRecord): Promise<void> {
     modelId: record.modelId,
     providerMode: record.providerMode,
   })
-  await fs.appendFile(indexPath, `${line}\n`, 'utf-8')
+  await fs.appendFile(await indexPath(), `${line}\n`, 'utf-8')
 }
 
 export async function updateRun(
   runId: string,
   patch: Partial<RunRecord>,
 ): Promise<void> {
-  const file = runPath(runId)
+  const file = await runPath(runId)
   let record: RunRecord | undefined
   try {
     const content = await fs.readFile(file, 'utf-8')
@@ -202,7 +216,7 @@ export async function updateRun(
       projectName: patch.projectName ?? '',
       startedAt: patch.startedAt ?? new Date().toISOString(),
       status: patch.status ?? 'running',
-      transcriptPath: patch.transcriptPath ?? transcriptPath(runId),
+      transcriptPath: patch.transcriptPath ?? await transcriptPath(runId),
       changedFiles: patch.changedFiles ?? [],
     }
   }
@@ -231,7 +245,7 @@ export async function listRuns(filters?: {
 
 export async function getRun(runId: string): Promise<RunRecord | undefined> {
   try {
-    const content = await fs.readFile(runPath(runId), 'utf-8')
+    const content = await fs.readFile(await runPath(runId), 'utf-8')
     return JSON.parse(content) as RunRecord
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined
@@ -394,18 +408,18 @@ export async function getRunHistory(runId: string): Promise<RunHistory | undefin
 
 export async function deleteRun(runId: string): Promise<boolean> {
   try {
-    await fs.unlink(runPath(runId))
+    await fs.unlink(await runPath(runId))
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false
     throw err
   }
   try {
-    await fs.unlink(transcriptPath(runId))
+    await fs.unlink(await transcriptPath(runId))
   } catch {
     // ignore
   }
   try {
-    await fs.rm(checkpointDir(runId), { recursive: true, force: true })
+    await fs.rm(await checkpointDir(runId), { recursive: true, force: true })
   } catch {
     // ignore
   }
@@ -418,12 +432,12 @@ export async function deleteRun(runId: string): Promise<boolean> {
 
 export async function appendEvent(runId: string, event: Record<string, unknown>): Promise<void> {
   await ensureDirs()
-  const file = transcriptPath(runId)
+  const file = await transcriptPath(runId)
   await fs.appendFile(file, `${JSON.stringify(redactEvent(event))}\n`, 'utf-8')
 }
 
 export async function readTranscript(runId: string): Promise<Record<string, unknown>[]> {
-  const file = transcriptPath(runId)
+  const file = await transcriptPath(runId)
   try {
     const content = await fs.readFile(file, 'utf-8')
     return content
@@ -444,7 +458,7 @@ export async function writeCheckpoint(
   content: string,
 ): Promise<string> {
   await ensureDirs()
-  const dir = checkpointDir(runId)
+  const dir = await checkpointDir(runId)
   await fs.mkdir(dir, { recursive: true })
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const snapshotPath = path.join(dir, `${id}-${path.basename(filePath)}`)
@@ -457,7 +471,7 @@ export async function readCheckpoint(snapshotPath: string): Promise<string> {
 }
 
 export async function listCheckpoints(runId: string): Promise<HistoryCheckpoint[]> {
-  const dir = checkpointDir(runId)
+  const dir = await checkpointDir(runId)
   try {
     const entries = await fs.readdir(dir)
     return entries.map(name => {
@@ -477,7 +491,7 @@ export async function listCheckpoints(runId: string): Promise<HistoryCheckpoint[
 
 async function listAllRuns(): Promise<RunRecord[]> {
   try {
-    const content = await fs.readFile(indexPath, 'utf-8')
+    const content = await fs.readFile(await indexPath(), 'utf-8')
     const records: RunRecord[] = []
     for (const line of content.split('\n')) {
       if (!line.trim()) continue
@@ -499,5 +513,5 @@ async function listAllRuns(): Promise<RunRecord[]> {
 async function writeIndex(records: RunRecord[]): Promise<void> {
   await ensureDirs()
   const lines = records.map(r => JSON.stringify(r)).join('\n')
-  await fs.writeFile(indexPath, lines ? `${lines}\n` : '', 'utf-8')
+  await fs.writeFile(await indexPath(), lines ? `${lines}\n` : '', 'utf-8')
 }

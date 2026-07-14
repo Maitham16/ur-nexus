@@ -17,9 +17,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@ur/agent-runtime": ["./src/types/agent-runtime-stub.d.ts"]
+      "@ur/agent-runtime": ["./vendor/agent-runtime/index.js"]
     },
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.test.ts"],
   "exclude": ["node_modules", "dist"]
 }

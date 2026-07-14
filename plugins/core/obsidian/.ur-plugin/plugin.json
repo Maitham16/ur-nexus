@@ -4,10 +4,10 @@
   "description": "Turn UR into an Obsidian second-brain operator: capture atomic notes, daily notes, Maps of Content, backlinks, and cited vault search — via direct vault edits or the Obsidian Local REST API MCP server.",
   "author": {
     "name": "Maitham Al-rubaye",
-    "url": "https://github.com/Maitham16/UR"
+    "url": "https://github.com/Maitham16/ur-nexus"
   },
-  "homepage": "https://github.com/Maitham16/UR/tree/master/plugins/core/obsidian",
-  "repository": "https://github.com/Maitham16/UR",
+  "homepage": "https://github.com/Maitham16/ur-nexus/tree/master/plugins/core/obsidian",
+  "repository": "https://github.com/Maitham16/ur-nexus",
   "license": "LicenseRef-UR-AGENT-Non-Commercial-Self-Responsibility",
   "keywords": ["obsidian", "second-brain", "zettelkasten", "pkm", "notes", "mcp"],
   "mcpServers": {

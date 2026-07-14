@@ -409,7 +409,7 @@ export function buildA2AAgentCard(
     url,
     version: urVersion,
     documentationUrl:
-      'https://github.com/Maitham16/UR/blob/master/docs/AGENT_TRENDS.md',
+      'https://github.com/Maitham16/ur-nexus/blob/master/docs/AGENT_TRENDS.md',
     capabilities: {
       streaming: true,
       pushNotifications: false,
@@ -435,7 +435,7 @@ export function buildA2AAgentCard(
     defaultOutputModes: ['text/plain', 'text/markdown', 'application/json'],
     provider: {
       organization: 'Maitham Al-rubaye',
-      url: 'https://github.com/Maitham16/UR',
+      url: 'https://github.com/Maitham16/ur-nexus',
     },
     skills: [
       {

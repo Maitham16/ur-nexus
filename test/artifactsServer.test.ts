@@ -169,7 +169,8 @@ test('POST /api/capture-diff records a diff artifact', async () => {
 test('startArtifactsServer serves GET and POST over HTTP and stops cleanly', async () => {
   const tmp = mkdtempSync(join(tmpdir(), 'ur-art-http-'))
   try {
-    const { url, alreadyRunning } = await startArtifactsServer(tmp, 0, diffExec)
+    const testPort = 45000 + (process.pid % 5000)
+    const { url, alreadyRunning } = await startArtifactsServer(tmp, testPort, diffExec)
     expect(alreadyRunning).toBe(false)
     expect(activeArtifactsServer()?.url).toBe(url)
 
@@ -186,7 +187,7 @@ test('startArtifactsServer serves GET and POST over HTTP and stops cleanly', asy
 
     expect((await fetch(`${url}/artifacts/99`)).status).toBe(404)
 
-    const second = await startArtifactsServer(tmp, 0)
+    const second = await startArtifactsServer(tmp, testPort)
     expect(second.alreadyRunning).toBe(true)
     expect(second.url).toBe(url)
 

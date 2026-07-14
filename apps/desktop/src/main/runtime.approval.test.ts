@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { randomUUID } from 'node:crypto'
+import { setElectronModule, clearElectronModule } from './electronModule.js'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -11,27 +11,36 @@ import {
   startRun,
   openProjectAndCache,
 } from './runtime.js'
+import { getInitialSettings } from '@ur/agent-runtime'
 
 let emittedEvents: unknown[] = []
 let tmpProject: string
+let dataDir: string
 
 beforeEach(async () => {
   emittedEvents = []
   tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'ur-desktop-runtime-'))
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ur-desktop-runtime-data-'))
+  process.env.UR_DESKTOP_DATA_DIR = dataDir
+  process.env.UR_CONFIG_DIR = path.join(dataDir, 'runtime')
   setRendererEmitter((projectRoot, event) => {
     void projectRoot
     emittedEvents.push(event)
   })
   await openProjectAndCache(tmpProject)
+  getInitialSettings()
 })
 
 afterEach(() => {
+  delete process.env.UR_DESKTOP_DATA_DIR
+  delete process.env.UR_CONFIG_DIR
   // Cleanup is best-effort; not all tests create runs.
   try {
     fs.rmSync(tmpProject, { recursive: true, force: true })
   } catch {
     // ignore
   }
+  fs.rmSync(dataDir, { recursive: true, force: true })
 })
 
 describe('requestApproval in a run', () => {
@@ -89,9 +98,8 @@ describe('requestApproval in a run', () => {
 
 describe('requestStandaloneApproval', () => {
   it('returns approved false for denied native dialog', async () => {
-    const electron = await import('electron')
-    const originalShowMessageBox = electron.dialog.showMessageBox
-    electron.dialog.showMessageBox = async () => ({ response: 2, checkboxChecked: false })
+    const originalShowMessageBox = async () => ({ response: 2, checkboxChecked: false })
+    setElectronModule({ dialog: { showMessageBox: originalShowMessageBox }, BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] } } as unknown as typeof import('electron'))
 
     try {
       const result = await requestStandaloneApproval(tmpProject, {
@@ -103,14 +111,13 @@ describe('requestStandaloneApproval', () => {
       })
       expect(result.approved).toBe(false)
     } finally {
-      electron.dialog.showMessageBox = originalShowMessageBox
+      clearElectronModule()
     }
   })
 
   it('returns approved true with run scope when second button is chosen', async () => {
-    const electron = await import('electron')
-    const originalShowMessageBox = electron.dialog.showMessageBox
-    electron.dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false })
+    const originalShowMessageBox = async () => ({ response: 1, checkboxChecked: false })
+    setElectronModule({ dialog: { showMessageBox: originalShowMessageBox }, BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] } } as unknown as typeof import('electron'))
 
     try {
       const result = await requestStandaloneApproval(tmpProject, {
@@ -123,7 +130,7 @@ describe('requestStandaloneApproval', () => {
       expect(result.approved).toBe(true)
       expect(result.scope).toBe('run')
     } finally {
-      electron.dialog.showMessageBox = originalShowMessageBox
+      clearElectronModule()
     }
   })
 })
@@ -149,5 +156,34 @@ describe('run-scope caching', () => {
     const result = await second
     expect(result.approved).toBe(true)
     expect(result.scope).toBe('run')
+  })
+
+  it('caches session-scope actions across runs in the same project', async () => {
+    const firstRun = await startRun(tmpProject)
+    const evaluation = {
+      behavior: 'ask' as const,
+      riskLevel: 'medium' as const,
+      actionType: 'file-write' as const,
+      target: 'session-file.txt',
+      reason: 'Session scope test',
+    }
+
+    const first = requestApproval(firstRun.runId, 'Write', { path: evaluation.target }, 'task-1', evaluation)
+    const event = emittedEvents.find(e =>
+      (e as { type?: string; target?: string }).type === 'approval_required' &&
+      (e as { target?: string }).target === evaluation.target,
+    )
+    respondApproval((event as { requestId: string }).requestId, true, 'session')
+    await first
+
+    const secondRun = await startRun(tmpProject)
+    const second = await requestApproval(
+      secondRun.runId,
+      'Write',
+      { path: evaluation.target },
+      'task-1',
+      evaluation,
+    )
+    expect(second.approved).toBe(true)
   })
 })

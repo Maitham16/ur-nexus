@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useDesktop } from '../hooks/useDesktop.js'
+import { useProject } from '../state/ProjectContext.js'
 import { Card } from '../components/Card.js'
 import type {
   RuntimeConnectorDto,
@@ -31,7 +32,7 @@ const EMPTY_FORM: AddConnectorRequestDto = {
 
 export function ConnectorsPage() {
   const desktop = useDesktop()
-  const [projectRoot, setProjectRoot] = useState('')
+  const { projectRoot } = useProject()
   const [connectors, setConnectors] = useState<RuntimeConnectorDto[]>([])
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [form, setForm] = useState<AddConnectorRequestDto>(EMPTY_FORM)
@@ -40,11 +41,6 @@ export function ConnectorsPage() {
   const [error, setError] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<{ name: string; ok: boolean; error?: string; tools?: RuntimeConnectorToolDto[] } | null>(null)
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    const storedRoot = localStorage.getItem('ur:projectRoot')
-    if (storedRoot) setProjectRoot(storedRoot)
-  }, [])
 
   const refresh = useCallback(async () => {
     if (!desktop || !projectRoot) return
@@ -64,29 +60,19 @@ export function ConnectorsPage() {
     void refresh()
   }, [refresh])
 
-  const selected = useMemo(
-    () => connectors.find(c => c.name === selectedName) ?? null,
-    [connectors, selectedName],
-  )
-
   const resetForm = useCallback(() => {
-    setForm({ ...EMPTY_FORM, projectRoot })
+    setForm({ ...EMPTY_FORM, projectRoot: projectRoot ?? '' })
     setEditing(false)
     setSelectedName(null)
     setTestResult(null)
     setError(null)
   }, [projectRoot])
 
-  const startAdd = useCallback(() => {
-    resetForm()
-    setForm(prev => ({ ...prev, projectRoot }))
-  }, [resetForm, projectRoot])
-
   const startEdit = useCallback((connector: RuntimeConnectorDto) => {
     setSelectedName(connector.name)
     setEditing(true)
     setForm({
-      projectRoot,
+      projectRoot: projectRoot ?? '',
       name: connector.name,
       transport: connector.transport,
       command: connector.command ?? '',

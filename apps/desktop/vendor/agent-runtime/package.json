@@ -1,0 +1,14 @@
+{
+  "name": "@ur/agent-runtime",
+  "version": "1.0.3",
+  "description": "UR-Nexus agent runtime bundled for desktop",
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "require": "./index.js"
+    }
+  }
+}

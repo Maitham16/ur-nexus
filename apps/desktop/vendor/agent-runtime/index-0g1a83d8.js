@@ -1,0 +1,530 @@
+import {
+  createOpenAISSEMessageStream,
+  fetchWithProviderReliability,
+  init_providerHttp,
+  init_streamingAdapters,
+  mergeAbortSignals,
+  normalizeOpenAICompatibleBaseUrl
+} from "./index-d9nwsx95.js";
+import {
+  ProviderCapabilityError,
+  ProviderResponseParseError,
+  init_providerClient
+} from "./index-133awary.js";
+import {
+  __esm
+} from "./index-8rxa073f.js";
+
+// src/services/api/openaiCompatible.ts
+import { randomUUID } from "crypto";
+async function createOpenAICompatibleClient(options) {
+  const endpoint = normalizeOpenAICompatibleBaseUrl(options.baseUrl);
+  const maxRetries = options.maxRetries;
+  async function doRequest(params, requestOptions) {
+    const response = await fetchWithProviderReliability(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {},
+        ...requestOptions?.headers ?? {}
+      },
+      body: JSON.stringify(toOpenAICompatibleRequest(params))
+    }, {
+      maxRetries,
+      timeoutMs: requestOptions?.timeoutMs,
+      signal: requestOptions?.signal,
+      failureMessage: (response2, body) => `OpenAI-compatible request failed for ${endpoint} (${response2.status}): ${body || response2.statusText}`
+    });
+    const data = await response.json();
+    return {
+      response,
+      data: parseOpenAICompatibleResponse(data, params.model)
+    };
+  }
+  async function doStream(params, requestOptions, controller) {
+    const streamController = controller ?? new AbortController;
+    const signal = mergeAbortSignals([requestOptions?.signal, streamController.signal]);
+    const response = await fetchWithProviderReliability(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {},
+        ...requestOptions?.headers ?? {}
+      },
+      body: JSON.stringify(toOpenAICompatibleRequest({ ...params, stream: true }))
+    }, {
+      maxRetries,
+      timeoutMs: requestOptions?.timeoutMs,
+      signal,
+      failureMessage: (response2, body) => `OpenAI-compatible streaming request failed for ${endpoint} (${response2.status}): ${body || response2.statusText}`
+    });
+    const requestId = response.headers.get("x-request-id") ?? response.headers.get("x-request-id".toLowerCase()) ?? `openai-compatible-${randomUUID()}`;
+    return {
+      response,
+      requestId,
+      data: createOpenAISSEMessageStream(response.body, {
+        controller: streamController,
+        signal,
+        model: params.model,
+        requestId,
+        providerName: "openai-compatible"
+      })
+    };
+  }
+  return {
+    beta: {
+      messages: {
+        create(params, requestOptions) {
+          if (params.stream) {
+            const controller = new AbortController;
+            const requestPromise = doStream(params, requestOptions, controller);
+            return {
+              async withResponse() {
+                const { response, data, requestId } = await requestPromise;
+                return {
+                  data,
+                  response,
+                  request_id: requestId
+                };
+              },
+              controller
+            };
+          }
+          return doRequest(params, requestOptions).then(({ data }) => data);
+        },
+        async countTokens(params) {
+          return {
+            input_tokens: Math.ceil(JSON.stringify(params.messages ?? []).length / 4)
+          };
+        }
+      }
+    }
+  };
+}
+function toOpenAICompatibleRequest(params) {
+  const tools = toOpenAITools(params.tools);
+  return {
+    model: params.model,
+    messages: toOpenAIMessages(params),
+    max_tokens: params.max_tokens,
+    ...params.temperature !== undefined && { temperature: params.temperature },
+    stream: Boolean(params.stream),
+    ...tools.length > 0 ? { tools } : {},
+    ...params.tool_choice !== undefined ? { tool_choice: mapOpenAIToolChoice(params.tool_choice) } : {}
+  };
+}
+function toOpenAIMessages(params, providerName = "openai-compatible") {
+  const messages = [];
+  const system = systemToText(params.system, providerName);
+  if (system) {
+    messages.push({ role: "system", content: system });
+  }
+  const toolNamesById = collectToolNamesById(params.messages);
+  for (const message of params.messages ?? []) {
+    messages.push(...messageToOpenAIMessages(message, toolNamesById, providerName));
+  }
+  return messages;
+}
+function systemToText(system, providerName = "provider") {
+  if (!system)
+    return "";
+  assertNoImageBlocks(system, providerName, "system content");
+  if (typeof system === "string")
+    return system;
+  if (Array.isArray(system)) {
+    return system.map((block) => block?.text ?? "").join(`
+
+`);
+  }
+  return "";
+}
+function contentToText(content) {
+  if (typeof content === "string")
+    return content;
+  if (!Array.isArray(content))
+    return "";
+  return content.map((block) => {
+    if (typeof block === "string")
+      return block;
+    if (block?.type === "text")
+      return block.text ?? "";
+    if (block?.type === "tool_result")
+      return contentToText(block.content);
+    return "";
+  }).join(`
+`);
+}
+function assertNoImageBlocks(content, providerName, context) {
+  if (!containsImageBlock(content))
+    return;
+  throw new ProviderCapabilityError(`${providerName} does not support image content in ${context}`, { providerName, capability: "multimodal_input", context });
+}
+function containsImageBlock(content) {
+  if (!Array.isArray(content))
+    return false;
+  return content.some((block) => {
+    if (block?.type === "image")
+      return true;
+    if (block?.type === "tool_result")
+      return containsImageBlock(block.content);
+    return false;
+  });
+}
+function normalizeImageBlockSource(block, providerName, context) {
+  if (block?.type !== "image") {
+    throw new ProviderCapabilityError(`${providerName} expected an image block in ${context}`, { providerName, capability: "multimodal_input", context, block });
+  }
+  const source = block.source;
+  if (!source || typeof source !== "object") {
+    throw new ProviderCapabilityError(`${providerName} received an image block without a source in ${context}`, { providerName, capability: "multimodal_input", context, block });
+  }
+  if (source.type === "base64") {
+    const mediaType = source.media_type ?? source.mediaType;
+    if (typeof mediaType !== "string" || mediaType.length === 0) {
+      throw new ProviderCapabilityError(`${providerName} image block in ${context} is missing media_type`, { providerName, capability: "multimodal_input", context, block });
+    }
+    if (typeof source.data !== "string" || source.data.length === 0) {
+      throw new ProviderCapabilityError(`${providerName} image block in ${context} is missing base64 data`, { providerName, capability: "multimodal_input", context, block });
+    }
+    return {
+      type: "base64",
+      mediaType,
+      data: source.data
+    };
+  }
+  if (source.type === "url") {
+    if (typeof source.url !== "string" || source.url.length === 0) {
+      throw new ProviderCapabilityError(`${providerName} image block in ${context} is missing a URL`, { providerName, capability: "multimodal_input", context, block });
+    }
+    const mediaType = source.media_type ?? source.mediaType;
+    return {
+      type: "url",
+      url: source.url,
+      ...typeof mediaType === "string" && mediaType.length > 0 ? { mediaType } : {}
+    };
+  }
+  throw new ProviderCapabilityError(`${providerName} does not support image source type "${String(source.type)}" in ${context}`, { providerName, capability: "multimodal_input", context, block });
+}
+function imageBlockToOpenAIContentPart(block, providerName, context) {
+  const source = normalizeImageBlockSource(block, providerName, context);
+  const url = source.type === "base64" ? `data:${source.mediaType};base64,${source.data}` : source.url;
+  return {
+    type: "image_url",
+    image_url: { url }
+  };
+}
+function toOpenAITools(tools) {
+  if (!Array.isArray(tools))
+    return [];
+  const result = [];
+  for (const tool of tools) {
+    const mapped = toOpenAITool(tool);
+    if (mapped)
+      result.push(mapped);
+  }
+  return result;
+}
+function mapOpenAIToolChoice(toolChoice) {
+  if (toolChoice === undefined || toolChoice === null)
+    return;
+  if (typeof toolChoice === "string") {
+    return toolChoice === "any" ? "required" : toolChoice;
+  }
+  if (toolChoice.type === "function") {
+    return toolChoice;
+  }
+  switch (toolChoice.type) {
+    case "auto":
+      return "auto";
+    case "any":
+      return "required";
+    case "none":
+      return "none";
+    case "tool":
+      if (typeof toolChoice.name !== "string" || toolChoice.name.length === 0) {
+        throw new Error("Invalid tool_choice: Anthropic tool choice requires a tool name");
+      }
+      return { type: "function", function: { name: toolChoice.name } };
+    default:
+      return toolChoice;
+  }
+}
+function parseOpenAICompatibleResponse(data, fallbackModel, providerName = "openai-compatible") {
+  const choice = data.choices?.[0];
+  const content = parseOpenAIMessageContent(choice?.message, choice?.text, providerName);
+  const includesToolUse = hasToolUse(content);
+  if (isOpenAIToolStopReason(choice?.finish_reason) && !includesToolUse) {
+    throw new ProviderResponseParseError(`${providerName} response finished with ${choice?.finish_reason} but did not include a tool call`, { choice });
+  }
+  return {
+    id: data.id ?? `${providerName}-${randomUUID()}`,
+    type: "message",
+    role: "assistant",
+    model: data.model ?? fallbackModel,
+    content,
+    stop_reason: mapOpenAIStopReason(choice?.finish_reason, includesToolUse),
+    stop_sequence: null,
+    usage: {
+      input_tokens: data.usage?.prompt_tokens ?? 0,
+      output_tokens: data.usage?.completion_tokens ?? 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0
+    }
+  };
+}
+function mapOpenAIStopReason(reason, includesToolUse = false) {
+  if (includesToolUse || isOpenAIToolStopReason(reason)) {
+    return "tool_use";
+  }
+  switch (reason) {
+    case "length":
+      return "max_tokens";
+    case "stop":
+    case "end":
+    case "end_turn":
+    case undefined:
+      return "end_turn";
+    default:
+      return "end_turn";
+  }
+}
+function isOpenAIToolStopReason(reason) {
+  return reason === "tool_calls" || reason === "function_call" || reason === "tool_use";
+}
+function toOpenAITool(tool) {
+  if (tool?.type === "function" && typeof tool.function?.name === "string" && tool.function.name.length > 0) {
+    return {
+      type: "function",
+      function: {
+        name: tool.function.name,
+        ...tool.function.description !== undefined && {
+          description: tool.function.description
+        },
+        parameters: sanitizeJsonSchema(tool.function.parameters)
+      }
+    };
+  }
+  if (typeof tool?.name !== "string" || !("input_schema" in tool)) {
+    return null;
+  }
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      ...tool.description !== undefined && { description: tool.description },
+      parameters: sanitizeJsonSchema(tool.input_schema)
+    }
+  };
+}
+function collectToolNamesById(messages) {
+  const names = new Map;
+  for (const message of messages ?? []) {
+    if (!Array.isArray(message?.content))
+      continue;
+    for (const block of message.content) {
+      if (block?.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
+        names.set(block.id, block.name);
+      }
+    }
+  }
+  return names;
+}
+function messageToOpenAIMessages(message, toolNamesById, providerName) {
+  const content = message?.content;
+  if (typeof content === "string") {
+    return [{ role: message.role, content }];
+  }
+  if (!Array.isArray(content)) {
+    return [{ role: message.role, content: "" }];
+  }
+  const textParts = [];
+  const multimodalParts = [];
+  let pendingTextParts = [];
+  let hasImageContent = false;
+  const toolCalls = [];
+  const toolResults = [];
+  const flushTextPart = () => {
+    if (pendingTextParts.length === 0)
+      return;
+    const text2 = pendingTextParts.join(`
+`);
+    if (text2.length > 0) {
+      multimodalParts.push({ type: "text", text: text2 });
+    }
+    pendingTextParts = [];
+  };
+  for (const [index, block] of content.entries()) {
+    if (typeof block === "string") {
+      textParts.push(block);
+      pendingTextParts.push(block);
+      continue;
+    }
+    switch (block?.type) {
+      case "text":
+        textParts.push(block.text ?? "");
+        pendingTextParts.push(block.text ?? "");
+        break;
+      case "image":
+        flushTextPart();
+        multimodalParts.push(imageBlockToOpenAIContentPart(block, providerName, `messages[].content[${index}]`));
+        hasImageContent = true;
+        break;
+      case "tool_use":
+        toolCalls.push({
+          id: block.id,
+          type: "function",
+          function: {
+            name: block.name,
+            arguments: JSON.stringify(block.input ?? {})
+          }
+        });
+        break;
+      case "tool_result":
+        assertNoImageBlocks(block.content, providerName, `tool_result ${block.tool_use_id ?? index} content`);
+        toolResults.push({
+          role: "tool",
+          tool_call_id: block.tool_use_id,
+          content: contentToText(block.content),
+          ...toolNamesById.get(block.tool_use_id) ? { name: toolNamesById.get(block.tool_use_id) } : {}
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  const text = textParts.join(`
+`);
+  flushTextPart();
+  const messageContent = hasImageContent ? multimodalParts : text;
+  if (message.role === "assistant" && toolCalls.length > 0) {
+    return [
+      {
+        role: "assistant",
+        content: hasImageContent ? messageContent : text || null,
+        tool_calls: toolCalls
+      }
+    ];
+  }
+  if (toolResults.length > 0) {
+    const result = [];
+    if (hasImageContent) {
+      result.push({ role: message.role, content: messageContent });
+    } else if (text) {
+      result.push({ role: message.role, content: text });
+    }
+    result.push(...toolResults);
+    return result;
+  }
+  return [{ role: message.role, content: messageContent }];
+}
+function parseOpenAIMessageContent(message, legacyText, providerName) {
+  const content = [];
+  const reasoning = typeof message?.reasoning_content === "string" ? message.reasoning_content : typeof message?.reasoning === "string" ? message.reasoning : "";
+  if (reasoning.length > 0) {
+    content.push({ type: "thinking", thinking: reasoning });
+  }
+  const text = openAIMessageText(message?.content, legacyText);
+  if (text.length > 0) {
+    content.push({ type: "text", text });
+  }
+  const toolCalls = parseOpenAIToolCalls(message?.tool_calls, `${providerName} choices[0].message.tool_calls`);
+  content.push(...toolCalls);
+  if (message?.function_call !== undefined) {
+    content.push(parseLegacyOpenAIFunctionCall(message.function_call, `${providerName} choices[0].message.function_call`));
+  }
+  return content.length > 0 ? content : [{ type: "text", text: "" }];
+}
+function openAIMessageText(content, legacyText) {
+  if (typeof content === "string")
+    return content;
+  if (Array.isArray(content)) {
+    return content.map((block) => {
+      if (typeof block === "string")
+        return block;
+      if (block?.type === "text")
+        return block.text ?? "";
+      return "";
+    }).join("");
+  }
+  if (typeof legacyText === "string")
+    return legacyText;
+  return "";
+}
+function parseOpenAIToolCalls(toolCalls, path) {
+  if (toolCalls === undefined || toolCalls === null)
+    return [];
+  if (!Array.isArray(toolCalls)) {
+    throw new ProviderResponseParseError(`${path} must be an array`, { toolCalls });
+  }
+  return toolCalls.map((toolCall, index) => parseOpenAIToolCall(toolCall, `${path}[${index}]`));
+}
+function parseOpenAIToolCall(toolCall, path) {
+  if (toolCall?.type !== undefined && toolCall.type !== "function") {
+    throw new ProviderResponseParseError(`${path} has unsupported tool call type`, {
+      toolCall
+    });
+  }
+  if (typeof toolCall?.id !== "string" || toolCall.id.length === 0) {
+    throw new ProviderResponseParseError(`${path} is missing a tool call id`, {
+      toolCall
+    });
+  }
+  const fn = toolCall.function;
+  if (typeof fn?.name !== "string" || fn.name.length === 0) {
+    throw new ProviderResponseParseError(`${path}.function.name is required`, {
+      toolCall
+    });
+  }
+  return {
+    type: "tool_use",
+    id: toolCall.id,
+    name: fn.name,
+    input: parseToolArguments(fn.arguments, `${path}.function.arguments`)
+  };
+}
+function parseLegacyOpenAIFunctionCall(functionCall, path) {
+  if (typeof functionCall?.name !== "string" || functionCall.name.length === 0) {
+    throw new ProviderResponseParseError(`${path}.name is required`, { functionCall });
+  }
+  return {
+    type: "tool_use",
+    id: `function_call_${randomUUID()}`,
+    name: functionCall.name,
+    input: parseToolArguments(functionCall.arguments, `${path}.arguments`)
+  };
+}
+function parseToolArguments(args, path) {
+  if (args === undefined || args === null || args === "")
+    return {};
+  if (typeof args !== "string")
+    return args;
+  try {
+    return JSON.parse(args);
+  } catch (error) {
+    throw new ProviderResponseParseError(`${path} is not valid JSON`, {
+      args,
+      cause: error
+    });
+  }
+}
+function hasToolUse(content) {
+  return content.some((block) => block?.type === "tool_use");
+}
+function sanitizeJsonSchema(schema) {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return { type: "object", properties: {} };
+  }
+  const clone = JSON.parse(JSON.stringify(schema));
+  delete clone.cache_control;
+  delete clone.strict;
+  delete clone.defer_loading;
+  delete clone.eager_input_streaming;
+  return clone;
+}
+var init_openaiCompatible = __esm(() => {
+  init_providerClient();
+  init_streamingAdapters();
+  init_providerHttp();
+});
+
+export { createOpenAICompatibleClient, toOpenAICompatibleRequest, toOpenAIMessages, systemToText, contentToText, assertNoImageBlocks, containsImageBlock, normalizeImageBlockSource, imageBlockToOpenAIContentPart, toOpenAITools, mapOpenAIToolChoice, parseOpenAICompatibleResponse, mapOpenAIStopReason, init_openaiCompatible };

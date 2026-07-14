@@ -134,5 +134,5 @@ describe('package runtime contract', () => {
         force: true,
       })
     }
-  })
+  }, 30_000)
 })

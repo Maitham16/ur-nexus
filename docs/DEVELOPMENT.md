@@ -97,7 +97,7 @@ ur --version
 This package is configured for install without cloning:
 
 ```sh
-bun add -g github:Maitham16/UR
+bun add -g github:Maitham16/ur-nexus
 ```
 
 The package exposes the global `ur` command from `bin/ur.js`. That launcher reads `package.json` for version and repository metadata, then runs `src/entrypoints/cli.tsx` with Bun.

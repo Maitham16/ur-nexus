@@ -14,7 +14,7 @@ import type { MarketplaceSource } from './schemas.js'
  */
 export const OFFICIAL_MARKETPLACE_SOURCE = {
   source: 'github',
-  repo: 'Maitham16/UR',
+  repo: 'Maitham16/ur-nexus',
 } as const satisfies MarketplaceSource
 
 /**

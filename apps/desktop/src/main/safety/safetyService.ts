@@ -1,14 +1,13 @@
 import * as path from 'node:path'
 import { homedir } from 'node:os'
+import { realpathSync } from 'node:fs'
 import {
   evaluateShellSafetyPolicy,
   loadProjectSafetyPolicy,
   pathIsInsideWorkspace,
   type ProjectSafetyPolicy,
   type ShellSafetyEvaluation,
-  type PermissionClass,
   checkPathSafetyForAutoEdit,
-  pathInWorkingPath,
   DANGEROUS_FILES,
 } from '@ur/agent-runtime'
 
@@ -96,9 +95,14 @@ const MACOS_SENSITIVE_DIRS = [
 ]
 
 function resolveCwd(ctx: RunContext): string {
-  return ctx.worktreeRoot && ctx.worktreeRoot !== ctx.projectRoot
+  const raw = ctx.worktreeRoot && ctx.worktreeRoot !== ctx.projectRoot
     ? ctx.worktreeRoot
     : ctx.projectRoot
+  try {
+    return realpathSync(raw)
+  } catch {
+    return raw
+  }
 }
 
 function isMacOSSensitivePath(absolutePath: string): { sensitive: boolean; reason?: string } {
@@ -115,7 +119,8 @@ function isMacOSSensitivePath(absolutePath: string): { sensitive: boolean; reaso
     !normalized.startsWith(home) &&
     !normalized.startsWith('/tmp') &&
     !normalized.startsWith('/private/tmp') &&
-    !normalized.startsWith('/var/folders')
+    !normalized.startsWith('/var/folders') &&
+    !normalized.startsWith('/private/var/folders')
 
   for (const sensitive of MACOS_SENSITIVE_DIRS) {
     if (normalized === sensitive || normalized.startsWith(sensitive + path.sep)) {

@@ -4,10 +4,10 @@
   "description": "Drive GitLab from UR: review and open merge requests, triage issues, and watch CI/CD pipelines — through GitLab's official MCP server or the glab CLI.",
   "author": {
     "name": "Maitham Al-rubaye",
-    "url": "https://github.com/Maitham16/UR"
+    "url": "https://github.com/Maitham16/ur-nexus"
   },
-  "homepage": "https://github.com/Maitham16/UR/tree/master/plugins/core/gitlab",
-  "repository": "https://github.com/Maitham16/UR",
+  "homepage": "https://github.com/Maitham16/ur-nexus/tree/master/plugins/core/gitlab",
+  "repository": "https://github.com/Maitham16/ur-nexus",
   "license": "LicenseRef-UR-AGENT-Non-Commercial-Self-Responsibility",
   "keywords": ["gitlab", "merge-request", "issues", "ci-cd", "pipeline", "mcp"],
   "mcpServers": {

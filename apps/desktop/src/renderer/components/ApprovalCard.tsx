@@ -1,4 +1,5 @@
 import type { ApprovalScope } from '../../shared/ipc.js'
+import { Icon } from './Icon.js'
 
 export interface ApprovalCardProps {
   actionType?: string
@@ -30,7 +31,7 @@ export function ApprovalCard({
 
   return (
     <div className={`message approval ${riskClass}`}>
-      <div className="message-meta">⏸ {title}</div>
+      <div className="message-meta"><Icon name="shield" size={13} /> {title}</div>
       {target && target !== toolName && (
         <div className="approval-target">{target}</div>
       )}
@@ -50,6 +51,8 @@ export function ApprovalCard({
           <button className="button" onClick={() => onApprove(true, 'once')}>Allow once</button>
           &nbsp;
           <button className="button" onClick={() => onApprove(true, 'run')}>Allow for this run</button>
+          &nbsp;
+          <button className="button button-secondary" onClick={() => onApprove(true, 'session')}>Allow for app session</button>
           &nbsp;
           <button className="button button-secondary" onClick={() => onApprove(false)}>Deny</button>
         </div>

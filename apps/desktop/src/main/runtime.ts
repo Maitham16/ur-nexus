@@ -1,3 +1,5 @@
+import './vendorGlobals.js'
+import type Electron from 'electron'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
@@ -9,18 +11,16 @@ import {
   pauseRun,
   resumeRun,
   listTools,
-  listProviders,
   listModels,
   setProvider,
   applyPatch,
   readHistory,
+  setCwd,
 } from '@ur/agent-runtime'
 import type {
   RuntimeProject,
   RuntimeSession,
   RuntimeToolInfo,
-  RuntimeProviderInfo,
-  RuntimeModelInfo,
   ProviderId,
   RuntimeToolDefinition,
 } from '@ur/agent-runtime'
@@ -33,7 +33,7 @@ import {
   testDesktopProviderConnection,
   listDesktopProviderModels,
   activateDesktopProvider,
-  type DesktopProviderKind,
+  parseDesktopProviderKind,
 } from './providers/providerService.js'
 import type {
   DesktopProviderInfoDto,
@@ -45,6 +45,7 @@ import type {
 import {
   addRecentProject,
   listRecentProjects,
+  removeRecentProject as removeStoredRecentProject,
 } from './projectStore.js'
 import { inspectProject } from './projectDetector.js'
 import type { ProjectInfoDto, WorktreeInfoDto, TaskInfoDto, AgentInfoDto } from '../shared/ipc.js'
@@ -63,13 +64,11 @@ import {
 } from './terminalManager.js'
 import {
   createTask,
-  createAgent,
   startTask,
   setTaskProgress,
   completeTask,
   failTask,
   setTaskWaitingApproval,
-  skipTask,
   resolveTaskApproval,
   addTaskChangedFile,
   setTaskVerification,
@@ -78,7 +77,6 @@ import {
   setAgentWaitingApproval,
   finishAgent,
   failAgent,
-  canRunAnotherAgent,
   setMaxParallelAgents,
   getMaxParallelAgents,
   toTaskDto,
@@ -89,12 +87,26 @@ import {
 
 export { RuntimeProject, RuntimeSession }
 
-import type { ApprovalScope } from '../shared/ipc.js'
+// The CLI enables config reads during startup; the desktop main process must
+// do the same before any session touches provider/model configuration.
+import { enableConfigs } from '@ur/agent-runtime'
+try {
+  enableConfigs()
+} catch (err) {
+  console.warn(
+    `[runtime] enableConfigs failed: ${err instanceof Error ? err.message : String(err)}`,
+  )
+}
+
+import type {
+  AgentPermissionSettingsDto,
+  ApprovalScope,
+  StartRunOptionsDto,
+} from '../shared/ipc.js'
 import {
   evaluateToolUse,
   evaluateShellCommand,
   evaluateFileWrite,
-  evaluateFileDelete,
   evaluateFileRead,
   evaluateLongRunningCommand,
   evaluateProviderKeyReplacement,
@@ -102,7 +114,28 @@ import {
   type ActionType,
 } from './safety/safetyService.js'
 import { appendApprovalLog } from './safety/approvalLog.js'
-import { dialog, BrowserWindow } from 'electron'
+import { getElectron } from './electronModule.js'
+import { buildPromptContext, clearContextFiles } from './contextFiles.js'
+import { RunUsageTracker, type RawUsage } from './usage.js'
+import { createCheckpoint, type CreateCheckpointOptions } from './checkpoints.js'
+import {
+  initRunState,
+  patchRunState,
+  appendCompletedToolCall,
+  addPendingApproval,
+  removePendingApproval,
+} from './sessions/runState.js'
+
+/** Checkpointing must never break the operation it protects. */
+async function safeCheckpoint(options: CreateCheckpointOptions): Promise<void> {
+  try {
+    await createCheckpoint(options)
+  } catch (err) {
+    console.warn(
+      `[checkpoints] failed to snapshot (${options.reason}): ${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+}
 import {
   appendRun,
   updateRun,
@@ -114,6 +147,11 @@ import {
   type RunRecord,
 } from './historyStore.js'
 import { buildRunReport, buildReportMarkdown, buildReportJson, type RunReport } from './reportBuilder.js'
+import {
+  applyAgentPermissionSettings,
+  getAgentPermissionSettings,
+  normalizeAgentPermissionSettings,
+} from './permissionSettings.js'
 
 export interface RuntimeRun {
   runId: string
@@ -124,11 +162,14 @@ export interface RuntimeRun {
   status: 'idle' | 'running' | 'paused' | 'stopped' | 'failed' | 'finished'
   __canUseTool?: import('@ur/agent-runtime').CanUseToolFn
   allowedActions: Set<string>
+  permissions: AgentPermissionSettingsDto
+  usageTracker?: RunUsageTracker
 }
 
 const projects = new Map<string, RuntimeProject>()
 const sessions = new Map<string, RuntimeSession>()
 const runs = new Map<string, RuntimeRun>()
+const sessionAllowedActions = new Set<string>()
 const pendingApprovals = new Map<
   string,
   { resolve: (value: { approved: boolean; scope: ApprovalScope }) => void; timeout: NodeJS.Timeout }
@@ -136,6 +177,10 @@ const pendingApprovals = new Map<
 
 export async function openProjectAndCache(root: string): Promise<{ root: string }> {
   const normalized = path.resolve(root)
+  const stat = await fs.stat(normalized).catch(() => null)
+  if (!stat || !stat.isDirectory()) {
+    throw new Error(`Not a directory: ${normalized}`)
+  }
   if (!projects.has(normalized)) {
     const project = await openProject(normalized)
     projects.set(normalized, project)
@@ -144,10 +189,20 @@ export async function openProjectAndCache(root: string): Promise<{ root: string 
   return { root: normalized }
 }
 
+export function closeProject(root: string): void {
+  const normalized = path.resolve(root)
+  projects.delete(normalized)
+  clearContextFiles(normalized)
+}
+
 export async function listProjects(): Promise<
   { root: string; name: string; lastOpenedAt: number }[]
 > {
   return listRecentProjects()
+}
+
+export async function removeRecentProject(root: string): Promise<void> {
+  await removeStoredRecentProject(path.resolve(root))
 }
 
 export async function getProjectInfo(root: string): Promise<ProjectInfoDto> {
@@ -162,7 +217,7 @@ export async function createRunWorktree(
   try {
     const worktree = await createIsolatedWorktree(project.root, branch)
     return { root: worktree.root, branch: worktree.branch, isMain: false }
-  } catch (err) {
+  } catch {
     // Fallback: return main workspace so caller can switch to patch proposal mode.
     return { root: project.root, branch: 'main', isMain: true }
   }
@@ -178,10 +233,13 @@ export function listWorktrees(projectRoot: string): WorktreeInfoDto[] {
 
 export async function startRun(
   projectRoot: string,
-  options: { useWorktree?: boolean; branch?: string } = {},
+  options: StartRunOptionsDto = {},
 ): Promise<{ runId: string; sessionId: string; projectRoot: string; worktreeRoot?: string }> {
   const project = getProject(projectRoot)
   const runId = randomUUID()
+  const permissions = options.permissions
+    ? normalizeAgentPermissionSettings(options.permissions)
+    : await getAgentPermissionSettings()
 
   // Create the run record early so the permission hook can reference it.
   const run: RuntimeRun = {
@@ -192,6 +250,7 @@ export async function startRun(
     changedFiles: new Set(),
     status: 'idle',
     allowedActions: new Set(),
+    permissions,
   }
   runs.set(runId, run)
 
@@ -211,13 +270,32 @@ export async function startRun(
   })
 
   const { ensureConnectorClientsConnected } = await import('./connectors/connectorService.js')
-  await ensureConnectorClientsConnected(projectRoot)
+  try {
+    await ensureConnectorClientsConnected(projectRoot)
+  } catch (err) {
+    // Best-effort: MCP connector config may not be available in test/headless
+    // environments. The run can proceed without connectors.
+    void err
+  }
 
   const appState = project.appStateStore.getState()
   const providerSettings = (appState.provider ?? {}) as {
     active?: string
     model?: string
   }
+  run.usageTracker = new RunUsageTracker(
+    providerSettings.active,
+    providerSettings.model,
+  )
+  await initRunState({
+    runId,
+    projectRoot,
+    worktreeRoot: run.worktreeRoot,
+    provider: {
+      providerId: providerSettings.active,
+      model: providerSettings.model,
+    },
+  })
 
   await appendRun({
     runId,
@@ -237,9 +315,8 @@ export async function startRun(
     tool,
     input,
   ) => {
-    const additionalDirectories = project.appStateStore.getState().permissions?.additionalDirectories
-    const evaluation = await evaluateToolUse(
-      { runId, projectRoot, worktreeRoot: run.worktreeRoot, additionalDirectories },
+    const evaluation = await evaluateRunToolUse(
+      run,
       {
         name: tool.name,
         isMcp: tool.isMcp,
@@ -249,8 +326,15 @@ export async function startRun(
       input as Record<string, unknown>,
     )
 
+    const updatedInput =
+      tool.name === 'Bash' && run.permissions.sandboxMode === 'danger-full-access'
+        ? { ...input, dangerouslyDisableSandbox: true }
+        : undefined
+
     if (evaluation.behavior === 'allow') {
-      return { behavior: 'allow' }
+      return updatedInput
+        ? { behavior: 'allow', updatedInput }
+        : { behavior: 'allow' }
     }
 
     if (evaluation.behavior === 'deny') {
@@ -265,10 +349,23 @@ export async function startRun(
       evaluation,
     )
     return approved.approved
-      ? { behavior: 'allow' }
+      ? updatedInput
+        ? { behavior: 'allow', updatedInput }
+        : { behavior: 'allow' }
       : { behavior: 'deny', message: 'User denied approval' }
   }
 
+  // The engine executes its tools relative to the runtime cwd, which is
+  // process-global in the vendored bundle. Point it at the run's workspace
+  // so model tool calls land in the opened project, not wherever the app
+  // process happened to start.
+  try {
+    setCwd(run.worktreeRoot ?? project.root)
+  } catch (err) {
+    console.warn(
+      `[runtime] setCwd failed: ${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
   const session = await createSession(project, { sessionId: runId, canUseTool })
   run.session = session
   sessions.set(session.sessionId, session)
@@ -304,9 +401,37 @@ export function resumeRunById(runId: string): void {
 export async function* runPromptStream(
   runId: string,
   prompt: string,
+  attachments?: string[],
 ): AsyncGenerator<import('../shared/ipc.js').RuntimeEvent> {
   const run = getRun(runId)
   run.status = 'running'
+
+  // Attached context files are read fresh at send time; unreadable
+  // attachments abort the send with a precise error instead of silently
+  // shipping a partial prompt.
+  let effectivePrompt = prompt
+  if (attachments && attachments.length > 0) {
+    const { context, failures } = await buildPromptContext(
+      run.projectRoot,
+      attachments,
+    )
+    if (failures.length > 0) {
+      const detail = failures
+        .map(f => `${f.relPath}: ${f.reason ?? f.kind}`)
+        .join('; ')
+      run.status = 'idle'
+      yield makeEvent(run, {
+        type: 'run_failed',
+        error: `Attachments could not be read — ${detail}`,
+      })
+      return
+    }
+    if (context) {
+      effectivePrompt = `${context}\n\n${prompt}`
+    }
+  }
+
+  patchRunState(runId, { pendingPrompt: prompt, status: 'running' })
 
   try {
     startTask(runId, 'task-1', 'agent-1')
@@ -349,10 +474,29 @@ export async function* runPromptStream(
       currentCommand: undefined,
     })
 
-    for await (const event of runPrompt(run.session, prompt)) {
-      const translated = translateRuntimeEvent(run, event)
-      await appendEvent(runId, translated as unknown as Record<string, unknown>)
-      yield translated
+    for await (const event of runPrompt(run.session, effectivePrompt)) {
+      const translatedEvents = translateRuntimeEvents(run, event)
+      if (translatedEvents.length === 0) {
+        // Keep full fidelity in the persisted transcript even for events
+        // that produce no UI output.
+        await appendEvent(runId, event as unknown as Record<string, unknown>)
+        continue
+      }
+      for (const translated of translatedEvents) {
+        await appendEvent(runId, translated as unknown as Record<string, unknown>)
+        if (translated.type === 'run_result') {
+          const usage = (translated as import('../shared/ipc.js').RunResultEvent).usage
+          await updateRun(runId, {
+            costUsd: usage.costUsd,
+            tokenUsage: {
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              totalTokens: usage.inputTokens + usage.outputTokens,
+            },
+          }).catch(() => undefined)
+        }
+        yield translated
+      }
     }
 
     completeTask(runId, 'task-1')
@@ -363,7 +507,24 @@ export async function* runPromptStream(
       message: 'Run completed',
     })
 
+    if (run.changedFiles.size > 0) {
+      await safeCheckpoint({
+        projectRoot: run.worktreeRoot ?? run.projectRoot,
+        reason: 'Task completed',
+        trigger: 'task-completed',
+        files: [...run.changedFiles],
+        sessionId: run.runId,
+        taskId: 'task-1',
+      })
+    }
+
     run.status = 'finished'
+    patchRunState(runId, {
+      status: 'finished',
+      lastPrompt: prompt,
+      pendingPrompt: undefined,
+      changedFiles: [...run.changedFiles],
+    })
     yield makeEvent(run, { type: 'task_done', taskId: 'task-1' })
     yield makeEvent(run, { type: 'agent_finished', agentId: 'agent-1', taskId: 'task-1' })
     yield makeEvent(run, {
@@ -387,6 +548,7 @@ export async function* runPromptStream(
   } catch (error) {
     run.status = 'failed'
     const message = error instanceof Error ? error.message : String(error)
+    patchRunState(runId, { status: 'failed', pendingPrompt: undefined })
     failTask(runId, 'task-1', message)
     failAgent(runId, 'agent-1', message)
     yield makeEvent(run, { type: 'task_failed', taskId: 'task-1', error: message })
@@ -435,14 +597,21 @@ export async function proposeEdit(
   filePath: string,
   newText: string,
   worktreeRoot?: string,
-): Promise<{ diffId: string; patch: string }> {
+): Promise<{ diffId: string; patch: string; baseHashes: Record<string, string> }> {
   const safePath = resolveWorktreePath(projectRoot, worktreeRoot, filePath)
   const original = await fs.readFile(safePath, 'utf-8').catch(() => '')
   const diffId = randomUUID()
-  // Phase 4 placeholder: simple whole-file replacement patch.
-  const patch = `--- a/${filePath}\n+++ b/${filePath}\n@@ -1,1 +1,1 @@\n-${original.split('\n').join('\n ')}\n+${newText.split('\n').join('\n ')}\n`
-  trackChangedFile(projectRoot, filePath, worktreeRoot)
-  return { diffId, patch }
+  const patch = buildUnifiedDiff(filePath, original, newText)
+  const { hashContent } = await import('./diffs.js')
+  // Base hash lets hunk application detect stale diffs after further edits.
+  const baseHashes = { [filePath]: hashContent(original) }
+  const run = findRunByWorktree(projectRoot, worktreeRoot)
+  if (run) {
+    emitToRenderer(projectRoot, {
+      ...makeEvent(run, { type: 'diff_created', diffId, filePath, patch, baseHashes }),
+    })
+  }
+  return { diffId, patch, baseHashes }
 }
 
 export async function applyProjectPatch(
@@ -451,20 +620,64 @@ export async function applyProjectPatch(
   worktreeRoot?: string,
 ): Promise<void> {
   const project = getProject(projectRoot)
-  if (worktreeRoot && worktreeRoot !== project.root) {
-    // Fallback patch proposal mode: write the patched file content to the
-    // worktree without using the runtime applyPatch, which expects the main
-    // project. We parse a very simple whole-file diff format for the scaffold.
-    const parsed = parseSimplePatch(patch)
-    for (const [filePath, newText] of Object.entries(parsed)) {
-      const safePath = resolveWorktreePath(projectRoot, worktreeRoot, filePath)
-      await fs.mkdir(path.dirname(safePath), { recursive: true })
-      await fs.writeFile(safePath, newText, 'utf-8')
-      trackChangedFile(projectRoot, filePath, worktreeRoot)
+  const targetRoot =
+    worktreeRoot && worktreeRoot !== project.root ? worktreeRoot : project.root
+
+  const touchedFiles = parsePatchFilePaths(patch)
+  await safeCheckpoint({
+    projectRoot: targetRoot,
+    reason: `Before applying patch to ${touchedFiles.join(', ') || 'files'}`,
+    trigger: 'before-edit',
+    files: touchedFiles,
+  })
+
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const execFileAsync = promisify(execFile)
+  const os = await import('node:os')
+
+  const patchText = patch.endsWith('\n') ? patch : `${patch}\n`
+  const tmpFile = path.join(
+    os.tmpdir(),
+    `ur-desktop-patch-${randomUUID()}.patch`,
+  )
+  await fs.writeFile(tmpFile, patchText, 'utf-8')
+  try {
+    await execFileAsync(
+      'git',
+      ['apply', '--whitespace=nowarn', '--recount', tmpFile],
+      { cwd: targetRoot },
+    )
+  } catch (gitError) {
+    // Non-git targets (or malformed contexts) fall back to the runtime's
+    // patch application against the main project.
+    if (targetRoot === project.root) {
+      await applyPatch(project, patchText)
+    } else {
+      const message =
+        gitError instanceof Error ? gitError.message : String(gitError)
+      throw new Error(`Patch could not be applied in ${targetRoot}: ${message}`)
     }
-    return
+  } finally {
+    await fs.rm(tmpFile, { force: true }).catch(() => undefined)
   }
-  await applyPatch(project, patch)
+
+  for (const filePath of parsePatchFilePaths(patchText)) {
+    trackChangedFile(projectRoot, filePath, worktreeRoot)
+    const run = findRunByWorktree(projectRoot, worktreeRoot)
+    if (run) {
+      emitToRenderer(projectRoot, {
+        ...makeEvent(run, { type: 'patch_applied', diffId: '', filePath }),
+      })
+    }
+  }
+
+  await safeCheckpoint({
+    projectRoot: targetRoot,
+    reason: `After applying patch to ${touchedFiles.join(', ') || 'files'}`,
+    trigger: 'after-edit',
+    files: touchedFiles,
+  })
 }
 
 export async function runProjectCommand(
@@ -550,17 +763,23 @@ export function listProjectProviders(projectRoot: string): DesktopProviderInfoDt
 }
 
 export function listProjectModels(projectRoot: string): DesktopModelInfoDto[] {
+  // Provider config is global; a project need not be open. This synchronous
+  // path only returns statically-known/cached models — the renderer uses the
+  // async `listProjectProviderModels` for live discovery.
   const config = getDesktopProviderConfig(projectRoot)
-  // Synchronous fallback using cached/static models when available.
-  const runtimeModels = listModels(getProject(projectRoot))
-  if (runtimeModels.length > 0) {
-    return runtimeModels.map(m => ({
-      id: m.id,
-      displayName: m.displayName,
-      provider: config.providerId,
-    }))
+  const project = projectRoot ? projects.get(path.resolve(projectRoot)) : undefined
+  const runtimeModels = project ? listModels(project) : []
+  const models = runtimeModels.map(m => ({
+    id: m.id,
+    displayName: m.displayName,
+    provider: config.providerId,
+  }))
+  // Always surface the configured model even when nothing else is cached, so
+  // the dropdown is never empty for a configured provider.
+  if (config.model && !models.some(m => m.id === config.model)) {
+    models.unshift({ id: config.model, displayName: config.model, provider: config.providerId })
   }
-  return []
+  return models
 }
 
 export async function updateProjectProvider(
@@ -572,8 +791,14 @@ export async function updateProjectProvider(
   await setProvider(project, providerId as ProviderId, model)
 }
 
-export function getProjectProviderConfig(projectRoot: string): DesktopProviderConfigDto {
-  return getDesktopProviderConfig(projectRoot)
+export function getProjectProviderConfig(
+  projectRoot: string,
+  providerId?: string,
+): DesktopProviderConfigDto {
+  return getDesktopProviderConfig(
+    projectRoot,
+    providerId === undefined ? undefined : parseDesktopProviderKind(providerId),
+  )
 }
 
 export async function setProjectProviderConfig(
@@ -599,28 +824,36 @@ export async function storeProjectProviderApiKey(
   if (!approved.approved) {
     throw new Error('User denied provider key replacement')
   }
-  await storeDesktopProviderApiKey(projectRoot, providerId as DesktopProviderKind, apiKey)
+  await storeDesktopProviderApiKey(projectRoot, parseDesktopProviderKind(providerId), apiKey)
 }
 
 export async function clearProjectProviderApiKey(
   projectRoot: string,
   providerId: string,
 ): Promise<void> {
-  await clearDesktopProviderApiKey(projectRoot, providerId as DesktopProviderKind)
+  const evaluation = {
+    ...evaluateProviderKeyReplacement(providerId),
+    reason: 'Removing a provider API key disconnects that provider until a new key is added.',
+  }
+  const approved = await requestStandaloneApproval(projectRoot, evaluation)
+  if (!approved.approved) {
+    throw new Error('User denied provider key removal')
+  }
+  await clearDesktopProviderApiKey(projectRoot, parseDesktopProviderKind(providerId))
 }
 
 export async function testProjectProviderConnection(
   projectRoot: string,
   providerId: string,
 ): Promise<DesktopProviderConnectionResultDto> {
-  return testDesktopProviderConnection(projectRoot, providerId as DesktopProviderKind)
+  return testDesktopProviderConnection(projectRoot, parseDesktopProviderKind(providerId))
 }
 
 export async function listProjectProviderModels(
   projectRoot: string,
   providerId: string,
 ): Promise<DesktopModelInfoDto[]> {
-  return listDesktopProviderModels(projectRoot, providerId as DesktopProviderKind)
+  return listDesktopProviderModels(projectRoot, parseDesktopProviderKind(providerId))
 }
 
 export function setActiveProjectProvider(
@@ -628,7 +861,7 @@ export function setActiveProjectProvider(
   providerId: string,
   model?: string,
 ): { ok: true; message: string } | { ok: false; message: string } {
-  return activateDesktopProvider(projectRoot, providerId as DesktopProviderKind, model)
+  return activateDesktopProvider(projectRoot, parseDesktopProviderKind(providerId), model)
 }
 
 export async function listProjectMcpServers(
@@ -745,18 +978,14 @@ export async function exportProjectReport(
   projectRoot: string,
   worktreeRoot?: string,
 ): Promise<{ path: string }> {
-  const project = getProject(projectRoot)
-  const reportDir = worktreeRoot && worktreeRoot !== project.root
-    ? path.join(worktreeRoot, '.ur')
-    : path.join(project.root, '.ur')
-  const reportPath = path.join(reportDir, 'desktop-report.md')
-  await fs.mkdir(reportDir, { recursive: true })
-  await fs.writeFile(
-    reportPath,
-    `# UR Desktop Report\n\nGenerated ${new Date().toISOString()}\n\nProject: ${project.root}\n${worktreeRoot ? `Worktree: ${worktreeRoot}\n` : ''}`,
-    'utf-8',
-  )
-  return { path: reportPath }
+  // Export the report of the most recent run for this project (running or
+  // finished), built from the persisted transcript — not a static stub.
+  void worktreeRoot
+  const runsForProject = await listRuns({ projectRoot, limit: 1 })
+  if (runsForProject.length === 0) {
+    throw new Error('No runs recorded for this project yet')
+  }
+  return exportRunReport(projectRoot, runsForProject[0].runId, 'markdown')
 }
 
 export async function listProjectRuns(
@@ -839,22 +1068,72 @@ function actionKey(actionType: ActionType, target: string): string {
   return `${actionType}:${target}`
 }
 
-function runAllowsAction(run: RuntimeRun, actionType: ActionType, target: string): boolean {
-  return run.allowedActions.has(actionKey(actionType, target))
+function sessionActionKey(
+  projectRoot: string,
+  actionType: ActionType,
+  target: string,
+): string {
+  return `${path.resolve(projectRoot)}:${actionKey(actionType, target)}`
 }
 
-function getFocusedWindow(): BrowserWindow | null {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+function runAllowsAction(run: RuntimeRun, actionType: ActionType, target: string): boolean {
+  return run.allowedActions.has(actionKey(actionType, target)) ||
+    sessionAllowedActions.has(sessionActionKey(run.projectRoot, actionType, target))
+}
+
+async function evaluateRunToolUse(
+  run: RuntimeRun,
+  tool: {
+    name: string
+    isMcp?: boolean
+    isReadOnly?: (input?: unknown) => boolean
+    isDestructive?: (input?: unknown) => boolean
+  },
+  input: Record<string, unknown>,
+): Promise<SafetyEvaluation> {
+  const project = getProject(run.projectRoot)
+  const additionalDirectories = project.appStateStore.getState().permissions?.additionalDirectories
+  const context = {
+    runId: run.runId,
+    projectRoot: run.projectRoot,
+    worktreeRoot: run.worktreeRoot,
+    additionalDirectories,
+  }
+
+  let evaluation: SafetyEvaluation
+  if (tool.name === 'Read') {
+    evaluation = evaluateFileRead(context, String(input.path ?? input.filePath ?? ''))
+  } else if (tool.name === 'Write' || tool.name === 'Edit' || tool.name === 'ApplyPatch') {
+    evaluation = evaluateFileWrite(context, String(input.path ?? input.filePath ?? ''))
+  } else if (tool.name === 'Bash') {
+    const command = String(input.command ?? '')
+    const expectedSeconds = input.expectedSeconds === undefined
+      ? undefined
+      : Number(input.expectedSeconds)
+    evaluation = expectedSeconds !== undefined && Number.isFinite(expectedSeconds)
+      ? evaluateLongRunningCommand(context, command, expectedSeconds)
+      : evaluateShellCommand(context, command)
+  } else {
+    evaluation = await evaluateToolUse(context, tool, input)
+  }
+
+  return applyAgentPermissionSettings(evaluation, run.permissions)
+}
+
+async function getFocusedWindow(): Promise<Electron.BrowserWindow | null> {
+  const electron = await getElectron()
+  return electron.BrowserWindow.getFocusedWindow() ?? electron.BrowserWindow.getAllWindows()[0] ?? null
 }
 
 async function showNativeApprovalDialog(
   projectRoot: string,
   evaluation: SafetyEvaluation,
-  parentWindow?: BrowserWindow | null,
+  parentWindow?: Electron.BrowserWindow | null,
 ): Promise<{ approved: boolean; scope: ApprovalScope }> {
-  const win = parentWindow ?? getFocusedWindow()
+  const win = parentWindow ?? (await getFocusedWindow())
   const buttons = ['Allow once', 'Allow for this run', 'Deny']
-  const { response } = await dialog.showMessageBox(win ?? undefined, {
+  const electron = await getElectron()
+  const { response } = await electron.dialog.showMessageBox(win ?? undefined as unknown as Electron.BrowserWindow, {
     type: 'warning',
     buttons,
     defaultId: 2,
@@ -872,7 +1151,7 @@ async function showNativeApprovalDialog(
 export async function requestStandaloneApproval(
   projectRoot: string,
   evaluation: SafetyEvaluation,
-  parentWindow?: BrowserWindow,
+  parentWindow?: Electron.BrowserWindow,
 ): Promise<{ approved: boolean; scope: ApprovalScope }> {
   const requestId = randomUUID()
   const result = await showNativeApprovalDialog(projectRoot, evaluation, parentWindow)
@@ -910,6 +1189,7 @@ export async function requestApproval(
     setAgentWaitingApproval(runId, 'agent-1')
   }
 
+  addPendingApproval(runId, requestId, toolName, evaluation?.target)
   const result = await new Promise<{ approved: boolean; scope: ApprovalScope }>(resolve => {
     const timeout = setTimeout(() => {
       pendingApprovals.delete(requestId)
@@ -929,10 +1209,11 @@ export async function requestApproval(
         target: evaluation?.target,
         reason: evaluation?.reason,
         riskLevel: evaluation?.riskLevel,
-        projectRoot: run.projectRoot,
+        approvalProjectRoot: run.projectRoot,
       }),
     })
   })
+  removePendingApproval(runId, requestId)
 
   await appendApprovalLog(run.projectRoot, {
     timestamp: new Date().toISOString(),
@@ -969,6 +1250,11 @@ export async function requestApproval(
   if (result.approved && result.scope === 'run' && evaluation) {
     run.allowedActions.add(actionKey(evaluation.actionType, evaluation.target))
   }
+  if (result.approved && result.scope === 'session' && evaluation) {
+    sessionAllowedActions.add(
+      sessionActionKey(run.projectRoot, evaluation.actionType, evaluation.target),
+    )
+  }
 
   return result
 }
@@ -998,13 +1284,7 @@ export async function executeTool(
   })
 
   if (!opts.skipApproval) {
-    const project = getProject(run.projectRoot)
-    const additionalDirectories = project.appStateStore.getState().permissions?.additionalDirectories
-    const evaluation = await evaluateToolUse(
-      { runId, projectRoot: run.projectRoot, worktreeRoot: run.worktreeRoot, additionalDirectories },
-      { name: toolName },
-      input,
-    )
+    const evaluation = await evaluateRunToolUse(run, { name: toolName }, input)
     if (evaluation.behavior === 'deny') {
       setAgentProgress(runId, 'agent-1', {
         message: `Tool denied: ${toolName}`,
@@ -1043,22 +1323,33 @@ export async function executeTool(
   }
 
   try {
-    const { requestToolCall } = await import('@ur/agent-runtime') as {
-      requestToolCall?: (session: RuntimeSession, toolName: string, input: Record<string, unknown>) => Promise<unknown>
-    }
-
-    let result: unknown
-    if (requestToolCall) {
-      result = await requestToolCall(run.session, toolName, input)
-    } else {
-      result = await executeToolLocal(run, toolName, input)
-    }
+    // Always execute through the local tool implementations. The bundled
+    // runtime's requestToolCall acknowledges the request without performing
+    // it (static success), which is exactly the kind of fake behavior the
+    // desktop app must not rely on.
+    const result: unknown = await executeToolLocal(run, toolName, input, {
+      permissionChecked: !opts.skipApproval,
+    })
 
     if (toolName === 'Write' || toolName === 'Edit' || toolName === 'ApplyPatch') {
       const filePath = String(input.path ?? input.filePath ?? '')
       if (filePath) {
         trackChangedFile(run.projectRoot, filePath, run.worktreeRoot)
         addTaskChangedFile(runId, taskId, filePath)
+      }
+    }
+
+    // Side-effecting tool completions are persisted so an interrupted run
+    // can be resumed without repeating them.
+    const SIDE_EFFECT_TOOLS = new Set(['Write', 'Edit', 'ApplyPatch', 'Bash', 'EnterWorktree'])
+    if (SIDE_EFFECT_TOOLS.has(toolName)) {
+      const denied = typeof result === 'object' && result !== null && 'denied' in result
+      if (!denied) {
+        appendCompletedToolCall(
+          runId,
+          toolName,
+          String(input.path ?? input.filePath ?? input.command ?? ''),
+        )
       }
     }
 
@@ -1099,6 +1390,7 @@ async function executeToolLocal(
   run: RuntimeRun,
   toolName: string,
   input: Record<string, unknown>,
+  opts: { permissionChecked?: boolean } = {},
 ): Promise<unknown> {
   const projectRoot = run.projectRoot
   const worktreeRoot = run.worktreeRoot
@@ -1112,10 +1404,10 @@ async function executeToolLocal(
         { runId: run.runId, projectRoot, worktreeRoot, additionalDirectories },
         filePath,
       )
-      if (readEval.behavior === 'deny') {
+      if (!opts.permissionChecked && readEval.behavior === 'deny') {
         return { denied: true, error: readEval.reason }
       }
-      if (readEval.behavior === 'ask') {
+      if (!opts.permissionChecked && readEval.behavior === 'ask') {
         const approved = await requestApproval(run.runId, toolName, input, 'task-1', readEval)
         if (!approved.approved) {
           return { denied: true, error: 'User denied approval' }
@@ -1129,18 +1421,29 @@ async function executeToolLocal(
     }
     case 'Glob': {
       const pattern = String(input.pattern ?? '')
-      const { glob } = await import('node:fs/promises')
       const cwd = resolveWorktreePath(projectRoot, worktreeRoot, '.')
-      const files = await glob(pattern, { cwd })
+      // Electron's embedded Node (20.x) has no fs.glob; use the local walker.
+      const files = await globProjectFiles(cwd, pattern)
       return { files }
     }
     case 'Grep': {
-      const pattern = String(input.pattern ?? '')
-      return runProjectCommand(
-        projectRoot,
-        `grep -Rin "${pattern.replace(/"/g, '\\"')}" .`,
-        worktreeRoot,
-      )
+      const { runSearch } = await import('./search.js')
+      const searchRoot = resolveWorktreePath(projectRoot, worktreeRoot, '.')
+      const result = await runSearch({
+        projectRoot: searchRoot,
+        pattern: String(input.pattern ?? ''),
+        fixed: input.fixed === true,
+        caseSensitive: input.caseSensitive !== false,
+        include:
+          typeof input.include === 'string'
+            ? [input.include]
+            : (input.include as string[] | undefined),
+        exclude:
+          typeof input.exclude === 'string'
+            ? [input.exclude]
+            : (input.exclude as string[] | undefined),
+      })
+      return result
     }
     case 'Bash': {
       const command = String(input.command ?? '')
@@ -1156,10 +1459,10 @@ async function executeToolLocal(
             { runId: run.runId, projectRoot, worktreeRoot },
             command,
           )
-      if (bashEval.behavior === 'deny') {
+      if (!opts.permissionChecked && bashEval.behavior === 'deny') {
         return { denied: true, error: bashEval.reason }
       }
-      if (bashEval.behavior === 'ask') {
+      if (!opts.permissionChecked && bashEval.behavior === 'ask') {
         const approved = await requestApproval(run.runId, toolName, input, 'task-1', bashEval)
         if (!approved.approved) {
           return { denied: true, error: 'User denied approval' }
@@ -1177,15 +1480,22 @@ async function executeToolLocal(
         { runId: run.runId, projectRoot, worktreeRoot },
         filePath,
       )
-      if (writeEval.behavior === 'deny') {
+      if (!opts.permissionChecked && writeEval.behavior === 'deny') {
         return { denied: true, error: writeEval.reason }
       }
-      if (writeEval.behavior === 'ask') {
+      if (!opts.permissionChecked && writeEval.behavior === 'ask') {
         const approved = await requestApproval(run.runId, toolName, input, 'task-1', writeEval)
         if (!approved.approved) {
           return { denied: true, error: 'User denied approval' }
         }
       }
+      await safeCheckpoint({
+        projectRoot,
+        reason: `Before Write ${filePath}`,
+        trigger: 'before-tool',
+        files: [filePath],
+        sessionId: run.runId,
+      })
       const safePath = resolveWorktreePath(projectRoot, worktreeRoot, filePath)
       await fs.mkdir(path.dirname(safePath), { recursive: true })
       await fs.writeFile(safePath, content, 'utf-8')
@@ -1198,10 +1508,10 @@ async function executeToolLocal(
         { runId: run.runId, projectRoot, worktreeRoot },
         filePath,
       )
-      if (writeEval.behavior === 'deny') {
+      if (!opts.permissionChecked && writeEval.behavior === 'deny') {
         return { denied: true, error: writeEval.reason }
       }
-      if (writeEval.behavior === 'ask') {
+      if (!opts.permissionChecked && writeEval.behavior === 'ask') {
         const approved = await requestApproval(run.runId, toolName, input, 'task-1', writeEval)
         if (!approved.approved) {
           return { denied: true, error: 'User denied approval' }
@@ -1224,10 +1534,10 @@ async function executeToolLocal(
         { runId: run.runId, projectRoot, worktreeRoot },
         filePath,
       )
-      if (writeEval.behavior === 'deny') {
+      if (!opts.permissionChecked && writeEval.behavior === 'deny') {
         return { denied: true, error: writeEval.reason }
       }
-      if (writeEval.behavior === 'ask') {
+      if (!opts.permissionChecked && writeEval.behavior === 'ask') {
         const approved = await requestApproval(run.runId, toolName, input, 'task-1', writeEval)
         if (!approved.approved) {
           return { denied: true, error: 'User denied approval' }
@@ -1258,7 +1568,10 @@ async function executeToolLocal(
       return { worktreeRoot: projectRoot }
     }
     default:
-      return { ok: true, toolName, note: 'Placeholder execution' }
+      return {
+        error: `Tool ${toolName} is not available in the desktop runtime`,
+        unsupported: true,
+      }
   }
 }
 
@@ -1315,23 +1628,13 @@ export function getProjectSafetyPolicy(
   return loadProjectSafetyPolicy(projectRoot)
 }
 
-export function setProjectSafetyPolicy(
+export async function setProjectSafetyPolicy(
   projectRoot: string,
   policy: import('@ur/agent-runtime').ProjectSafetyPolicy,
-): string {
-  const { writeProjectSafetyPolicy } = require('@ur/agent-runtime') as {
-    writeProjectSafetyPolicy: (cwd: string) => string
-  }
-  const {
-    loadProjectSafetyPolicy,
-    DEFAULT_PROJECT_SAFETY_POLICY,
-    writeProjectSafetyPolicy: writePolicy,
-  } = require('@ur/agent-runtime') as {
-    loadProjectSafetyPolicy: (cwd: string) => import('@ur/agent-runtime').ProjectSafetyPolicy
+): Promise<string> {
+  const { DEFAULT_PROJECT_SAFETY_POLICY } = require('@ur/agent-runtime') as {
     DEFAULT_PROJECT_SAFETY_POLICY: import('@ur/agent-runtime').ProjectSafetyPolicy
-    writeProjectSafetyPolicy: (cwd: string) => string
   }
-  const policyPath = writePolicy(projectRoot)
   // Merge with defaults so missing fields inherit safe defaults.
   const merged = {
     ...DEFAULT_PROJECT_SAFETY_POLICY,
@@ -1343,8 +1646,14 @@ export function setProjectSafetyPolicy(
     },
   }
   const file = path.join(projectRoot, '.ur', 'safety-policy.json')
-  fs.writeFile(file, `${JSON.stringify(merged, null, 2)}\n`, 'utf-8')
-  return policyPath
+  const temp = `${file}.${process.pid}.${randomUUID()}.tmp`
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  await fs.writeFile(temp, `${JSON.stringify(merged, null, 2)}\n`, {
+    encoding: 'utf-8',
+    mode: 0o600,
+  })
+  await fs.rename(temp, file)
+  return file
 }
 
 export function getRun(runId: string): RuntimeRun {
@@ -1424,10 +1733,10 @@ function makeEvent(
   } as import('../shared/ipc.js').RuntimeEvent
 }
 
-function translateRuntimeEvent(
+function translateRuntimeEvents(
   run: RuntimeRun,
   event: import('@ur/agent-runtime').RuntimeEvent,
-): import('../shared/ipc.js').RuntimeEvent {
+): import('../shared/ipc.js').RuntimeEvent[] {
   const base = {
     runId: run.runId,
     sessionId: run.session.sessionId,
@@ -1436,23 +1745,71 @@ function translateRuntimeEvent(
   }
 
   const type = (event as { type?: string }).type ?? 'unknown'
+  const asEvent = (payload: Record<string, unknown>) =>
+    ({ ...base, ...payload }) as import('../shared/ipc.js').RuntimeEvent
 
   switch (type) {
     case 'thinking':
     case 'text':
-      return { ...base, type: 'model_stream', delta: String((event as { text?: string }).text ?? '') } as import('../shared/ipc.js').RuntimeEvent
+      return [
+        asEvent({
+          type: 'model_stream',
+          delta: String((event as { text?: string }).text ?? ''),
+        }),
+      ]
+    case 'assistant': {
+      // SDK-style assistant message: text/tool_use content blocks plus
+      // per-request usage.
+      const events: import('../shared/ipc.js').RuntimeEvent[] = []
+      const message = (event as {
+        message?: {
+          content?: Array<Record<string, unknown>> | string
+          usage?: RawUsage
+        }
+      }).message
+      if (message?.usage && run.usageTracker) {
+        run.usageTracker.addMessageUsage(message.usage)
+        events.push(
+          asEvent({ type: 'usage_updated', usage: run.usageTracker.snapshot() }),
+        )
+      }
+      const blocks = Array.isArray(message?.content) ? message.content : []
+      if (typeof message?.content === 'string' && message.content) {
+        events.push(asEvent({ type: 'model_stream', delta: message.content }))
+      }
+      for (const block of blocks) {
+        if (block.type === 'text' && typeof block.text === 'string' && block.text) {
+          events.push(asEvent({ type: 'model_stream', delta: block.text }))
+        } else if (block.type === 'tool_use') {
+          const toolName = String(block.name ?? '')
+          setAgentProgress(run.runId, 'agent-1', {
+            message: `Tool call: ${toolName}`,
+            currentTool: toolName,
+          })
+          events.push(
+            asEvent({
+              type: 'tool_call_started',
+              toolName,
+              input: (block.input ?? {}) as Record<string, unknown>,
+            }),
+          )
+        }
+      }
+      return events
+    }
     case 'tool_use': {
       const toolName = String((event as { name?: string }).name ?? '')
       setAgentProgress(run.runId, 'agent-1', {
         message: `Tool call: ${toolName}`,
         currentTool: toolName,
       })
-      return {
-        ...base,
-        type: 'tool_call_started',
-        toolName,
-        input: ((event as { input?: unknown }).input ?? {}) as Record<string, unknown>,
-      } as import('../shared/ipc.js').RuntimeEvent
+      return [
+        asEvent({
+          type: 'tool_call_started',
+          toolName,
+          input: ((event as { input?: unknown }).input ?? {}) as Record<string, unknown>,
+        }),
+      ]
     }
     case 'tool_result': {
       const toolName = String((event as { name?: string }).name ?? '')
@@ -1460,12 +1817,13 @@ function translateRuntimeEvent(
         message: `Tool result: ${toolName}`,
         currentTool: undefined,
       })
-      return {
-        ...base,
-        type: 'tool_call_finished',
-        toolName,
-        result: (event as { result?: unknown }).result,
-      } as import('../shared/ipc.js').RuntimeEvent
+      return [
+        asEvent({
+          type: 'tool_call_finished',
+          toolName,
+          result: (event as { result?: unknown }).result,
+        }),
+      ]
     }
     case 'command': {
       const command = String((event as { command?: string }).command ?? '')
@@ -1473,35 +1831,225 @@ function translateRuntimeEvent(
         message: `Command: ${command}`,
         currentCommand: command,
       })
-      return {
-        ...base,
-        type: 'command_started',
-        command,
-      } as import('../shared/ipc.js').RuntimeEvent
+      return [asEvent({ type: 'command_started', command })]
+    }
+    case 'result': {
+      // Final run summary: authoritative usage and provider-reported cost.
+      const e = event as {
+        usage?: RawUsage
+        total_cost_usd?: number
+        duration_ms?: number
+        num_turns?: number
+        result?: string
+        is_error?: boolean
+      }
+      if (run.usageTracker) {
+        run.usageTracker.setFinalUsage(e.usage ?? {}, e.total_cost_usd)
+        return [
+          asEvent({
+            type: 'run_result',
+            usage: run.usageTracker.snapshot(),
+            durationMs: e.duration_ms,
+            numTurns: e.num_turns,
+            resultText: e.result,
+            isError: e.is_error === true,
+          }),
+        ]
+      }
+      return []
     }
     default:
-      return {
-        ...base,
-        type: 'model_stream',
-        delta: JSON.stringify(event),
-      } as import('../shared/ipc.js').RuntimeEvent
+      // Unknown event types are persisted to the transcript by the caller
+      // but produce no chat noise.
+      return []
   }
 }
 
-function parseSimplePatch(patch: string): Record<string, string> {
-  const result: Record<string, string> = {}
-  const lines = patch.split('\n')
-  let currentFile: string | null = null
-  let newLines: string[] = []
-  for (const line of lines) {
-    if (line.startsWith('+++ b/')) {
-      if (currentFile) result[currentFile] = newLines.join('\n')
-      currentFile = line.slice(6)
-      newLines = []
-    } else if (line.startsWith('+')) {
-      newLines.push(line.slice(1))
+/** Convert a glob pattern (`*`, `?`, `**`) to a regular expression. */
+function globPatternToRegExp(pattern: string): RegExp {
+  let regex = ''
+  let i = 0
+  while (i < pattern.length) {
+    const ch = pattern[i]
+    if (ch === '*') {
+      if (pattern[i + 1] === '*') {
+        // `**/` matches any number of directories including none.
+        if (pattern[i + 2] === '/') {
+          regex += '(?:[^/]+/)*'
+          i += 3
+        } else {
+          regex += '.*'
+          i += 2
+        }
+      } else {
+        regex += '[^/]*'
+        i += 1
+      }
+    } else if (ch === '?') {
+      regex += '[^/]'
+      i += 1
+    } else {
+      regex += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      i += 1
     }
   }
-  if (currentFile) result[currentFile] = newLines.join('\n')
-  return result
+  return new RegExp(`^${regex}$`)
+}
+
+const GLOB_SKIP_DIRS = new Set(['.git', 'node_modules'])
+
+/**
+ * Dependency-free recursive glob. Electron's embedded Node has no fs.glob,
+ * and the desktop app must not add search dependencies for this.
+ */
+export async function globProjectFiles(
+  cwd: string,
+  pattern: string,
+  limit = 5000,
+): Promise<string[]> {
+  const matcher = globPatternToRegExp(pattern)
+  const results: string[] = []
+
+  async function walk(relDir: string): Promise<void> {
+    if (results.length >= limit) return
+    const absDir = path.join(cwd, relDir)
+    let entries
+    try {
+      entries = await fs.readdir(absDir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (results.length >= limit) return
+      const rel = relDir ? `${relDir}/${entry.name}` : entry.name
+      if (entry.isDirectory()) {
+        if (!GLOB_SKIP_DIRS.has(entry.name)) {
+          await walk(rel)
+        }
+      } else if (matcher.test(rel)) {
+        results.push(rel)
+      }
+    }
+  }
+
+  await walk('')
+  return results.sort()
+}
+
+/** File paths touched by a unified diff (from +++ b/ headers). */
+function parsePatchFilePaths(patch: string): string[] {
+  const paths: string[] = []
+  for (const line of patch.split('\n')) {
+    if (line.startsWith('+++ b/')) {
+      paths.push(line.slice(6).trim())
+    } else if (line.startsWith('+++ ') && !line.includes('/dev/null')) {
+      paths.push(line.slice(4).trim())
+    }
+  }
+  return paths
+}
+
+/**
+ * Line-based unified diff (Myers via simple LCS table) with 3 lines of
+ * context. Suitable for the file sizes the desktop edit flow handles.
+ */
+export function buildUnifiedDiff(
+  filePath: string,
+  original: string,
+  updated: string,
+): string {
+  if (original === updated) {
+    return ''
+  }
+  // A trailing newline means the split produces a phantom empty final
+  // element; drop it so hunk line counts match what git sees.
+  const aEndsNewline = original.endsWith('\n')
+  const bEndsNewline = updated.endsWith('\n')
+  const a = original.split('\n')
+  if (aEndsNewline) a.pop()
+  const b = updated.split('\n')
+  if (bEndsNewline) b.pop()
+
+  // LCS table.
+  const n = a.length
+  const m = b.length
+  const lcs: number[][] = Array.from({ length: n + 1 }, () =>
+    new Array<number>(m + 1).fill(0),
+  )
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[i][j] =
+        a[i] === b[j]
+          ? lcs[i + 1][j + 1] + 1
+          : Math.max(lcs[i + 1][j], lcs[i][j + 1])
+    }
+  }
+
+  type Op = { kind: ' ' | '-' | '+'; line: string; aLine: number; bLine: number }
+  const ops: Op[] = []
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      ops.push({ kind: ' ', line: a[i], aLine: i, bLine: j })
+      i++
+      j++
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      ops.push({ kind: '-', line: a[i], aLine: i, bLine: j })
+      i++
+    } else {
+      ops.push({ kind: '+', line: b[j], aLine: i, bLine: j })
+      j++
+    }
+  }
+  while (i < n) {
+    ops.push({ kind: '-', line: a[i], aLine: i, bLine: j })
+    i++
+  }
+  while (j < m) {
+    ops.push({ kind: '+', line: b[j], aLine: i, bLine: j })
+    j++
+  }
+
+  // Group into hunks with context.
+  const CONTEXT = 3
+  const changedIdx = ops
+    .map((op, idx) => (op.kind === ' ' ? -1 : idx))
+    .filter(idx => idx !== -1)
+  if (changedIdx.length === 0) return ''
+
+  const hunks: Array<{ start: number; end: number }> = []
+  let hunkStart = Math.max(0, changedIdx[0] - CONTEXT)
+  let hunkEnd = Math.min(ops.length - 1, changedIdx[0] + CONTEXT)
+  for (const idx of changedIdx.slice(1)) {
+    if (idx - CONTEXT <= hunkEnd + 1) {
+      hunkEnd = Math.min(ops.length - 1, idx + CONTEXT)
+    } else {
+      hunks.push({ start: hunkStart, end: hunkEnd })
+      hunkStart = Math.max(0, idx - CONTEXT)
+      hunkEnd = Math.min(ops.length - 1, idx + CONTEXT)
+    }
+  }
+  hunks.push({ start: hunkStart, end: hunkEnd })
+
+  const out: string[] = [`--- a/${filePath}`, `+++ b/${filePath}`]
+  for (const hunk of hunks) {
+    const slice = ops.slice(hunk.start, hunk.end + 1)
+    const aStart = (slice.find(op => op.kind !== '+')?.aLine ?? ops[hunk.start].aLine) + 1
+    const bStart = (slice.find(op => op.kind !== '-')?.bLine ?? ops[hunk.start].bLine) + 1
+    const aCount = slice.filter(op => op.kind !== '+').length
+    const bCount = slice.filter(op => op.kind !== '-').length
+    out.push(`@@ -${aStart},${aCount} +${bStart},${bCount} @@`)
+    for (const op of slice) {
+      out.push(`${op.kind}${op.line}`)
+      const isLastOfA =
+        op.kind !== '+' && op.aLine === a.length - 1 && !aEndsNewline
+      const isLastOfB =
+        op.kind !== '-' && op.bLine === b.length - 1 && !bEndsNewline
+      if (isLastOfA || isLastOfB) {
+        out.push('\\ No newline at end of file')
+      }
+    }
+  }
+  return `${out.join('\n')}\n`
 }

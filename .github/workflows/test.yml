@@ -46,7 +46,18 @@ jobs:
       - name: Run tests (Bun)
         run: |
           set -xeuo pipefail
-          bun test --timeout 120000 2>&1 | tee test-output.log
+          # Bun shares process-global state across a broad discovery run. Keep
+          # the core, listener, and desktop suites in isolated invocations so
+          # provider env, HTTP ports, and package-install tempdirs cannot race.
+          bun test --timeout 120000 \
+            --path-ignore-patterns='apps/desktop/**' \
+            --path-ignore-patterns='src/server.test.ts' \
+            --path-ignore-patterns='test/artifactsServer.test.ts' \
+            2>&1 | tee test-output.log
+          bun test src/server.test.ts test/artifactsServer.test.ts \
+            --timeout 120000 2>&1 | tee -a test-output.log
+          cd apps/desktop
+          bun test --timeout 120000 2>&1 | tee -a "$GITHUB_WORKSPACE/test-output.log"
 
       - name: Upload test output on failure
         if: failure()
@@ -63,6 +74,15 @@ jobs:
         run: |
           set -xeuo pipefail
           bun run bundle
+
+      - name: Build and validate desktop npm package
+        if: success()
+        run: |
+          set -xeuo pipefail
+          bun run --cwd apps/desktop typecheck
+          bun run --cwd apps/desktop lint
+          bun run --cwd apps/desktop build
+          bun run --cwd apps/desktop package:check
 
       - name: Smoke test
         if: success()
@@ -94,3 +114,11 @@ jobs:
           set -xeuo pipefail
           npm install -g .
           ur --version
+
+      - name: Test Desktop Global Install (NPM)
+        if: success()
+        run: |
+          set -xeuo pipefail
+          desktop_tarball="$(npm pack ./apps/desktop --ignore-scripts --pack-destination "$RUNNER_TEMP" --silent)"
+          npm install -g "$RUNNER_TEMP/$desktop_tarball" --ignore-scripts
+          test "$(ur-nexus-desktop --version)" = "1.0.2 (UR-Nexus Desktop)"

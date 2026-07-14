@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { getAppDataPath } from '../utils/appDataPath.js'
 import { redactValue } from '../utils/redactSecrets.js'
 
-export type ApprovalScope = 'once' | 'run' | 'session' | 'permanent'
+export type ApprovalScope = 'once' | 'run' | 'session'
 
 export interface ApprovalLogEntry {
   timestamp: string
@@ -20,10 +20,14 @@ export interface ApprovalLogEntry {
   agentId?: string
 }
 
-const logDir = path.join(getAppDataPath(), 'desktop')
-const logPath = path.join(logDir, 'approval-log.jsonl')
+async function logPaths(): Promise<{ logDir: string; logPath: string }> {
+  const appData = await getAppDataPath()
+  const logDir = path.join(appData, 'desktop')
+  return { logDir, logPath: path.join(logDir, 'approval-log.jsonl') }
+}
 
 async function ensureDir(): Promise<void> {
+  const { logDir } = await logPaths()
   await fs.mkdir(logDir, { recursive: true })
 }
 
@@ -38,11 +42,13 @@ export async function appendApprovalLog(
     reason: String(redactValue(entry.reason) ?? entry.reason),
     projectRoot,
   }
+  const { logPath } = await logPaths()
   await fs.appendFile(logPath, `${JSON.stringify(safeEntry)}\n`, 'utf-8')
 }
 
 export async function readApprovalLog(projectRoot: string): Promise<ApprovalLogEntry[]> {
   try {
+    const { logPath } = await logPaths()
     const content = await fs.readFile(logPath, 'utf-8')
     return content
       .split('\n')

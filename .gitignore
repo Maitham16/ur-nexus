@@ -8,6 +8,12 @@ package-lock.json
 backup/
 dist/*
 !dist/cli.js
+# Desktop and shared-runtime bundles are regenerated for releases. Their
+# current clean bundle sets are force-added by the release workflow; ignore
+# stale content-hashed chunks and local installers between builds.
+apps/desktop/dist/
+apps/desktop/vendor/agent-runtime/*
+packages/agent-runtime/dist/*
 build/
 coverage/
 .nyc_output/
@@ -55,6 +61,8 @@ yarn.lock
 .fuse_hidden*
 
 # UR local state that should stay machine-specific
+# Match runtime state at the repository root and inside workspace packages.
+**/.ur/
 UR.local.md
 .ur/context/
 .ur/plans/
@@ -86,6 +94,24 @@ Thumbs.db
 *.swo
 .vscode/
 .idea/
+
+# Finder/editor duplicate copies (for example "file 2.ts") are never source.
+**/* 2.*
+**/* 3.*
+**/* 4.*
+**/* 5.*
+**/* 6.*
+**/* 7.*
+**/* 8.*
+**/* 9.*
+**/* 2/
+**/* 3/
+**/* 4/
+**/* 5/
+**/* 6/
+**/* 7/
+**/* 8/
+**/* 9/
 
 # Package manager caches
 .npm/

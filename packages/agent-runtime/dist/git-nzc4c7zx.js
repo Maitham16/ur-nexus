@@ -1,0 +1,67 @@
+import {
+  dirIsInGitRepo,
+  findCanonicalGitRoot,
+  findGitRoot,
+  findRemoteBase,
+  getBranch,
+  getChangedFiles,
+  getDefaultBranch,
+  getFileStatus,
+  getGitDir,
+  getGitState,
+  getGithubRepo,
+  getHead,
+  getIsClean,
+  getIsGit,
+  getIsHeadOnRemote,
+  getRemoteUrl,
+  getRepoRemoteHash,
+  getWorktreeCount,
+  gitExe,
+  hasUnpushedCommits,
+  init_git,
+  isAtGitRoot,
+  isCurrentDirectoryBareGitRepo,
+  normalizeGitRemoteUrl,
+  preserveGitStateForIssue,
+  stashToCleanState
+} from "./index-6dy59xbm.js";
+import"./index-0r3wd4mq.js";
+import"./index-b5f4m7g4.js";
+import"./index-h7h0j06f.js";
+import"./index-7h9ddexs.js";
+import"./index-f80dj2bz.js";
+import"./index-ycnb0yeb.js";
+import"./index-vpczjthp.js";
+import"./index-t784n9jz.js";
+import"./index-93rq225h.js";
+import"./index-8rxa073f.js";
+init_git();
+
+export {
+  stashToCleanState,
+  preserveGitStateForIssue,
+  normalizeGitRemoteUrl,
+  isCurrentDirectoryBareGitRepo,
+  isAtGitRoot,
+  hasUnpushedCommits,
+  gitExe,
+  getWorktreeCount,
+  getRepoRemoteHash,
+  getRemoteUrl,
+  getIsHeadOnRemote,
+  getIsGit,
+  getIsClean,
+  getHead,
+  getGithubRepo,
+  getGitState,
+  getGitDir,
+  getFileStatus,
+  getDefaultBranch,
+  getChangedFiles,
+  getBranch,
+  findRemoteBase,
+  findGitRoot,
+  findCanonicalGitRoot,
+  dirIsInGitRepo
+};

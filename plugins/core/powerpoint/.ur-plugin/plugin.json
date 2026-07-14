@@ -4,10 +4,10 @@
   "description": "Build, convert, review, and theme PowerPoint decks from UR — through the Office PowerPoint MCP server (python-pptx, ~32 tools, templates) with a python-pptx fallback.",
   "author": {
     "name": "Maitham Al-rubaye",
-    "url": "https://github.com/Maitham16/UR"
+    "url": "https://github.com/Maitham16/ur-nexus"
   },
-  "homepage": "https://github.com/Maitham16/UR/tree/master/plugins/core/powerpoint",
-  "repository": "https://github.com/Maitham16/UR",
+  "homepage": "https://github.com/Maitham16/ur-nexus/tree/master/plugins/core/powerpoint",
+  "repository": "https://github.com/Maitham16/ur-nexus",
   "license": "LicenseRef-UR-AGENT-Non-Commercial-Self-Responsibility",
   "keywords": ["powerpoint", "pptx", "slides", "presentation", "office", "mcp"],
   "mcpServers": {

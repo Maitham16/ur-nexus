@@ -1,4 +1,3 @@
-import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 export interface ShellCommand {
@@ -32,25 +31,9 @@ const running = new Map<string, import('node-pty').IPty>()
 const commands = new Map<string, ShellCommand>()
 
 const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash'
-const shellArgs = process.platform === 'win32' ? [] : ['-c']
-
-function stripAnsi(data: string): string {
-  // Strip ANSI escape sequences and control characters for clean output.
-  return data
-    .replace(/\u001b\[[\d;?]*[A-Za-z]/g, '')
-    .replace(/\u001b\][\d;]*[^\u0007]*\u0007/g, '')
-    .replace(/\u0007/g, '')
-    .replace(/\r\n/g, '\n')
-}
-
-function splitOutput(data: string): { stdout: string; stderr: string } {
-  // node-pty combines stdout and stderr; we present it as a single combined stream
-  // for the command block and keep a clean copy without ANSI codes.
-  return { stdout: data, stderr: '' }
-}
 
 export function createShellRunner(opts: ShellRunnerOptions) {
-  function run(command: string, options?: { requireApproval?: boolean }): Promise<ShellCommand> {
+  function run(command: string): Promise<ShellCommand> {
     return new Promise(resolve => {
       const id = randomUUID()
       const startTime = Date.now()

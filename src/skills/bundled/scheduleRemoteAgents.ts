@@ -206,7 +206,7 @@ You CANNOT delete triggers. If the user asks to delete, direct them to: https://
       "session_context": {
           "model": "inherit",
         "sources": [
-          {"git_repository": {"url": "${gitRepoUrl || 'https://github.com/Maitham16/UR'}"}}
+          {"git_repository": {"url": "${gitRepoUrl || 'https://github.com/Maitham16/ur-nexus'}"}}
         ],
         "allowed_tools": ["Bash", "Read", "Write", "Edit", "Glob", "Grep"]
       },

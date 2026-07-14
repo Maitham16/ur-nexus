@@ -1,13 +1,10 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, IpcRendererEvent } from 'electron'
 import type {
   IpcChannel,
   IpcEvent,
   RuntimeEvent,
   RuntimeProjectDto,
   RuntimeSessionDto,
-  RuntimeToolInfoDto,
-  RuntimeProviderInfoDto,
-  RuntimeModelInfoDto,
   RuntimeTaskInfoDto,
   RuntimeAgentInfoDto,
   RuntimeMcpServerDto,
@@ -19,10 +16,8 @@ import type {
   ProposeEditRequestDto,
   ApplyPatchRequestDto,
   RunCommandRequestDto,
-  TerminalCommandDto,
   AddMcpServerRequestDto,
   ApprovalResponseDto,
-  ApprovalScope,
   GetSafetyPolicyRequestDto,
   SetSafetyPolicyRequestDto,
   ListRunsRequestDto,
@@ -43,6 +38,37 @@ import type {
   AddConnectorRequestDto,
   UpdateConnectorRequestDto,
   CallConnectorToolRequestDto,
+  OpenProjectDialogResultDto,
+  OpenFilesDialogResultDto,
+  SaveFileDialogRequestDto,
+  SaveFileDialogResultDto,
+  AddContextFilesRequestDto,
+  ContextFileDto,
+  ExplorerListRequestDto,
+  ExplorerMutationRequestDto,
+  ExplorerEntryDto,
+  GitFileStatusDto,
+  GitDiffRequestDto,
+  SearchRequestDto,
+  SearchResultDto,
+  ParseDiffRequestDto,
+  ParsedDiffFileDto,
+  ApplyHunksRequestDto,
+  TestRunRequestDto,
+  TestRunResultDto,
+  FailingTestDto,
+  BackgroundAgentDto,
+  LaunchBackgroundAgentRequestDto,
+  CheckpointRequestDto,
+  CheckpointDto,
+  RewindPreviewDto,
+  GeneratePlanRequestDto,
+  ExecutePlanRequestDto,
+  PlanDto,
+  PersistedRunStateDto,
+  ResumeRunRequestDto,
+  AgentPermissionSettingsDto,
+  StartRunOptionsDto,
 } from '../shared/ipc.js'
 
 // Thin typed wrapper over ipcRenderer. No Node APIs are exposed to the renderer.
@@ -62,15 +88,105 @@ const api = {
     }
   },
 
+  // Resolve the on-disk path of a dragged-and-dropped File object.
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+
+  // Menu actions dispatched by the native macOS menu.
+  onMenuAction: (
+    callback: (payload: { action: string; payload?: unknown }) => void,
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      payload: { action: string; payload?: unknown },
+    ) => callback(payload)
+    ipcRenderer.on('menu:action', handler)
+    return () => {
+      ipcRenderer.removeListener('menu:action', handler)
+    }
+  },
+
+  // Native dialogs
+  openProjectDialog: (): Promise<OpenProjectDialogResultDto> =>
+    ipcRenderer.invoke('dialog:open-project'),
+
+  openFilesDialog: (options?: {
+    multi?: boolean
+    defaultPath?: string
+  }): Promise<OpenFilesDialogResultDto> =>
+    ipcRenderer.invoke('dialog:open-files', options),
+
+  saveFileDialog: (req: SaveFileDialogRequestDto): Promise<SaveFileDialogResultDto> =>
+    ipcRenderer.invoke('dialog:save-file', req),
+
   // Projects
   openProject: (root: string): Promise<RuntimeProjectDto> =>
     ipcRenderer.invoke('project:open', root),
 
+  closeProject: (root: string): Promise<void> =>
+    ipcRenderer.invoke('project:close', root),
+
   listProjects: (): Promise<RecentProjectDto[]> =>
     ipcRenderer.invoke('project:list'),
 
+  removeRecentProject: (root: string): Promise<void> =>
+    ipcRenderer.invoke('project:remove-recent', root),
+
   inspectProject: (root: string): Promise<ProjectInfoDto> =>
     ipcRenderer.invoke('project:inspect', root),
+
+  // Context files / attachments
+  addContextFiles: (req: AddContextFilesRequestDto): Promise<ContextFileDto[]> =>
+    ipcRenderer.invoke('context:add-files', req),
+
+  removeContextFile: (projectRoot: string, filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('context:remove-file', projectRoot, filePath),
+
+  listContextFiles: (projectRoot: string): Promise<ContextFileDto[]> =>
+    ipcRenderer.invoke('context:list', projectRoot),
+
+  // File explorer
+  listExplorer: (req: ExplorerListRequestDto): Promise<ExplorerEntryDto[]> =>
+    ipcRenderer.invoke('explorer:list', req),
+
+  createExplorerEntry: (req: ExplorerMutationRequestDto): Promise<void> =>
+    ipcRenderer.invoke('explorer:create', req),
+
+  renameExplorerEntry: (req: ExplorerMutationRequestDto): Promise<void> =>
+    ipcRenderer.invoke('explorer:rename', req),
+
+  deleteExplorerEntry: (req: ExplorerMutationRequestDto): Promise<void> =>
+    ipcRenderer.invoke('explorer:delete', req),
+
+  revealInFinder: (absolutePath: string): Promise<void> =>
+    ipcRenderer.invoke('file:reveal', absolutePath),
+
+  openInDefaultApp: (absolutePath: string): Promise<void> =>
+    ipcRenderer.invoke('file:open-default', absolutePath),
+
+  // Content search (ripgrep-parity)
+  searchGrep: (req: SearchRequestDto): Promise<SearchResultDto> =>
+    ipcRenderer.invoke('search:grep', req),
+
+  // Structured test runner
+  runTests: (req: TestRunRequestDto): Promise<TestRunResultDto> =>
+    ipcRenderer.invoke('test:run', req),
+
+  rerunFailedTests: (
+    req: TestRunRequestDto & {
+      framework: string
+      failingTests: FailingTestDto[]
+    },
+  ): Promise<TestRunResultDto> => ipcRenderer.invoke('test:rerun-failed', req),
+
+  // Git review
+  gitStatus: (projectRoot: string): Promise<GitFileStatusDto[]> =>
+    ipcRenderer.invoke('git:status', projectRoot),
+
+  gitDiff: (req: GitDiffRequestDto): Promise<string> =>
+    ipcRenderer.invoke('git:diff', req),
+
+  gitRevertFile: (req: GitDiffRequestDto): Promise<void> =>
+    ipcRenderer.invoke('git:revert-file', req),
 
   // Worktrees
   createWorktree: (projectRoot: string, branch?: string): Promise<WorktreeInfoDto> =>
@@ -82,7 +198,7 @@ const api = {
   // Runs
   startRun: (
     projectRoot: string,
-    options?: { useWorktree?: boolean; branch?: string },
+    options?: StartRunOptionsDto,
   ): Promise<RuntimeSessionDto> =>
     ipcRenderer.invoke('run:start', projectRoot, options),
 
@@ -95,18 +211,30 @@ const api = {
   resumeRun: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke('run:resume', sessionId),
 
-  sendMessage: (sessionId: string, content: string): Promise<void> =>
-    ipcRenderer.invoke('message:send', sessionId, content),
+  sendMessage: (
+    sessionId: string,
+    content: string,
+    attachments?: string[],
+  ): Promise<void> =>
+    ipcRenderer.invoke('message:send', sessionId, content, attachments),
 
   // Files
   readFile: (req: ReadFileRequestDto): Promise<string | null> =>
     ipcRenderer.invoke('file:read', req),
 
-  proposeEdit: (req: ProposeEditRequestDto): Promise<{ diffId: string; patch: string }> =>
+  proposeEdit: (
+    req: ProposeEditRequestDto,
+  ): Promise<{ diffId: string; patch: string; baseHashes: Record<string, string> }> =>
     ipcRenderer.invoke('edit:propose', req),
 
   applyPatch: (req: ApplyPatchRequestDto): Promise<void> =>
     ipcRenderer.invoke('patch:apply', req),
+
+  parseDiff: (req: ParseDiffRequestDto): Promise<ParsedDiffFileDto[]> =>
+    ipcRenderer.invoke('patch:parse', req),
+
+  applyHunks: (req: ApplyHunksRequestDto): Promise<{ appliedFiles: string[] }> =>
+    ipcRenderer.invoke('patch:apply-hunks', req),
 
   // Commands
   runCommand: (
@@ -137,6 +265,80 @@ const api = {
 
   getMaxAgents: (): Promise<number> => ipcRenderer.invoke('settings:maxAgents'),
 
+  // Background agents
+  launchBackgroundAgent: (
+    req: LaunchBackgroundAgentRequestDto,
+  ): Promise<BackgroundAgentDto> => ipcRenderer.invoke('bgagent:launch', req),
+
+  listBackgroundAgents: (projectRoot?: string): Promise<BackgroundAgentDto[]> =>
+    ipcRenderer.invoke('bgagent:list', projectRoot),
+
+  getBackgroundAgent: (id: string): Promise<BackgroundAgentDto | null> =>
+    ipcRenderer.invoke('bgagent:get', id),
+
+  cancelBackgroundAgent: (id: string): Promise<void> =>
+    ipcRenderer.invoke('bgagent:cancel', id),
+
+  retryBackgroundAgent: (id: string): Promise<BackgroundAgentDto> =>
+    ipcRenderer.invoke('bgagent:retry', id),
+
+  removeBackgroundAgent: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('bgagent:remove', id),
+
+  // Checkpoints
+  createCheckpoint: (req: CheckpointRequestDto): Promise<CheckpointDto> =>
+    ipcRenderer.invoke('checkpoint:create', req),
+
+  listCheckpoints: (projectRoot: string): Promise<CheckpointDto[]> =>
+    ipcRenderer.invoke('checkpoint:list', projectRoot),
+
+  previewRewind: (req: CheckpointRequestDto): Promise<RewindPreviewDto> =>
+    ipcRenderer.invoke('checkpoint:preview', req),
+
+  rewindToCheckpoint: (
+    req: CheckpointRequestDto,
+  ): Promise<{ restored: string[]; deleted: string[]; safetyCheckpointId: string }> =>
+    ipcRenderer.invoke('checkpoint:rewind', req),
+
+  deleteCheckpoint: (req: CheckpointRequestDto): Promise<boolean> =>
+    ipcRenderer.invoke('checkpoint:delete', req),
+
+  readCheckpointAudit: (projectRoot: string): Promise<Record<string, unknown>[]> =>
+    ipcRenderer.invoke('checkpoint:audit', projectRoot),
+
+  // Planning
+  generatePlan: (req: GeneratePlanRequestDto): Promise<PlanDto> =>
+    ipcRenderer.invoke('plan:generate', req),
+
+  executePlan: (
+    req: ExecutePlanRequestDto,
+  ): Promise<{ planId: string; tasks: Array<{ id: string; status: string; error?: string }> }> =>
+    ipcRenderer.invoke('plan:execute', req),
+
+  shouldPlan: (prompt: string): Promise<boolean> =>
+    ipcRenderer.invoke('plan:should-plan', prompt),
+
+  // Session resume
+  listInterruptedRuns: (projectRoot?: string): Promise<PersistedRunStateDto[]> =>
+    ipcRenderer.invoke('resume:list', projectRoot),
+
+  getRunState: (runId: string): Promise<PersistedRunStateDto | null> =>
+    ipcRenderer.invoke('resume:get', runId),
+
+  getRunTranscript: (runId: string): Promise<Record<string, unknown>[]> =>
+    ipcRenderer.invoke('resume:transcript', runId),
+
+  resumeInterruptedRun: (
+    req: ResumeRunRequestDto,
+  ): Promise<{ newRunId: string; resumedFrom: string }> =>
+    ipcRenderer.invoke('resume:run', req),
+
+  markInterruptedRunFailed: (req: ResumeRunRequestDto): Promise<void> =>
+    ipcRenderer.invoke('resume:mark-failed', req),
+
+  archiveInterruptedRun: (req: ResumeRunRequestDto): Promise<void> =>
+    ipcRenderer.invoke('resume:archive', req),
+
   // Providers / models / tools
   listProviders: (projectRoot: string): Promise<DesktopProviderInfoDto[]> =>
     ipcRenderer.invoke('providers:list', projectRoot),
@@ -151,8 +353,8 @@ const api = {
   ): Promise<void> =>
     ipcRenderer.invoke('provider:update', projectRoot, providerId, model),
 
-  getProviderConfig: (projectRoot: string): Promise<DesktopProviderConfigDto> =>
-    ipcRenderer.invoke('provider:config:get', projectRoot),
+  getProviderConfig: (projectRoot: string, providerId?: string): Promise<DesktopProviderConfigDto> =>
+    ipcRenderer.invoke('provider:config:get', projectRoot, providerId),
 
   setProviderConfig: (
     projectRoot: string,
@@ -178,6 +380,15 @@ const api = {
 
   listToolDefinitions: (projectRoot: string): Promise<RuntimeToolDefinitionDto[]> =>
     ipcRenderer.invoke('tools:list', projectRoot),
+
+  // Agent permissions
+  getAgentPermissions: (): Promise<AgentPermissionSettingsDto> =>
+    ipcRenderer.invoke('permissions:get'),
+
+  setAgentPermissions: (
+    settings: AgentPermissionSettingsDto,
+  ): Promise<AgentPermissionSettingsDto> =>
+    ipcRenderer.invoke('permissions:set', settings),
 
   // MCP
   listMcpServers: (projectRoot: string): Promise<RuntimeMcpServerDto[]> =>

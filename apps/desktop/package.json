@@ -1,40 +1,93 @@
 {
-  "name": "@ur/desktop",
-  "version": "1.44.7",
-  "description": "UR-Nexus desktop app",
+  "name": "ur-nexus-desktop",
+  "version": "1.0.3",
+  "description": "Professional local-first desktop coding agent with BYOK cloud providers and Ollama support",
+  "author": "Maitham",
   "type": "module",
-  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Maitham16/ur-nexus.git",
+    "directory": "apps/desktop"
+  },
+  "bugs": {
+    "url": "https://github.com/Maitham16/ur-nexus/issues"
+  },
+  "homepage": "https://github.com/Maitham16/ur-nexus#readme",
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "ur-nexus-desktop": "bin/ur-nexus-desktop.js"
+  },
+  "files": [
+    "assets/icon.icns",
+    "bin/ur-nexus-desktop.js",
+    "dist/main/main.mjs",
+    "dist/preload/preload.cjs",
+    "dist/renderer",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "dev": "bun run build:main && bun run build:preload && concurrently \"bun run dev:vite\" \"bun run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron ./dist/main/main.mjs",
-    "build": "bun run build:main && bun run build:preload && bun run build:vite",
-    "build:main": "esbuild src/main/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/main/main.mjs --external:electron --external:node-pty --external:electron-updater --sourcemap",
-    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/preload/preload.mjs --external:electron --sourcemap",
+    "build": "bun run typecheck && bun run build:main && bun run build:preload && bun run build:vite",
+    "build:main": "esbuild src/main/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/main/main.mjs --external:electron --external:node-pty --sourcemap --banner:js=\"import{createRequire as ___cr}from'node:module';import{fileURLToPath as ___futp}from'node:url';import{dirname as ___dn}from'node:path';const require=globalThis.require??___cr(import.meta.url);const __filename=___futp(import.meta.url);const __dirname=___dn(__filename);\"",
+    "build:preload": "esbuild src/preload/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/preload/preload.cjs --external:electron --sourcemap",
     "build:vite": "vite build",
     "build:electron": "electron-builder",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:icon": "node scripts/build-icon.mjs",
+    "package:mac": "bun run build && bun run build:icon && electron-builder --mac",
+    "smoke:mac": "UR_REQUIRE_PACKAGED=1 bun test test/smoke.test.mjs",
+    "check:standalone": "bun test test/standalone.test.mjs",
+    "verify:single-instance": "UR_REQUIRE_PACKAGED=1 bun test test/single-instance.test.mjs",
+    "prepack": "bun run build",
+    "package:check": "npm pack --dry-run --json --ignore-scripts",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "test": "bun test",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "dependencies": {
-    "@ur/agent-runtime": "workspace:*",
-    "electron-updater": "^6.8.9",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "electron": "^43.1.0",
     "node-pty": "^1.1.0",
+    "ws": "^8.18.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.24.0"
   },
+  "optionalDependencies": {
+    "@vscode/ripgrep": "^1.18.0"
+  },
+  "trustedDependencies": [
+    "esbuild",
+    "@vscode/ripgrep",
+    "electron",
+    "node-pty"
+  ],
   "devDependencies": {
+    "@ur/agent-runtime": "file:./vendor/agent-runtime",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "bun-types": "^1.2.0",
     "concurrently": "^8.2.2",
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.0",
+    "electron-builder": "^26.15.3",
+    "electron-builder-squirrel-windows": "^26.15.3",
     "esbuild": "^0.23.0",
+    "eslint": "8",
     "typescript": "^5.7.0",
     "vite": "^5.3.0",
     "wait-on": "^7.2.0"
-  }
+  },
+  "main": "dist/main/main.mjs"
 }
