@@ -51,6 +51,7 @@ jobs:
 
       - name: Configure optional Apple signing
         env:
+          RELEASE_MACOS_SIGNING_ENABLED: ${{ vars.ENABLE_MACOS_SIGNING }}
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           RELEASE_APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -68,21 +69,25 @@ jobs:
             } >> "${GITHUB_ENV}"
           }
 
-          if [[ -n "${MACOS_CERTIFICATE}" && -n "${MACOS_CERTIFICATE_PASSWORD}" ]]; then
+          if [[ "${RELEASE_MACOS_SIGNING_ENABLED}" == "true" && -n "${MACOS_CERTIFICATE}" && -n "${MACOS_CERTIFICATE_PASSWORD}" ]]; then
             write_env CSC_LINK "${MACOS_CERTIFICATE}"
             write_env CSC_KEY_PASSWORD "${MACOS_CERTIFICATE_PASSWORD}"
             echo "Apple code signing enabled."
+          elif [[ "${RELEASE_MACOS_SIGNING_ENABLED}" != "true" ]]; then
+            echo "Apple code signing is disabled; building unsigned installers."
           elif [[ -n "${MACOS_CERTIFICATE}" || -n "${MACOS_CERTIFICATE_PASSWORD}" ]]; then
             echo "::warning::Incomplete macOS certificate secrets; building unsigned installers."
           else
             echo "No macOS certificate configured; building unsigned installers."
           fi
 
-          if [[ -n "${RELEASE_APPLE_ID}" && -n "${RELEASE_APPLE_APP_SPECIFIC_PASSWORD}" && -n "${RELEASE_APPLE_TEAM_ID}" ]]; then
+          if [[ "${RELEASE_MACOS_SIGNING_ENABLED}" == "true" && -n "${RELEASE_APPLE_ID}" && -n "${RELEASE_APPLE_APP_SPECIFIC_PASSWORD}" && -n "${RELEASE_APPLE_TEAM_ID}" ]]; then
             write_env APPLE_ID "${RELEASE_APPLE_ID}"
             write_env APPLE_APP_SPECIFIC_PASSWORD "${RELEASE_APPLE_APP_SPECIFIC_PASSWORD}"
             write_env APPLE_TEAM_ID "${RELEASE_APPLE_TEAM_ID}"
             echo "Apple notarization enabled."
+          elif [[ "${RELEASE_MACOS_SIGNING_ENABLED}" != "true" ]]; then
+            echo "Apple notarization is disabled."
           elif [[ -n "${RELEASE_APPLE_ID}" || -n "${RELEASE_APPLE_APP_SPECIFIC_PASSWORD}" || -n "${RELEASE_APPLE_TEAM_ID}" ]]; then
             echo "::warning::Incomplete Apple notarization secrets; skipping notarization."
           else
