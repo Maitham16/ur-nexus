@@ -96,7 +96,27 @@ jobs:
 
       - name: Build Intel and Apple Silicon applications
         working-directory: apps/desktop
-        run: bun run package:mac:release
+        run: |
+          set +e
+          bun run package:mac:release 2>&1 | tee native-package.log
+          package_status=${PIPESTATUS[0]}
+          set -e
+
+          if [[ ${package_status} -ne 0 ]]; then
+            tail -80 native-package.log > native-package-tail.log
+            {
+              echo '### Native packaging failure'
+              echo '```text'
+              cat native-package-tail.log
+              echo '```'
+            } >> "${GITHUB_STEP_SUMMARY}"
+            message=$(cat native-package-tail.log)
+            message=${message//'%'/'%25'}
+            message=${message//$'\r'/'%0D'}
+            message=${message//$'\n'/'%0A'}
+            echo "::error title=Native packaging failed::${message}"
+            exit "${package_status}"
+          fi
 
       - name: Smoke-test native application
         working-directory: apps/desktop
