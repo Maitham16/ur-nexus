@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.4
+
+- Start immediately in a fully functional general chat without requiring a
+  file, folder, or project; project selection and file attachments remain
+  optional and can be added directly from the composer.
+- Run project-free conversations inside a private app-owned workspace so the
+  runtime keeps a real sandbox without gaining access to the user's home
+  directory.
+- Ship native Intel and Apple Silicon macOS application bundles, DMGs, ZIPs,
+  checksums, packaged-app smoke tests, and automated GitHub Release publishing.
+- Install under the professional **UR Nexus Desktop** application name while
+  preserving the existing icon and the stable user-data location.
+- Use the terminal agent's complete live slash-command registry in Desktop,
+  including built-ins, aliases, project skills, plugins, and workflows; native
+  desktop destinations override terminal-only dialogs where appropriate.
+
 ## 1.0.3
 
 - Make global npm installation reliable under npm's install-script approval

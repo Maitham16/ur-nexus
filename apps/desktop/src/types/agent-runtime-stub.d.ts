@@ -65,6 +65,21 @@ export interface RuntimeSession {
   sessionId: string
 }
 
+export interface RuntimeCommand {
+  name: string
+  description: string
+  argumentHint?: string
+  aliases?: string[]
+  isHidden?: boolean
+  userInvocable?: boolean
+  type: 'local' | 'local-jsx' | 'prompt'
+  source?: string
+  loadedFrom?: string
+}
+
+export declare function getCommands(cwd: string): Promise<RuntimeCommand[]>
+export declare function getCommandName(command: RuntimeCommand): string
+
 export interface RuntimeToolInfo {
   name: string
 }

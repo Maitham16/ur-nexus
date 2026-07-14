@@ -51,7 +51,7 @@ Environment for the pass: macOS ___, app version ___, date ___, tester ___.
   only that region changes on disk; edit the file externally, Accept another:
   the stale banner appears; Revert restores. (Automated: `diffs.test.ts`; the
   UI interaction needs eyes.)
-- [ ] **DMG installation / replacement** — Open `dist/UR Desktop-<v>-arm64.dmg`,
+- [ ] **DMG installation / replacement** — Open `dist/UR Nexus Desktop-<v>-arm64.dmg`,
   drag to /Applications, launch from /Applications (Gatekeeper: unsigned build
   requires right-click → Open). Install a rebuilt DMG over it: replacement
   keeps recents/history (stored in Application Support, not the bundle).

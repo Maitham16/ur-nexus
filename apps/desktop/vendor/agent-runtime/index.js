@@ -2,24 +2,24 @@ import {
   init_mappers,
   localCommandOutputToSDKAssistantMessage,
   toSDKCompactMetadata
-} from "./index-anycy6ng.js";
+} from "./index-68cr5n61.js";
 import {
   backgroundDir,
   init_backgroundRunner,
   listBackgroundTasks,
   startBackgroundTask
-} from "./index-wrrxw9xc.js";
-import"./index-30hhb4zp.js";
-import"./index-2pd4r2w9.js";
-import"./index-h9kt1sj4.js";
-import"./index-df0wfzdw.js";
-import"./index-hakw7em9.js";
-import"./index-c6n1hema.js";
-import"./index-rad7f2cp.js";
+} from "./index-zxm9dac1.js";
+import"./index-kw2wxbby.js";
+import"./index-fayv8cwb.js";
+import"./index-j4g1j45r.js";
+import"./index-qg6cjfb3.js";
+import"./index-5jrgxedg.js";
+import"./index-hp4vvv8v.js";
+import"./index-zn5x3nwj.js";
 import {
   init_slashCommandParsing,
   parseSlashCommand
-} from "./index-95j18myh.js";
+} from "./index-x50xy1hv.js";
 import {
   DANGEROUS_DIRECTORIES,
   DANGEROUS_FILES,
@@ -59,6 +59,7 @@ import {
   getAskRules,
   getAttachmentMessages,
   getCommandName,
+  getCommands,
   getContentText,
   getDefaultAppState,
   getDenyRules,
@@ -157,7 +158,12 @@ import {
   toolMatchesName,
   updateUsage,
   useAppState
-} from "./index-79vhy4mk.js";
+} from "./index-3xrbnz6c.js";
+import {
+  cloneFileStateCache,
+  createFileStateCacheWithSizeLimit,
+  init_fileStateCache
+} from "./index-kkermbsd.js";
 import {
   Divider,
   init_Divider,
@@ -168,13 +174,8 @@ import {
   useKeybinding,
   useKeybindings,
   useTerminalSize
-} from "./index-grma1d53.js";
-import {
-  cloneFileStateCache,
-  createFileStateCacheWithSizeLimit,
-  init_fileStateCache
-} from "./index-h3gckbec.js";
-import"./index-e4qqkpaw.js";
+} from "./index-gph76kef.js";
+import"./index-2j7c2ame.js";
 import {
   ThemedBox_default,
   ThemedText,
@@ -182,14 +183,13 @@ import {
   init_systemTheme,
   require_compiler_runtime,
   resolveThemeSetting
-} from "./index-4ywxxsys.js";
-import"./index-hq5et9ce.js";
-import"./index-e6d6jy9m.js";
-import"./index-f8sv7ymg.js";
-import"./index-bkd049y5.js";
-import"./index-q92gn3zb.js";
-import"./index-hny2avst.js";
-import"./index-0b2n9cdp.js";
+} from "./index-61fyyngt.js";
+import"./index-6hrfermc.js";
+import"./index-r9gwtga0.js";
+import"./index-s87snjmt.js";
+import"./index-6ykfn1n2.js";
+import"./index-e7z6rkgj.js";
+import"./index-e7zhbfbk.js";
 import {
   DEFAULT_PROJECT_SAFETY_POLICY,
   approvalLevelForEvaluation,
@@ -199,34 +199,35 @@ import {
   loadProjectSafetyPolicy,
   pathIsInsideWorkspace,
   writeProjectSafetyPolicy
-} from "./index-t4d29e3d.js";
-import"./index-yqwh56at.js";
-import"./index-hgk4djez.js";
-import"./index-keaxkjg6.js";
-import"./index-nn6db592.js";
-import"./index-yw8ef0zj.js";
-import"./index-b85xt2xy.js";
-import"./index-skb7s3mf.js";
-import"./index-k4smejj6.js";
-import"./index-nx1e0qxk.js";
-import"./index-g6p7fqb0.js";
+} from "./index-gkqe0rrq.js";
+import"./index-ked7nkp4.js";
+import"./index-43251g5q.js";
+import"./index-33ph0x52.js";
+import"./index-wxp81q89.js";
+import"./index-efqwnst8.js";
+import"./index-na6pcvfj.js";
+import"./index-98nws6xf.js";
+import"./index-f6z7dc9t.js";
+import"./index-4k4gpxwy.js";
+import"./index-zh6q93c4.js";
+import"./index-j9j0h3gp.js";
 import {
   require_jsx_dev_runtime,
   require_react
-} from "./index-2krq0sbw.js";
-import"./index-4pm7msm9.js";
-import"./index-08vfk1s7.js";
-import"./index-9zsppqmn.js";
-import"./index-wpmv59x8.js";
-import"./index-484d6yds.js";
-import"./index-wx2fg0aa.js";
-import"./index-qc0evn6c.js";
-import"./index-rra3q270.js";
-import"./index-2gbtdq3b.js";
-import"./index-3tq38g6m.js";
-import"./index-jmsjkkjh.js";
-import"./index-y4htdtvj.js";
-import"./index-racy6ymd.js";
+} from "./index-mpvjr5hg.js";
+import"./index-gtvyh4ft.js";
+import"./index-d6epqsmt.js";
+import"./index-bwntnbyg.js";
+import"./index-xvadh9a8.js";
+import"./index-a38sm3ww.js";
+import"./index-t5r7sy2d.js";
+import"./index-ktb0kcww.js";
+import"./index-tdkq0knn.js";
+import"./index-kq80n9z5.js";
+import"./index-1f511qkg.js";
+import"./index-bdfn6xh6.js";
+import"./index-60smdz72.js";
+import"./index-5jrp51k1.js";
 import {
   AGENT_TOOL_NAME,
   DEFAULT_PROVIDER_ID,
@@ -273,29 +274,31 @@ import {
   stripAnsi,
   truncate,
   updateSettingsForSource
-} from "./index-133awary.js";
-import"./index-pnhq4694.js";
+} from "./index-31dnhhm9.js";
+import"./index-f7bfe40r.js";
 import {
   count,
   init_array
-} from "./index-4mfpjpj0.js";
+} from "./index-z5aeypvg.js";
 import {
   init_analytics,
   logEvent
-} from "./index-mpmmtc93.js";
-import"./index-s5dp14ed.js";
+} from "./index-5jmh1e0k.js";
+import"./index-r54kbd6k.js";
+import"./index-f6t8v2s9.js";
+import"./index-wxsgjqjk.js";
 import {
   findCanonicalGitRoot,
   findGitRoot,
   init_git
-} from "./index-6dy59xbm.js";
-import"./index-0r3wd4mq.js";
+} from "./index-s1a1wahe.js";
+import"./index-wred0kdg.js";
 import {
   getCwd,
   init_cwd
-} from "./index-b5f4m7g4.js";
-import"./index-h7h0j06f.js";
-import"./index-7h9ddexs.js";
+} from "./index-2p1fe0x7.js";
+import"./index-9xfq6h4s.js";
+import"./index-0x08e9n5.js";
 import {
   BASH_STDERR_TAG,
   BASH_STDOUT_TAG,
@@ -311,19 +314,17 @@ import {
   init_xml,
   logError,
   stripDisplayTags
-} from "./index-f80dj2bz.js";
-import"./index-q00jv0fc.js";
-import"./index-cs7da0vv.js";
-import"./index-ycnb0yeb.js";
+} from "./index-4bphgmcc.js";
+import"./index-7bd814mt.js";
 import {
   figures_default,
   init_figures
-} from "./index-vpczjthp.js";
+} from "./index-m9qhxms7.js";
 import {
   init_envUtils,
   isBareMode,
   isEnvTruthy
-} from "./index-t784n9jz.js";
+} from "./index-5h7w9qkc.js";
 import {
   getModelUsage,
   getProjectRoot,
@@ -335,7 +336,7 @@ import {
   isSessionPersistenceDisabled,
   setCwdState,
   setPromptId
-} from "./index-93rq225h.js";
+} from "./index-nhjg91p1.js";
 import {
   __esm,
   __export,
@@ -344,7 +345,7 @@ import {
   __toESM
 } from "./index-8rxa073f.js";
 
-// src/components/MessageSelector.tsx
+// ../../src/components/MessageSelector.tsx
 var exports_MessageSelector = {};
 __export(exports_MessageSelector, {
   selectableUserMessagesFilter: () => selectableUserMessagesFilter,
@@ -1375,7 +1376,10 @@ var init_MessageSelector = __esm(() => {
   jsx_dev_runtime = __toESM(require_jsx_dev_runtime(), 1);
 });
 
-// src/QueryEngine.ts
+// src/index.ts
+init_commands();
+
+// ../../src/QueryEngine.ts
 init_last();
 init_state();
 init_ur();
@@ -1405,7 +1409,7 @@ init_model();
 init_pluginLoader();
 import { randomUUID as randomUUID5 } from "crypto";
 
-// src/utils/processUserInput/processUserInput.ts
+// ../../src/utils/processUserInput/processUserInput.ts
 init_analytics();
 init_messages();
 init_commands();
@@ -1420,7 +1424,7 @@ init_queryProfiler();
 init_slashCommandParsing();
 import { randomUUID as randomUUID2 } from "crypto";
 
-// src/utils/processUserInput/processTextPrompt.ts
+// ../../src/utils/processUserInput/processTextPrompt.ts
 init_state();
 init_analytics();
 init_messages();
@@ -1428,7 +1432,7 @@ init_events();
 init_sessionTracing();
 import { randomUUID } from "crypto";
 
-// src/utils/userPromptKeywords.ts
+// ../../src/utils/userPromptKeywords.ts
 function matchesNegativeKeyword(input) {
   const lowerInput = input.toLowerCase();
   const negativePattern = /\b(wtf|wth|ffs|omfg|shit(ty|tiest)?|dumbass|horrible|awful|piss(ed|ing)? off|piece of (shit|crap|junk)|what the (fuck|hell)|fucking? (broken|useless|terrible|awful|horrible)|fuck you|screw (this|you)|so frustrating|this sucks|damn it)\b/;
@@ -1443,7 +1447,7 @@ function matchesKeepGoingKeyword(input) {
   return keepGoingPattern.test(lowerInput);
 }
 
-// src/utils/processUserInput/processTextPrompt.ts
+// ../../src/utils/processUserInput/processTextPrompt.ts
 function processTextPrompt(input, imageContentBlocks, imagePasteIds, attachmentMessages, uuid, permissionMode, isMeta) {
   const promptId = randomUUID();
   setPromptId(promptId);
@@ -1489,7 +1493,7 @@ function processTextPrompt(input, imageContentBlocks, imagePasteIds, attachmentM
   };
 }
 
-// src/utils/processUserInput/processUserInput.ts
+// ../../src/utils/processUserInput/processUserInput.ts
 async function processUserInput({
   input,
   preExpansionInput,
@@ -1693,11 +1697,11 @@ async function processUserInputBase(input, mode, setToolJSX, context, pastedCont
   const attachmentMessages = shouldExtractAttachments ? await toArray(getAttachmentMessages(inputString, context, ideSelection ?? null, [], messages, querySource)) : [];
   queryCheckpoint("query_attachment_loading_end");
   if (inputString !== null && mode === "bash") {
-    const { processBashCommand } = await import("./processBashCommand-apc30320.js");
+    const { processBashCommand } = await import("./processBashCommand-qzbf5g2g.js");
     return addImageMetadataMessage(await processBashCommand(inputString, precedingInputBlocks, attachmentMessages, context, setToolJSX), imageMetadataTexts);
   }
   if (inputString !== null && !effectiveSkipSlash && inputString.startsWith("/")) {
-    const { processSlashCommand } = await import("./processSlashCommand-tfrb30n3.js");
+    const { processSlashCommand } = await import("./processSlashCommand-zvf82b0y.js");
     const slashResult = await processSlashCommand(inputString, precedingInputBlocks, imageContentBlocks, attachmentMessages, context, setToolJSX, uuid, isAlreadyProcessing, canUseTool);
     return addImageMetadataMessage(slashResult, imageMetadataTexts);
   }
@@ -1726,7 +1730,7 @@ function addImageMetadataMessage(result, imageMetadataTexts) {
   return result;
 }
 
-// src/utils/queryContext.ts
+// ../../src/utils/queryContext.ts
 init_prompts();
 init_context();
 init_abortController();
@@ -1748,7 +1752,7 @@ async function fetchSystemPromptParts({
   return { defaultSystemPrompt, userContext, systemContext };
 }
 
-// src/QueryEngine.ts
+// ../../src/QueryEngine.ts
 init_Shell();
 init_sessionStorage();
 init_systemPromptType();
@@ -1756,7 +1760,7 @@ init_systemTheme();
 init_thinking();
 init_mappers();
 
-// src/utils/messages/systemInit.ts
+// ../../src/utils/messages/systemInit.ts
 init_state();
 init_outputStyles();
 init_constants();
@@ -1786,7 +1790,7 @@ function buildSystemInitMessage(inputs) {
     slash_commands: inputs.commands.filter((c) => c.userInvocable !== false).map((c) => c.name),
     apiKeySource: getURHQApiKeyWithSource().source,
     betas: getSdkBetas(),
-    ur_version: "1.0.2",
+    ur_version: MACRO.VERSION,
     output_style: outputStyle,
     agents: inputs.agents.map((agent) => agent.agentType),
     skills: inputs.skills.filter((s) => s.userInvocable !== false).map((skill) => skill.name),
@@ -1802,7 +1806,7 @@ function buildSystemInitMessage(inputs) {
   return initMessage;
 }
 
-// src/QueryEngine.ts
+// ../../src/QueryEngine.ts
 init_filesystem();
 init_queryHelpers();
 var messageSelector = () => (init_MessageSelector(), __toCommonJS(exports_MessageSelector));
@@ -2530,7 +2534,7 @@ async function* ask({
   }
 }
 
-// packages/agent-runtime/src/index.ts
+// src/index.ts
 init_query();
 init_tools();
 init_providerRegistry();
@@ -2592,10 +2596,11 @@ async function createSession(project, opts = {}) {
   const sessionId = opts.sessionId ?? randomUUID6();
   const appState = project.appStateStore.getState();
   const tools = getAllBaseTools();
+  const commands = await getCommands(project.root);
   const engine = new QueryEngine({
     cwd: project.root,
     tools,
-    commands: [],
+    commands,
     mcpClients: appState.mcp.clients,
     agents: appState.agentDefinitions.activeAgents,
     canUseTool: opts.canUseTool ?? (async () => ({ behavior: "allow" })),
@@ -2748,6 +2753,8 @@ export {
   getDenyRules,
   getDefaultAppState,
   getCwd,
+  getCommands,
+  getCommandName,
   getAskRules,
   getAllowRules,
   getAllMcpConfigs,

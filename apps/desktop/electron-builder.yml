@@ -1,5 +1,10 @@
-appId: com.maitham.urdesktop
-productName: UR Desktop
+# UR Nexus Desktop is a renamed product. Give it a distinct Launch Services
+# identity so stale UR Desktop installations (which used
+# com.maitham.urdesktop) cannot hide this app from Spotlight or Applications.
+# User settings still migrate seamlessly because main/index.ts pins userData
+# to the existing "UR Desktop" Application Support directory.
+appId: com.maitham.urnexus.desktop
+productName: UR Nexus Desktop
 copyright: Copyright © 2026
 icon: assets/icon.icns
 files:
@@ -22,12 +27,10 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  notarize:
-    teamId: '${env.APPLE_TEAM_ID}'
 dmg:
   sign: false
 protocols:
-  - name: UR Desktop
+  - name: UR Nexus Desktop
     schemes:
       - ur-desktop
 # electron-builder rebuild defaults to `npm rebuild`; override to use bun if available.

@@ -238,6 +238,14 @@ function AppShell() {
   }, [theme])
 
   useEffect(() => {
+    const toggleTheme = () => {
+      setTheme(value => (value === 'dark' ? 'light' : 'dark'))
+    }
+    window.addEventListener('ur-desktop:toggle-theme', toggleTheme)
+    return () => window.removeEventListener('ur-desktop:toggle-theme', toggleTheme)
+  }, [])
+
+  useEffect(() => {
     window.localStorage.setItem(
       'ur-desktop:sidebar',
       sidebarCollapsed ? 'collapsed' : 'expanded',

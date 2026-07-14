@@ -1,18 +1,21 @@
 import { spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test, expect } from 'bun:test'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const packagedDirectory = process.arch === 'arm64' ? 'mac-arm64' : 'mac'
 const packagedAppBin = path.join(
   __dirname,
   '..',
   'dist',
-  'mac-arm64',
-  'UR Desktop.app',
+  packagedDirectory,
+  'UR Nexus Desktop.app',
   'Contents',
   'MacOS',
-  'UR Desktop',
+  'UR Nexus Desktop',
 )
 
 function waitForOutput(proc, marker, timeoutMs = 10000) {
@@ -43,23 +46,24 @@ function waitForOutput(proc, marker, timeoutMs = 10000) {
 // The packaged .app binary has a complete Electron Framework. Bun's
 // node_modules/electron/dist copy may be a partial shim, so the packaged
 // binary is the only reliable smoke target. In a plain `bun test` run before
-// packaging, the test is skipped; `bun run smoke:mac` sets
-// UR_REQUIRE_PACKAGED=1 so a missing bundle is a hard failure there.
+// packaging, the test is skipped. Direct invocations may set
+// UR_REQUIRE_PACKAGED=1 so a missing bundle is a hard failure.
 const isPackaged = require('node:fs').existsSync(packagedAppBin)
 const requirePackaged = process.env.UR_REQUIRE_PACKAGED === '1'
 
 if (!isPackaged && requirePackaged) {
   throw new Error(
-    'Packaged UR Desktop.app not found. Run `bun run package:mac` before smoke:mac.',
+    'Packaged UR Nexus Desktop.app not found. Run `bun run package:mac` before smoke:mac.',
   )
 }
 
 // Never launch a GUI process as a side effect of the ordinary unit suite.
-// The explicit smoke:mac release command opts in with UR_REQUIRE_PACKAGED.
+// Explicit direct test invocations opt in with UR_REQUIRE_PACKAGED.
 const smokeTest = isPackaged && requirePackaged ? test : test.skip
 
 smokeTest('packaged electron app starts and reports ready', async () => {
   const bin = packagedAppBin
+  const dataDir = mkdtempSync(path.join(tmpdir(), 'ur-nexus-smoke-'))
   const proc = spawn(bin, ['--headless', '--smoke-test'], {
     cwd: path.join(__dirname, '..'),
     env: {
@@ -67,6 +71,7 @@ smokeTest('packaged electron app starts and reports ready', async () => {
       NODE_ENV: 'production',
       SKIP_WINDOW_ON_NO_DISPLAY: '1',
       UR_DESKTOP_SMOKE_TEST: '1',
+      UR_DESKTOP_DATA_DIR: dataDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -76,6 +81,11 @@ smokeTest('packaged electron app starts and reports ready', async () => {
     output = await waitForOutput(proc, 'UR_DESKTOP_READY')
   } finally {
     proc.kill('SIGTERM')
+    await new Promise(resolve => {
+      if (proc.exitCode !== null) resolve()
+      else proc.once('exit', resolve)
+    })
+    rmSync(dataDir, { recursive: true, force: true })
   }
 
   expect(output).toContain('UR_DESKTOP_READY')

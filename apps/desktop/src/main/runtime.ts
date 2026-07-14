@@ -12,6 +12,8 @@ import {
   resumeRun,
   listTools,
   listModels,
+  getCommands,
+  getCommandName,
   setProvider,
   applyPatch,
   readHistory,
@@ -41,6 +43,7 @@ import type {
   DesktopProviderConfigPatch,
   DesktopModelInfoDto,
   DesktopProviderConnectionResultDto,
+  RuntimeSlashCommandDto,
 } from '../shared/ipc.js'
 import {
   addRecentProject,
@@ -152,6 +155,7 @@ import {
   getAgentPermissionSettings,
   normalizeAgentPermissionSettings,
 } from './permissionSettings.js'
+import { ensureChatWorkspace } from './chatWorkspace.js'
 
 export interface RuntimeRun {
   runId: string
@@ -189,10 +193,59 @@ export async function openProjectAndCache(root: string): Promise<{ root: string 
   return { root: normalized }
 }
 
+/**
+ * Open the app-owned workspace used by a project-free conversation. Unlike a
+ * user project, it is deliberately not added to Recents or persisted as the
+ * last opened project in the renderer.
+ */
+export async function openChatWorkspace(): Promise<{ root: string }> {
+  const root = await ensureChatWorkspace()
+  if (!projects.has(root)) {
+    const project = await openProject(root)
+    projects.set(root, project)
+  }
+  return { root }
+}
+
 export function closeProject(root: string): void {
   const normalized = path.resolve(root)
   projects.delete(normalized)
   clearContextFiles(normalized)
+}
+
+/**
+ * Return the live slash-command catalog from the same registry used by the
+ * terminal agent. This includes project skills and plugins, while excluding
+ * hidden and model-only commands that a user cannot invoke from the composer.
+ */
+export async function listProjectSlashCommands(
+  projectRoot: string,
+): Promise<RuntimeSlashCommandDto[]> {
+  const project = getProject(projectRoot)
+  const commands = await getCommands(project.root)
+  const seen = new Set<string>()
+
+  return commands.flatMap(command => {
+    const name = getCommandName(command)
+    if (
+      command.isHidden === true ||
+      command.userInvocable === false ||
+      !name ||
+      seen.has(name)
+    ) {
+      return []
+    }
+    seen.add(name)
+    return [{
+      name,
+      description: command.description || `Run /${name}`,
+      argumentHint: command.argumentHint,
+      aliases: command.aliases ?? [],
+      commandType: command.type,
+      source: command.source,
+      loadedFrom: command.loadedFrom,
+    }]
+  }).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function listProjects(): Promise<

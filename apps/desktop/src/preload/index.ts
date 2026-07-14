@@ -9,6 +9,7 @@ import type {
   RuntimeAgentInfoDto,
   RuntimeMcpServerDto,
   RuntimeToolDefinitionDto,
+  RuntimeSlashCommandDto,
   ProjectInfoDto,
   RecentProjectDto,
   WorktreeInfoDto,
@@ -134,6 +135,9 @@ const api = {
   inspectProject: (root: string): Promise<ProjectInfoDto> =>
     ipcRenderer.invoke('project:inspect', root),
 
+  getChatWorkspace: (): Promise<RuntimeProjectDto> =>
+    ipcRenderer.invoke('project:chat-workspace'),
+
   // Context files / attachments
   addContextFiles: (req: AddContextFilesRequestDto): Promise<ContextFileDto[]> =>
     ipcRenderer.invoke('context:add-files', req),
@@ -252,6 +256,9 @@ const api = {
     projectRoot: string,
     worktreeRoot?: string,
   ): Promise<import('../shared/ipc.js').TerminalCommandDto[]> => ipcRenderer.invoke('commands:list', projectRoot, worktreeRoot),
+
+  listSlashCommands: (projectRoot: string): Promise<RuntimeSlashCommandDto[]> =>
+    ipcRenderer.invoke('slash-commands:list', projectRoot),
 
   // Tasks / agents
   listTasks: (projectRoot: string): Promise<RuntimeTaskInfoDto[]> =>

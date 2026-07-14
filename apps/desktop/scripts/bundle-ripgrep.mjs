@@ -34,6 +34,23 @@ export default async function afterPack(context) {
   updatePlist('Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true')
   console.log(`[bundle-security] hardened ${infoPlist}`)
 
+  // @vscode/ripgrep installs a host-architecture binary. Release builds are
+  // produced for both Mac architectures, so only copy it into the matching
+  // bundle; the other bundle uses the app's architecture-neutral search
+  // fallback instead of shipping an executable that cannot run there.
+  const outputName = path.basename(context.appOutDir)
+  const targetArch = outputName === 'mac-arm64'
+    ? 'arm64'
+    : outputName === 'mac-universal'
+      ? 'universal'
+      : 'x64'
+  if (targetArch !== process.arch) {
+    console.log(
+      `[bundle-ripgrep] skipping host ${process.arch} binary for ${targetArch} bundle`,
+    )
+    return
+  }
+
   let rgPath
   try {
     rgPath = require('@vscode/ripgrep').rgPath

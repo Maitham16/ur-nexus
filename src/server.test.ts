@@ -114,7 +114,7 @@ describe('server', () => {
         expect(response.statusCode).toBe(200)
         expect(response.headers['content-type']).toContain('application/json')
         expect(response.body.message).toBe('UR Server is running')
-        expect(response.body.version).toBe('1.0.3')
+        expect(response.body.version).toBe('1.0.4')
         expect(response.body.port).toBe(port)
         expect(response.body.host).toBe(config.host)
       } finally {

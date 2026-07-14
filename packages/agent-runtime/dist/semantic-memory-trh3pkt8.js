@@ -1,0 +1,129 @@
+import {
+  init_argumentSubstitution,
+  parseArguments
+} from "./index-f6z7dc9t.js";
+import {
+  init_json,
+  safeParseJSON
+} from "./index-wxsgjqjk.js";
+import {
+  getCwd,
+  init_cwd
+} from "./index-2p1fe0x7.js";
+import"./index-9xfq6h4s.js";
+import"./index-0x08e9n5.js";
+import"./index-4bphgmcc.js";
+import"./index-5h7w9qkc.js";
+import"./index-nhjg91p1.js";
+import {
+  __esm
+} from "./index-8rxa073f.js";
+
+// ../../src/commands/semantic-memory/semantic-memory.ts
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
+function indexPath() {
+  return join(getCwd(), ".ur", "semantic-memory", "index", "index.json");
+}
+function tokenize(value) {
+  return [...new Set(value.toLowerCase().match(/[a-z0-9_]{3,}/g) ?? [])];
+}
+function sourceFiles() {
+  const cwd = getCwd();
+  const files = [];
+  for (const file of ["UR.md", "README.md"]) {
+    const path = join(cwd, file);
+    if (existsSync(path))
+      files.push(path);
+  }
+  for (const dir of [join(cwd, ".ur", "memory"), join(cwd, ".ur", "docs")]) {
+    if (!existsSync(dir))
+      continue;
+    for (const file of readdirSync(dir)) {
+      const path = join(dir, file);
+      if (statSync(path).isFile() && /\.(md|txt|jsonl)$/i.test(file)) {
+        files.push(path);
+      }
+    }
+  }
+  return files;
+}
+function chunkText(source, text) {
+  return text.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean).slice(0, 500).map((part, index) => ({
+    id: `${basename(source)}:${index + 1}`,
+    source,
+    text: part.length > 1600 ? `${part.slice(0, 1600)}...` : part,
+    tokens: tokenize(part)
+  }));
+}
+function buildIndex() {
+  const entries = sourceFiles().flatMap((file) => chunkText(file, readFileSync(file, "utf-8")));
+  const index = {
+    version: 1,
+    mode: "lexical",
+    builtAt: new Date().toISOString(),
+    entries
+  };
+  mkdirSync(join(getCwd(), ".ur", "semantic-memory", "index"), { recursive: true });
+  writeFileSync(indexPath(), `${JSON.stringify(index, null, 2)}
+`);
+  return index;
+}
+function loadIndex() {
+  if (!existsSync(indexPath()))
+    return null;
+  const parsed = safeParseJSON(readFileSync(indexPath(), "utf-8"), false);
+  return parsed && typeof parsed === "object" ? parsed : null;
+}
+function searchIndex(index, query) {
+  const queryTokens = tokenize(query);
+  return index.entries.map((entry) => {
+    const entryTokens = new Set(entry.tokens);
+    const score = queryTokens.filter((token) => entryTokens.has(token)).length;
+    return { ...entry, score };
+  }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+}
+var call = async (args) => {
+  const tokens = parseArguments(args);
+  const json = tokens.includes("--json");
+  const command = tokens.find((token) => !token.startsWith("--")) ?? "status";
+  if (command === "build") {
+    const index2 = buildIndex();
+    return {
+      type: "text",
+      value: json ? JSON.stringify(index2, null, 2) : `Built semantic memory index with ${index2.entries.length} entries at ${indexPath()}`
+    };
+  }
+  const index = loadIndex();
+  if (command === "status") {
+    const status = index ? { builtAt: index.builtAt, mode: index.mode, entries: index.entries.length, path: indexPath() } : { entries: 0, path: indexPath(), missing: true };
+    return { type: "text", value: json ? JSON.stringify(status, null, 2) : JSON.stringify(status, null, 2) };
+  }
+  if (command === "search") {
+    const query = tokens.filter((token) => !token.startsWith("--") && token !== "search").join(" ");
+    const activeIndex = index ?? buildIndex();
+    const results = searchIndex(activeIndex, query);
+    if (json)
+      return { type: "text", value: JSON.stringify({ results }, null, 2) };
+    if (results.length === 0)
+      return { type: "text", value: "No memory matches." };
+    return {
+      type: "text",
+      value: results.map((result) => `${result.source} (${result.score})
+${result.text}`).join(`
+
+`)
+    };
+  }
+  return { type: "text", value: "Usage: ur semantic-memory build|search|status [query] [--json]" };
+};
+var init_semantic_memory = __esm(() => {
+  init_argumentSubstitution();
+  init_cwd();
+  init_json();
+});
+init_semantic_memory();
+
+export {
+  call
+};

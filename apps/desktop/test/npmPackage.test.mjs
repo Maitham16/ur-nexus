@@ -9,7 +9,7 @@ const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
 describe('desktop npm package contract', () => {
   test('publishes the requested public identity', () => {
     expect(pkg.name).toBe('ur-nexus-desktop')
-    expect(pkg.version).toBe('1.0.3')
+    expect(pkg.version).toBe('1.0.4')
     expect(pkg.private).not.toBe(true)
     expect(pkg.publishConfig).toEqual({ access: 'public' })
     expect(pkg.repository.url).toContain('Maitham16/ur-nexus')

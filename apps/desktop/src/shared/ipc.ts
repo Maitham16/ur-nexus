@@ -61,6 +61,7 @@ export type IpcChannel =
   | 'project:recent'
   | 'project:remove-recent'
   | 'project:inspect'
+  | 'project:chat-workspace'
   // Context / attachments
   | 'context:add-files'
   | 'context:remove-file'
@@ -139,6 +140,7 @@ export type IpcChannel =
   | 'provider:test'
   | 'provider:models:get'
   | 'tools:list'
+  | 'slash-commands:list'
   // Agent permissions
   | 'permissions:get'
   | 'permissions:set'
@@ -834,6 +836,16 @@ export interface RuntimeToolDefinitionDto {
   risk?: 'none' | 'low' | 'medium' | 'high'
   needsApproval?: boolean
   [key: string]: unknown
+}
+
+export interface RuntimeSlashCommandDto {
+  name: string
+  description: string
+  argumentHint?: string
+  aliases: string[]
+  commandType: 'local' | 'local-jsx' | 'prompt'
+  source?: string
+  loadedFrom?: string
 }
 
 export type DesktopProviderKind =

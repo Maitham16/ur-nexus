@@ -2,10 +2,18 @@ import './vendorGlobals.js'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promises as fs } from 'node:fs'
 import { registerIpcHandlers } from './ipcRegistry.js'
 import { installApplicationMenu } from './menu.js'
 import { setRendererEmitter } from './runtime.js'
 import { loadConfig } from './config.js'
+
+// Keep the user-data directory stable for existing installations while using
+// the full product name in Finder, Spotlight, the Dock, and the menu bar.
+const stableUserDataPath = process.env.UR_DESKTOP_DATA_DIR ??
+  path.join(app.getPath('appData'), 'UR Desktop')
+app.setName('UR Nexus Desktop')
+app.setPath('userData', stableUserDataPath)
 
 const isDev = process.env.NODE_ENV === 'development'
 // Packaged Electron apps can normalize or consume command-line arguments on
@@ -71,6 +79,20 @@ function createWindow(): BrowserWindow {
       win.webContents.send('runtime:deepLink', pendingDeepLinks.shift())
     }
   })
+
+  // Deterministic renderer capture for local release QA. It is opt-in through
+  // an explicit environment path and never runs in normal installations.
+  const screenshotPath = process.env.UR_DESKTOP_SCREENSHOT_PATH
+  if (screenshotPath) {
+    win.webContents.once('did-finish-load', () => {
+      setTimeout(() => {
+        void win.webContents
+          .capturePage()
+          .then(image => fs.writeFile(path.resolve(screenshotPath), image.toPNG()))
+          .finally(() => app.quit())
+      }, 1200)
+    })
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     let parsed: URL

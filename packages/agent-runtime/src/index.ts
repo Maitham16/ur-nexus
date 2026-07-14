@@ -5,6 +5,8 @@
 // Keeping the source of truth in src/ avoids duplicating logic or moving
 // thousands of files during Phase 1.
 
+import { getCommands } from 'src/commands.js'
+
 export {
   QueryEngine,
   ask,
@@ -146,6 +148,8 @@ export {
 } from 'src/services/providers/providerRegistry.js'
 
 export {
+  getCommands,
+  getCommandName,
   getSlashCommandToolSkills,
   type Command,
 } from 'src/commands.js'
@@ -339,10 +343,15 @@ export async function createSession(
   const sessionId = opts.sessionId ?? randomUUID()
   const appState = project.appStateStore.getState()
   const tools = getAllBaseTools()
+  // Use the same command registry as the terminal agent. Embedders such as
+  // the desktop app therefore execute built-ins, project skills, plugins and
+  // workflow commands through the real runtime instead of treating `/...` as
+  // ordinary model text.
+  const commands = await getCommands(project.root)
   const engine = new QueryEngine({
     cwd: project.root,
     tools,
-    commands: [],
+    commands,
     mcpClients: appState.mcp.clients,
     agents: appState.agentDefinitions.activeAgents,
     canUseTool: opts.canUseTool ?? (async () => ({ behavior: 'allow' } as import('src/types/permissions.js').PermissionDecision<Record<string, unknown>>)),

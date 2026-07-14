@@ -1,10 +1,10 @@
-# UR Desktop
+# UR Nexus Desktop
 
 A standalone macOS Electron app for UR-Nexus. It installs and runs alone with no global `ur` CLI dependency, no subscription CLI provider, and bundles the internal `@ur/agent-runtime` package.
 
 ## Install from npm
 
-UR-Nexus Desktop is published as `ur-nexus-desktop` and includes its own
+UR Nexus Desktop is published as `ur-nexus-desktop` and includes its own
 Electron runtime. No API key is bundled: each user chooses a provider and adds,
 replaces, or removes their own credentials in **Settings**.
 
@@ -49,14 +49,14 @@ Produces:
 ## macOS package
 
 ```bash
-bun run build:electron
+bun run package:mac
 ```
 
 Generates in `dist/`:
 
-- `UR Desktop-x.x.x-arm64.dmg` (Apple Silicon)
-- `UR Desktop-x.x.x-arm64.zip` (Apple Silicon)
-- `UR Desktop-x.x.x-x64.dmg` (Intel, when built on Intel or with `--x64`)
+- `UR Nexus Desktop-x.x.x-arm64.dmg` (Apple Silicon)
+- `UR Nexus Desktop-x.x.x-arm64.zip` (Apple Silicon)
+- `UR Nexus Desktop-x.x.x-x64.dmg` (Intel)
 
 Universal binaries are produced when `electron-builder` runs on an Apple Silicon Mac with both architectures available. Set `electron-arch` or use `electron-builder --universal` if needed.
 
@@ -64,7 +64,10 @@ The native terminal module (`node-pty`) is unpacked from the ASAR so it loads at
 
 ## macOS install
 
-Open the produced `.dmg` and drag **UR Desktop** to `/Applications`. On first launch the app opens without a project selected; use the project input in the chat footer to open a local directory.
+Open the produced `.dmg` and drag **UR Nexus Desktop** to `/Applications`.
+It then appears in Finder, Launchpad, and Spotlight like a normal Mac app.
+On first launch the composer is ready immediately in **General chat**; choosing
+a project or attaching files is optional.
 
 ## macOS Keychain secret storage
 
@@ -74,7 +77,9 @@ API keys are stored by the main process in the macOS Keychain via the existing `
 
 Open **Settings**, pick a provider, enter a model, and save. Click **Save & test** to verify reachability.
 
-In chat, type `/` to open the command palette. Continue typing to filter,
+In chat, type `/` to open the complete terminal-agent command palette. The
+catalog is loaded from the shared runtime and includes built-ins, project
+skills, plugins, aliases, and workflows. Continue typing to filter,
 use <kbd>↑</kbd>/<kbd>↓</kbd> to navigate, <kbd>Tab</kbd> or
 <kbd>Enter</kbd> to select, and <kbd>Esc</kbd> to close it.
 
@@ -152,7 +157,9 @@ The app registers the `ur-desktop://` protocol. On launch it handles `open-url` 
 
 - `hardenedRuntime: true`
 - `entitlements: build/entitlements.mac.plist`
-- `notarize.teamId: ${env.APPLE_TEAM_ID}`
+
+electron-builder enables notarization when a complete supported Apple
+credential set is present in the environment.
 
 To sign and notarize, set environment variables before packaging:
 

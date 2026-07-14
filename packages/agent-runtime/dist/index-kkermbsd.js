@@ -1,0 +1,82 @@
+import {
+  L,
+  init_index_min
+} from "./index-0x08e9n5.js";
+import {
+  __esm
+} from "./index-8rxa073f.js";
+
+// ../../src/utils/fileStateCache.ts
+import { normalize } from "path";
+
+class FileStateCache {
+  cache;
+  constructor(maxEntries, maxSizeBytes) {
+    this.cache = new L({
+      max: maxEntries,
+      maxSize: maxSizeBytes,
+      sizeCalculation: (value) => Math.max(1, Buffer.byteLength(value.content))
+    });
+  }
+  get(key) {
+    return this.cache.get(normalize(key));
+  }
+  set(key, value) {
+    this.cache.set(normalize(key), value);
+    return this;
+  }
+  has(key) {
+    return this.cache.has(normalize(key));
+  }
+  delete(key) {
+    return this.cache.delete(normalize(key));
+  }
+  clear() {
+    this.cache.clear();
+  }
+  get size() {
+    return this.cache.size;
+  }
+  get max() {
+    return this.cache.max;
+  }
+  get maxSize() {
+    return this.cache.maxSize;
+  }
+  get calculatedSize() {
+    return this.cache.calculatedSize;
+  }
+  keys() {
+    return this.cache.keys();
+  }
+  entries() {
+    return this.cache.entries();
+  }
+  dump() {
+    return this.cache.dump();
+  }
+  load(entries) {
+    this.cache.load(entries);
+  }
+}
+function createFileStateCacheWithSizeLimit(maxEntries, maxSizeBytes = DEFAULT_MAX_CACHE_SIZE_BYTES) {
+  return new FileStateCache(maxEntries, maxSizeBytes);
+}
+function cacheToObject(cache) {
+  return Object.fromEntries(cache.entries());
+}
+function cacheKeys(cache) {
+  return Array.from(cache.keys());
+}
+function cloneFileStateCache(cache) {
+  const cloned = createFileStateCacheWithSizeLimit(cache.max, cache.maxSize);
+  cloned.load(cache.dump());
+  return cloned;
+}
+var READ_FILE_STATE_CACHE_SIZE = 100, DEFAULT_MAX_CACHE_SIZE_BYTES;
+var init_fileStateCache = __esm(() => {
+  init_index_min();
+  DEFAULT_MAX_CACHE_SIZE_BYTES = 25 * 1024 * 1024;
+});
+
+export { READ_FILE_STATE_CACHE_SIZE, createFileStateCacheWithSizeLimit, cacheToObject, cacheKeys, cloneFileStateCache, init_fileStateCache };

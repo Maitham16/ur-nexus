@@ -51,7 +51,7 @@ export function createServer(config: ServerConfig): ServerInstance {
       const activePort = address && typeof address !== 'string' ? address.port : config.port
       res.end(JSON.stringify({
         message: 'UR Server is running',
-        version: '1.0.3',
+        version: '1.0.4',
         port: activePort,
         host: config.host
       }))

@@ -7,8 +7,11 @@ import {
   setRendererEmitter,
   respondApproval,
   openProjectAndCache,
+  openChatWorkspace,
   closeProject,
   startRun,
+  runPromptStream,
+  listProjectSlashCommands,
   executeTool,
   proposeEdit,
   applyProjectPatch,
@@ -55,6 +58,25 @@ afterEach(() => {
 })
 
 describe('desktop runtime end-to-end (no window)', () => {
+  it('starts a sandboxed general chat without a user-selected project', async () => {
+    const chat = await openChatWorkspace()
+    expect(chat.root).toBe(path.join(dataDir, 'chat-workspace'))
+
+    const { runId, projectRoot } = await startRun(chat.root)
+    expect(projectRoot).toBe(chat.root)
+
+    const writeResult = await executeTool(runId, 'Write', {
+      path: 'general-chat.txt',
+      content: 'private chat workspace\n',
+    }) as { written?: boolean }
+    expect(writeResult.written).toBe(true)
+    expect(fs.readFileSync(path.join(chat.root, 'general-chat.txt'), 'utf-8')).toBe(
+      'private chat workspace\n',
+    )
+    expect(fs.existsSync(path.join(repo, 'general-chat.txt'))).toBe(false)
+    closeProject(chat.root)
+  })
+
   it('runs Write/Read/Glob tools against the real project directory', async () => {
     const { runId } = await startRun(repo)
 
@@ -88,6 +110,24 @@ describe('desktop runtime end-to-end (no window)', () => {
       unsupported?: boolean
     }
     expect(bogus.unsupported).toBe(true)
+  })
+
+  it('lists and executes the terminal agent slash-command registry', async () => {
+    const commands = await listProjectSlashCommands(repo)
+    expect(commands.length).toBeGreaterThan(100)
+    expect(commands.some(command => command.name === 'workspace')).toBe(true)
+    expect(commands.some(command => command.name === 'security-review')).toBe(true)
+
+    const { runId } = await startRun(repo)
+    const events = []
+    for await (const event of runPromptStream(runId, '/workspace')) {
+      events.push(event)
+    }
+    const output = events
+      .filter(event => event.type === 'model_stream')
+      .map(event => String((event as { delta?: string }).delta ?? ''))
+      .join('')
+    expect(output).toContain(repo)
   })
 
   it('proposes a real unified diff and applies it via git apply', async () => {

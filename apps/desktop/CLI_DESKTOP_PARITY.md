@@ -1,6 +1,6 @@
 # CLI ↔ Desktop Capability Parity
 
-Audit date: 2026-07-14 (release update) (desktop 1.0.3, runtime bundle 1.0.3, CLI source `src/` at monorepo root).
+Audit date: 2026-07-14 (release update) (desktop 1.0.4, runtime bundle 1.0.4, CLI source `src/` at monorepo root).
 
 The desktop app is standalone: it vendors the agent runtime as a prebuilt local
 bundle (`vendor/agent-runtime`, declared as `file:./vendor/agent-runtime` in
@@ -13,6 +13,7 @@ Legend — **Status**: ✅ working end-to-end · 🟡 working with noted limits 
 | CLI capability | CLI source | Desktop implementation | Desktop UI | Runtime/API used | Status | Missing behavior | Tests |
 |---|---|---|---|---|---|---|---|
 | Prompt execution | `src/QueryEngine.ts`, `src/query.ts` | `runtime.ts → runPromptStream()` consumes vendored `runPrompt()`; events streamed over `runtime:event` | Chat | `@ur/agent-runtime` `createSession`/`runPrompt` | ✅ | — | `ipcRegistry.test.ts`, `runtime.approval.test.ts` |
+| Slash commands and skills | `src/commands.ts`, project/plugin/workflow registries | Runtime sessions receive `getCommands(projectRoot)` and the renderer loads the same live catalog over `slash-commands:list`; desktop-native routes override CLI-only TUI dialogs | Chat `/` palette | shared command registry + `QueryEngine` slash processing | ✅ | — | `slashCommands.test.ts`, `runtime.e2e.test.ts` |
 | Chat sessions | `src/screens/repl`, session store | `startRun()` creates a runtime session per chat; follow-up messages reuse the session | Chat | `createSession(project, {sessionId, canUseTool})` | ✅ | Named multi-chat tabs (single active session per window) | smoke + registry tests |
 | Planning | `src/services/promptPlanning` | `planning.ts`: shouldPlan heuristic, structured plan generation via real model run, placeholder-plan rejection, editable review, scheduler-driven execution | Chat Plan mode (review/edit/start), live task board | real model run + TaskScheduler | ✅ | — | `planning.test.ts` (12) |
 | Task creation/updates | `src/tasks.ts`, `src/tools/TaskCreateTool…TaskUpdateTool` | `taskAgentRegistry.ts` + `executeToolLocal` TaskCreate/TaskUpdate/TaskList mapping | Tasks page, Chat context | local registry + tool events | ✅ | Cross-session task persistence | registry tests |

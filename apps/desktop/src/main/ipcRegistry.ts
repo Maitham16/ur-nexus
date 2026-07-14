@@ -40,6 +40,7 @@ import type {
 } from '../shared/ipc.js'
 import {
   openProjectAndCache,
+  openChatWorkspace,
   listProjects,
   removeRecentProject,
   getProjectInfo,
@@ -57,6 +58,7 @@ import {
   stopProjectCommand,
   listProjectTerminalCommands,
   listProjectToolDefinitions,
+  listProjectSlashCommands,
   listProjectProviders,
   listProjectModels,
   getProjectProviderConfig,
@@ -317,6 +319,7 @@ export function registerIpcHandlers(
     },
     'project:inspect': (root: unknown) =>
       getProjectInfo(expectString(root, 'root')),
+    'project:chat-workspace': () => openChatWorkspace(),
 
     // ------ Context files ------
     'context:add-files': (req: unknown) => {
@@ -793,6 +796,8 @@ export function registerIpcHandlers(
       ),
     'tools:list': (projectRoot: unknown) =>
       listProjectToolDefinitions(expectString(projectRoot, 'projectRoot')),
+    'slash-commands:list': (projectRoot: unknown) =>
+      listProjectSlashCommands(expectString(projectRoot, 'projectRoot')),
 
     // ------ Agent permissions ------
     'permissions:get': () => getAgentPermissionSettings(),

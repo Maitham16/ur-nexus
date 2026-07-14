@@ -5132,6 +5132,11 @@ body {
   font-size: 12.5px;
 }
 
+.chat-recent-projects {
+  width: min(100%, 650px);
+  margin-top: 30px;
+}
+
 .starter-grid {
   width: min(100%, 580px);
   display: flex;
@@ -5289,6 +5294,21 @@ body {
   height: 5px;
   border-radius: 50%;
   background: var(--ok);
+}
+
+.composer-context-button {
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.composer-context-button:hover {
+  color: var(--text-secondary);
+  background: var(--surface-3);
 }
 
 .message {

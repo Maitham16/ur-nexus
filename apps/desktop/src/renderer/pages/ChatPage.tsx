@@ -14,6 +14,7 @@ import {
   expandSlashPrompt,
   filterSlashCommands,
   getSlashCommandQuery,
+  mergeSlashCommands,
   parseSlashCommand,
   type DesktopSlashCommand,
 } from '../slashCommands.js'
@@ -64,6 +65,27 @@ const starterPrompts: Array<{ icon: IconName; title: string; prompt: string; mod
     icon: 'plan',
     title: 'Plan complex work',
     prompt: 'Create an implementation plan for the next major improvement to this project, including dependencies, verification, and rollout risks.',
+    mode: 'plan',
+  },
+]
+
+const generalStarterPrompts: typeof starterPrompts = [
+  {
+    icon: 'chat',
+    title: 'Start a conversation',
+    prompt: 'Help me think through an idea clearly. Ask useful questions and turn it into practical next steps.',
+    mode: 'ask',
+  },
+  {
+    icon: 'sparkles',
+    title: 'Write or improve something',
+    prompt: 'Help me create a polished first draft. Ask for any essential context, then produce something I can use.',
+    mode: 'ask',
+  },
+  {
+    icon: 'plan',
+    title: 'Plan a project',
+    prompt: 'Turn my goal into a clear, professional plan with milestones, risks, and the best first action.',
     mode: 'plan',
   },
 ]
@@ -231,6 +253,9 @@ export function ChatPage() {
     openProjectViaDialog,
   } = useProject()
 
+  const [chatWorkspaceRoot, setChatWorkspaceRoot] = useState<string | null>(null)
+  const runtimeRoot = projectRoot ?? chatWorkspaceRoot
+
   const [runId, setRunId] = useState<string | null>(null)
   const [worktreeRoot, setWorktreeRoot] = useState<string | undefined>(undefined)
   const [useWorktree, setUseWorktree] = useState(false)
@@ -249,10 +274,13 @@ export function ChatPage() {
   const [planHint, setPlanHint] = useState(false)
   const [slashSelection, setSlashSelection] = useState(0)
   const [slashDismissed, setSlashDismissed] = useState(false)
+  const [slashCommands, setSlashCommands] = useState<DesktopSlashCommand[]>([
+    ...DESKTOP_SLASH_COMMANDS,
+  ])
   const slashQuery = useMemo(() => getSlashCommandQuery(input), [input])
   const slashSuggestions = useMemo(
-    () => slashQuery === null ? [] : filterSlashCommands(slashQuery).slice(0, 9),
-    [slashQuery],
+    () => slashQuery === null ? [] : filterSlashCommands(slashQuery, slashCommands),
+    [slashCommands, slashQuery],
   )
   const slashMenuOpen = !slashDismissed && slashQuery !== null && slashSuggestions.length > 0
 
@@ -261,11 +289,38 @@ export function ChatPage() {
   }, [slashQuery])
 
   useEffect(() => {
+    if (!slashMenuOpen) return
+    document
+      .querySelector('.slash-command-item[aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [slashMenuOpen, slashSelection])
+
+  useEffect(() => {
     if (!desktop) return
     desktop.getAgentPermissions().then(setPermissions).catch(() => {
       setPermissions(DEFAULT_PERMISSIONS)
     })
   }, [desktop])
+
+  // Load the exact command catalog used by the terminal runtime. Desktop UI
+  // overrides are merged on top for commands such as /model and /settings;
+  // non-TUI commands execute through the shared runtime unchanged, while any
+  // remaining CLI-only dialogs use an explicit agent-backed desktop action.
+  useEffect(() => {
+    if (!desktop || !runtimeRoot) return
+    let cancelled = false
+    desktop
+      .listSlashCommands(runtimeRoot)
+      .then(commands => {
+        if (!cancelled) setSlashCommands(mergeSlashCommands(commands))
+      })
+      .catch(() => {
+        if (!cancelled) setSlashCommands([...DESKTOP_SLASH_COMMANDS])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [desktop, runtimeRoot])
 
   // Debounced planning-recommendation check against the real heuristic.
   useEffect(() => {
@@ -297,7 +352,26 @@ export function ChatPage() {
   const streamRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const runIdRef = useRef<string | null>(null)
+  const previousRuntimeRootRef = useRef<string | null>(null)
   runIdRef.current = runId
+
+  // General conversations run inside an app-owned private directory. This
+  // preserves a real sandbox/cwd without forcing the user to choose a project.
+  useEffect(() => {
+    if (!desktop) return
+    let cancelled = false
+    desktop
+      .getChatWorkspace()
+      .then(workspace => {
+        if (!cancelled) setChatWorkspaceRoot(workspace.root)
+      })
+      .catch(err => {
+        if (!cancelled) setSendError(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [desktop])
 
   useEffect(() => {
     if (!startTime || status !== 'running') return
@@ -323,21 +397,21 @@ export function ChatPage() {
     textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 72), 180)}px`
   }, [input])
 
-  // A newly opened workspace always starts as a ready, focused thread.
+  // The composer is ready for both general chat and project-backed threads.
   useEffect(() => {
-    if (!projectRoot) return
+    if (!runtimeRoot) return
     const frame = requestAnimationFrame(() => composerRef.current?.focus())
     return () => cancelAnimationFrame(frame)
-  }, [projectRoot])
+  }, [runtimeRoot])
 
   const refreshProjectState = useCallback(async () => {
-    if (!desktop || !projectRoot) return
+    if (!desktop || !runtimeRoot) return
     try {
       const [p, m, a, t] = await Promise.all([
-        desktop.listProviders(projectRoot),
-        desktop.listModels(projectRoot),
-        desktop.listAgents(projectRoot),
-        desktop.listTasks(projectRoot),
+        desktop.listProviders(runtimeRoot),
+        desktop.listModels(runtimeRoot),
+        desktop.listAgents(runtimeRoot),
+        desktop.listTasks(runtimeRoot),
       ])
       setProviders(p)
       setModels(m)
@@ -353,7 +427,7 @@ export function ChatPage() {
       // is populated on load (the static list is often minimal).
       if (providerId) {
         desktop
-          .listProviderModels(projectRoot, providerId)
+          .listProviderModels(runtimeRoot, providerId)
           .then(discovered => {
             if (discovered.length > 0) {
               setModels(discovered)
@@ -367,23 +441,23 @@ export function ChatPage() {
     } catch (err) {
       setSendError(err instanceof Error ? err.message : String(err))
     }
-  }, [desktop, projectRoot])
+  }, [desktop, runtimeRoot])
 
   useEffect(() => {
     void refreshProjectState()
   }, [refreshProjectState])
 
   const refreshInterrupted = useCallback(async () => {
-    if (!desktop || !projectRoot) {
+    if (!desktop || !runtimeRoot) {
       setInterruptedRuns([])
       return
     }
     try {
-      setInterruptedRuns(await desktop.listInterruptedRuns(projectRoot))
+      setInterruptedRuns(await desktop.listInterruptedRuns(runtimeRoot))
     } catch {
       setInterruptedRuns([])
     }
-  }, [desktop, projectRoot])
+  }, [desktop, runtimeRoot])
 
   useEffect(() => {
     void refreshInterrupted()
@@ -458,8 +532,8 @@ export function ChatPage() {
   const handleEvent = useCallback(
     (event: RuntimeEvent) => {
       // Events are broadcast to all windows; only render those for the
-      // active project (terminal-only events carry an empty projectRoot).
-      if (projectRoot && event.projectRoot && event.projectRoot !== projectRoot) {
+      // active chat workspace (terminal-only events carry an empty root).
+      if (runtimeRoot && event.projectRoot && event.projectRoot !== runtimeRoot) {
         return
       }
       switch (event.type) {
@@ -764,13 +838,13 @@ export function ChatPage() {
         }
       }
     },
-    [elapsed, projectRoot, pushSystem, refreshProjectState],
+    [elapsed, runtimeRoot, pushSystem, refreshProjectState],
   )
 
   useRuntimeEvents(handleEvent)
 
   const ensureRun = useCallback(async (): Promise<string | null> => {
-    if (!desktop || !projectRoot) return null
+    if (!desktop || !runtimeRoot) return null
     if (runIdRef.current) return runIdRef.current
     setStatus('starting')
     try {
@@ -778,12 +852,15 @@ export function ChatPage() {
       // provider settings at creation time.
       if (selectedProvider) {
         await desktop.updateProvider(
-          projectRoot,
+          runtimeRoot,
           selectedProvider,
           selectedModel || undefined,
         )
       }
-      const session = await desktop.startRun(projectRoot, { useWorktree, permissions })
+      const session = await desktop.startRun(runtimeRoot, {
+        useWorktree: projectRoot ? useWorktree : false,
+        permissions,
+      })
       setRunId(session.sessionId)
       runIdRef.current = session.sessionId
       setWorktreeRoot(session.worktreeRoot)
@@ -794,7 +871,7 @@ export function ChatPage() {
       setSendError(err instanceof Error ? err.message : String(err))
       return null
     }
-  }, [desktop, projectRoot, useWorktree, permissions, selectedProvider, selectedModel])
+  }, [desktop, runtimeRoot, projectRoot, useWorktree, permissions, selectedProvider, selectedModel])
 
   const sendPrompt = useCallback(
     async (content: string, files: ContextFileDto[]) => {
@@ -840,7 +917,7 @@ export function ChatPage() {
 
   const generatePlanFromPrompt = useCallback(
     async (content: string) => {
-      if (!desktop || !projectRoot) return
+      if (!desktop || !runtimeRoot) return
       setMessages(prev => [
         ...prev,
         {
@@ -858,7 +935,7 @@ export function ChatPage() {
       ])
       setStatus('starting')
       try {
-        const plan = await desktop.generatePlan({ projectRoot, prompt: content })
+        const plan = await desktop.generatePlan({ projectRoot: runtimeRoot, prompt: content })
         setMessages(prev => [
           ...prev,
           {
@@ -883,12 +960,12 @@ export function ChatPage() {
         setStatus('idle')
       }
     },
-    [desktop, projectRoot],
+    [desktop, runtimeRoot],
   )
 
   const executePlanMessage = useCallback(
     async (msg: PlanMessage) => {
-      if (!desktop || !projectRoot) return
+      if (!desktop || !runtimeRoot) return
       setMessages(prev =>
         prev.map(m =>
           m.id === msg.id ? ({ ...m, planStatus: 'running' } as PlanMessage) : m,
@@ -898,7 +975,7 @@ export function ChatPage() {
       setStartTime(Date.now())
       setElapsed(0)
       try {
-        const result = await desktop.executePlan({ projectRoot, plan: msg.plan })
+        const result = await desktop.executePlan({ projectRoot: runtimeRoot, plan: msg.plan })
         const failed = result.tasks.some(t => t.status === 'failed')
         setMessages(prev =>
           prev.map(m =>
@@ -922,7 +999,7 @@ export function ChatPage() {
         setStatus('idle')
       }
     },
-    [desktop, projectRoot],
+    [desktop, runtimeRoot],
   )
 
   const updatePlanMessage = useCallback(
@@ -976,7 +1053,25 @@ export function ChatPage() {
     setSendError(null)
     setLastUserPrompt(null)
     setUsage(null)
+    setAttachments([])
+    setAttachmentErrors([])
   }, [])
+
+  // A thread belongs to exactly one workspace. Switching between general chat
+  // and a selected project starts a clean thread and stops any old live run so
+  // events and attachments can never cross workspace boundaries.
+  useEffect(() => {
+    const previousRoot = previousRuntimeRootRef.current
+    if (previousRoot && runtimeRoot && previousRoot !== runtimeRoot) {
+      const activeRunId = runIdRef.current
+      if (activeRunId) void desktop?.stopRun(activeRunId).catch(() => undefined)
+      for (const file of attachments) {
+        void desktop?.removeContextFile(previousRoot, file.path)
+      }
+      clearContext()
+    }
+    previousRuntimeRootRef.current = runtimeRoot
+  }, [attachments, clearContext, desktop, runtimeRoot])
 
   const selectSlashCommand = useCallback((command: DesktopSlashCommand) => {
     const next = `/${command.name} `
@@ -992,7 +1087,9 @@ export function ChatPage() {
     async (content: string, files: ContextFileDto[]): Promise<boolean> => {
       const parsed = parseSlashCommand(content)
       if (!parsed) return false
-      const command = DESKTOP_SLASH_COMMANDS.find(item => item.name === parsed.name)
+      const command = slashCommands.find(item =>
+        item.name === parsed.name || item.aliases?.includes(parsed.name),
+      )
       if (!command) return false
 
       const addSystemMessage = (message: string) => {
@@ -1012,10 +1109,19 @@ export function ChatPage() {
         return true
       }
 
+      if (command.action === 'agent') {
+        await sendPrompt(
+          `Perform the desktop equivalent of the terminal command /${command.name}${parsed.args ? ` ${parsed.args}` : ''}. ` +
+          `Its purpose is: ${command.description}. Use the available desktop agent tools, explain any terminal-only limitation, and complete the requested outcome safely.`,
+          files,
+        )
+        return true
+      }
+
       switch (command.name) {
         case 'help':
           addSystemMessage(
-            `Available desktop commands:\n\n${DESKTOP_SLASH_COMMANDS.map(item => `/${item.name}${item.argumentHint ? ` ${item.argumentHint}` : ''} — ${item.description}`).join('\n')}`,
+            `Available commands (${slashCommands.length}):\n\n${slashCommands.map(item => `/${item.name}${item.argumentHint ? ` ${item.argumentHint}` : ''} — ${item.description}`).join('\n')}`,
           )
           return true
         case 'new':
@@ -1033,6 +1139,28 @@ export function ChatPage() {
           )
           return true
         }
+        case 'theme':
+          window.dispatchEvent(new CustomEvent('ur-desktop:toggle-theme'))
+          return true
+        case 'copy': {
+          const latest = messages.findLast(message =>
+            message.role === 'assistant' || message.role === 'final_report',
+          ) as AssistantMessage | FinalReportMessage | undefined
+          if (!latest) {
+            addSystemMessage('There is no response to copy yet.')
+            return true
+          }
+          try {
+            await navigator.clipboard.writeText(latest.content)
+            addSystemMessage('Latest response copied to the clipboard.')
+          } catch {
+            addSystemMessage('Clipboard access was unavailable. Use the response copy button instead.')
+          }
+          return true
+        }
+        case 'exit':
+          window.close()
+          return true
         case 'model': {
           if (!parsed.args) {
             navigate('/settings')
@@ -1042,11 +1170,11 @@ export function ChatPage() {
           const model = models.find(item =>
             item.id.toLowerCase() === wanted || item.displayName?.toLowerCase() === wanted,
           )
-          if (!model || !selectedProvider || !projectRoot) {
+          if (!model || !selectedProvider || !runtimeRoot) {
             addSystemMessage(`Model "${parsed.args}" is not available for the active provider. Use /model to open provider settings.`)
             return true
           }
-          await desktop?.updateProvider(projectRoot, selectedProvider, model.id)
+          await desktop?.updateProvider(runtimeRoot, selectedProvider, model.id)
           setSelectedModel(model.id)
           addSystemMessage(`Active model changed to ${model.displayName || model.id}.`)
           return true
@@ -1096,13 +1224,16 @@ export function ChatPage() {
       clearContext,
       desktop,
       models,
+      messages,
       navigate,
       permissions,
       projectRoot,
+      runtimeRoot,
       providers,
       selectedModel,
       selectedProvider,
       sendPrompt,
+      slashCommands,
     ],
   )
 
@@ -1114,9 +1245,9 @@ export function ChatPage() {
     setAttachments([])
     setAttachmentErrors([])
     setSlashDismissed(false)
-    if (projectRoot) {
+    if (runtimeRoot) {
       for (const f of files) {
-        void desktop?.removeContextFile(projectRoot, f.path)
+        void desktop?.removeContextFile(runtimeRoot, f.path)
       }
     }
     if (await executeDesktopSlashCommand(content, files)) return
@@ -1132,14 +1263,14 @@ export function ChatPage() {
     generatePlanFromPrompt,
     input,
     mode,
-    projectRoot,
+    runtimeRoot,
     sendPrompt,
   ])
 
   const addAttachmentPaths = useCallback(
     async (paths: string[]) => {
-      if (!desktop || !projectRoot || paths.length === 0) return
-      const results = await desktop.addContextFiles({ projectRoot, paths })
+      if (!desktop || !runtimeRoot || paths.length === 0) return
+      const results = await desktop.addContextFiles({ projectRoot: runtimeRoot, paths })
       const accepted = results.filter(r => r.ok)
       const rejected = results.filter(r => !r.ok)
       setAttachments(prev => {
@@ -1150,25 +1281,25 @@ export function ChatPage() {
         rejected.map(r => `${r.name}: ${r.reason ?? r.kind}`),
       )
     },
-    [desktop, projectRoot],
+    [desktop, runtimeRoot],
   )
 
   const attachFiles = useCallback(async () => {
-    if (!desktop || !projectRoot) return
+    if (!desktop || !runtimeRoot) return
     const result = await desktop.openFilesDialog({
       multi: true,
-      defaultPath: projectRoot,
+      defaultPath: projectRoot ?? undefined,
     })
     if (result.canceled) return
     await addAttachmentPaths(result.paths)
-  }, [desktop, projectRoot, addAttachmentPaths])
+  }, [desktop, runtimeRoot, projectRoot, addAttachmentPaths])
 
   const removeAttachment = useCallback(
     (file: ContextFileDto) => {
       setAttachments(prev => prev.filter(f => f.path !== file.path))
-      if (projectRoot) void desktop?.removeContextFile(projectRoot, file.path)
+      if (runtimeRoot) void desktop?.removeContextFile(runtimeRoot, file.path)
     },
-    [desktop, projectRoot],
+    [desktop, runtimeRoot],
   )
 
   // Files dropped anywhere in the window route here via the app shell.
@@ -1232,9 +1363,9 @@ export function ChatPage() {
   )
 
   const exportReport = async () => {
-    if (!desktop || !projectRoot) return
+    if (!desktop || !runtimeRoot) return
     try {
-      const report = await desktop.exportReport(projectRoot, worktreeRoot)
+      const report = await desktop.exportReport(runtimeRoot, worktreeRoot)
       setMessages(prev => [
         ...prev,
         {
@@ -1254,8 +1385,8 @@ export function ChatPage() {
     setSelectedProvider(providerId)
     if (!providerId) return
     try {
-      await desktop?.updateProvider(projectRoot ?? '', providerId, selectedModel || undefined)
-      const discovered = await desktop?.listProviderModels(projectRoot ?? '', providerId)
+      await desktop?.updateProvider(runtimeRoot ?? '', providerId, selectedModel || undefined)
+      const discovered = await desktop?.listProviderModels(runtimeRoot ?? '', providerId)
       if (discovered) {
         setModels(discovered)
         if (discovered[0] && !discovered.some(model => model.id === selectedModel)) {
@@ -1269,9 +1400,9 @@ export function ChatPage() {
 
   const changeModel = async (modelId: string) => {
     setSelectedModel(modelId)
-    if (selectedProvider && modelId && projectRoot) {
+    if (selectedProvider && modelId && runtimeRoot) {
       await desktop
-        ?.updateProvider(projectRoot, selectedProvider, modelId)
+        ?.updateProvider(runtimeRoot, selectedProvider, modelId)
         .catch(err => setSendError(err instanceof Error ? err.message : String(err)))
     }
   }
@@ -1283,50 +1414,19 @@ export function ChatPage() {
 
   const busy = status === 'running' || status === 'starting' || status === 'waiting_approval'
 
-  if (!projectRoot) {
-    return (
-      <div className="page chat-page welcome-page codex-welcome">
-        <section className="welcome-shell">
-          <div className="codex-welcome-mark"><Icon name="sparkles" size={22} /></div>
-          <h1>What should we work on?</h1>
-          <p className="welcome-lede">
-            Open a local project to start a thread. UR can read the codebase, make changes, run commands, and verify the result.
-          </p>
-          <div className="welcome-actions">
-            <button className="button" onClick={openProjectViaDialog}>
-              <Icon name="folder" size={16} /> Open project
-            </button>
-          </div>
-          {recentProjects.length > 0 && (
-            <div className="welcome-recent" tabIndex={-1}>
-              <div className="welcome-recent-heading"><span>Recent projects</span><button className="link-button" onClick={() => navigate('/projects')}>View all</button></div>
-              <div className="welcome-recent-grid">
-                {recentProjects.slice(0, 3).map(project => (
-                  <button key={project.root} onClick={() => void openProject(project.root)}>
-                    <span className="recent-project-icon"><Icon name="folder" size={17} /></span>
-                    <span className="recent-project-copy"><strong>{project.name}</strong><small>{project.root}</small></span>
-                    <span className="recent-project-arrow">→</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      </div>
-    )
-  }
-
   const chooseStarter = (starter: (typeof starterPrompts)[number]) => {
     setMode(starter.mode)
     setInput(starter.prompt)
     requestAnimationFrame(() => composerRef.current?.focus())
   }
 
+  const activeStarterPrompts = projectRoot ? starterPrompts : generalStarterPrompts
+
   return (
     <div className="page chat-page workspace-page">
       <header className="chat-header">
         <div className="chat-header-left">
-          <div className="chat-project">{projectName}</div>
+          <div className="chat-project">{projectRoot ? projectName : 'New chat'}</div>
           <div className="chat-meta">
             {status === 'idle' && (
               <span className="workspace-ready"><i /> Agent ready</span>
@@ -1367,19 +1467,26 @@ export function ChatPage() {
         </div>
 
         <div className="chat-header-right">
-          <button className="button button-secondary button-small" onClick={() => navigate('/explorer')}>
-            Open
-          </button>
-          <button className="button button-secondary button-small" onClick={() => navigate('/diffs')}>
-            Changes{changedFiles.length > 0 ? ` ${changedFiles.length}` : ''}
-          </button>
           <button
-            className="icon-button toolbar-icon-button"
-            onClick={() => navigate('/history')}
-            title="Checkpoints and run history"
+            className="button button-secondary button-small"
+            onClick={projectRoot ? () => navigate('/explorer') : openProjectViaDialog}
           >
-            <Icon name="history" size={16} />
+            <Icon name="folder" size={14} /> {projectRoot ? 'Files' : 'Choose project'}
           </button>
+          {projectRoot && (
+            <>
+              <button className="button button-secondary button-small" onClick={() => navigate('/diffs')}>
+                Changes{changedFiles.length > 0 ? ` ${changedFiles.length}` : ''}
+              </button>
+              <button
+                className="icon-button toolbar-icon-button"
+                onClick={() => navigate('/history')}
+                title="Checkpoints and run history"
+              >
+                <Icon name="history" size={16} />
+              </button>
+            </>
+          )}
           <button
             className="icon-button toolbar-icon-button"
             onClick={exportReport}
@@ -1435,11 +1542,18 @@ export function ChatPage() {
       <div className="chat-stream" ref={streamRef}>
         {messages.length === 0 && (
           <div className="chat-starter">
-            <div className="chat-starter-project"><Icon name="folder" size={14} /> {projectName}</div>
-            <h2>Let’s build</h2>
-            <p>Ask UR to build a feature, fix a bug, review the code, or make a plan.</p>
+            <div className="chat-starter-project">
+              <Icon name={projectRoot ? 'folder' : 'chat'} size={14} />
+              {projectRoot ? projectName : 'General chat · no project required'}
+            </div>
+            <h2>{projectRoot ? 'Let’s build' : 'How can I help?'}</h2>
+            <p>
+              {projectRoot
+                ? 'Ask UR to build a feature, fix a bug, review the code, or make a plan.'
+                : 'Start typing now, attach files if useful, or choose a project when you want UR to work with a codebase.'}
+            </p>
             <div className="starter-grid">
-              {starterPrompts.slice(0, 3).map(starter => (
+              {activeStarterPrompts.slice(0, 3).map(starter => (
                 <button key={starter.title} className="starter-card" onClick={() => chooseStarter(starter)}>
                   <span className="starter-card-icon"><Icon name={starter.icon} size={17} /></span>
                   <span><strong>{starter.title}</strong><small>{starter.prompt.split('.')[0]}</small></span>
@@ -1447,6 +1561,23 @@ export function ChatPage() {
                 </button>
               ))}
             </div>
+            {!projectRoot && recentProjects.length > 0 && (
+              <div className="welcome-recent chat-recent-projects" tabIndex={-1}>
+                <div className="welcome-recent-heading">
+                  <span>Or continue with a project</span>
+                  <button className="link-button" onClick={() => navigate('/projects')}>View all</button>
+                </div>
+                <div className="welcome-recent-grid">
+                  {recentProjects.slice(0, 3).map(project => (
+                    <button key={project.root} onClick={() => void openProject(project.root)}>
+                      <span className="recent-project-icon"><Icon name="folder" size={17} /></span>
+                      <span className="recent-project-copy"><strong>{project.name}</strong><small>{project.root}</small></span>
+                      <span className="recent-project-arrow">→</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1455,7 +1586,7 @@ export function ChatPage() {
             <DiffCard
               key={message.id}
               message={message as DiffMessage}
-              projectRoot={projectRoot}
+              projectRoot={runtimeRoot}
               worktreeRoot={worktreeRoot}
               onUpdate={updateDiffMessage}
               onError={setSendError}
@@ -1589,7 +1720,7 @@ export function ChatPage() {
         {slashMenuOpen && (
           <div className="slash-command-menu" role="listbox" aria-label="Slash commands">
             <div className="slash-command-heading">
-              <span>Commands</span>
+              <span>{slashSuggestions.length} command{slashSuggestions.length === 1 ? '' : 's'}</span>
               <small>↑↓ navigate · Tab select · Esc close</small>
             </div>
             <div className="slash-command-results">
@@ -1623,7 +1754,7 @@ export function ChatPage() {
           <textarea
             ref={composerRef}
             className="composer-textarea"
-            placeholder={`${mode === 'edit' ? 'Describe the change you want' : mode === 'agent' ? 'Describe the outcome you want' : mode === 'plan' ? 'Describe the project to plan' : 'Ask anything about this project'}…`}
+            placeholder={`${mode === 'edit' ? 'Describe the change you want' : mode === 'agent' ? 'Describe the outcome you want' : mode === 'plan' ? 'Describe what you want to plan' : projectRoot ? 'Ask anything about this project' : 'Message UR Nexus'}…`}
             value={input}
             onChange={e => {
               setInput(e.target.value)
@@ -1662,7 +1793,7 @@ export function ChatPage() {
           <button
             className="button send-button"
             onClick={send}
-            disabled={!input.trim() || status === 'starting'}
+            disabled={!input.trim() || status === 'starting' || !runtimeRoot}
             title="Send (Enter)"
           >
             {status === 'starting' ? <span className="button-spinner" /> : <Icon name="send" size={17} />}
@@ -1692,7 +1823,14 @@ export function ChatPage() {
               ))}
             </select>
           </div>
-          <span className="composer-context-label"><i /> Local</span>
+          <button
+            type="button"
+            className="composer-context-label composer-context-button"
+            onClick={openProjectViaDialog}
+            title={projectRoot ? `Current project: ${projectRoot}` : 'Choose a project (optional)'}
+          >
+            <i /> {projectRoot ? projectName : 'General chat'}
+          </button>
           <label
             className="composer-permission-control"
             title="Approval profile for the next thread"
@@ -1711,24 +1849,30 @@ export function ChatPage() {
               <option value="never">Auto approve</option>
             </select>
           </label>
-          <label className="worktree-toggle" title="Run in an isolated git worktree">
-            <input
-              type="checkbox"
-              checked={useWorktree}
-              onChange={e => setUseWorktree(e.target.checked)}
-              disabled={runId !== null}
-            />
-            <Icon name="branch" size={13} /> Isolated worktree
-          </label>
+          {projectRoot && (
+            <label className="worktree-toggle" title="Run in an isolated git worktree">
+              <input
+                type="checkbox"
+                checked={useWorktree}
+                onChange={e => setUseWorktree(e.target.checked)}
+                disabled={runId !== null}
+              />
+              <Icon name="branch" size={13} /> Isolated worktree
+            </label>
+          )}
           <span className="composer-privacy">
-            {permissions.sandboxMode === 'read-only'
+            {!projectRoot
+              ? 'Private workspace'
+              : permissions.sandboxMode === 'read-only'
               ? 'Read only'
               : permissions.sandboxMode === 'danger-full-access'
                 ? 'Full access'
                 : 'Workspace access'}
           </span>
           <span className="composer-footer-spacer" />
-          <span className="composer-footer-agents"><i /> {agents.length} agent{agents.length === 1 ? '' : 's'} available</span>
+          {agents.length > 0 && (
+            <span className="composer-footer-agents"><i /> {agents.length} agent{agents.length === 1 ? '' : 's'} active</span>
+          )}
         </div>
 
         {changedFiles.length > 0 && (

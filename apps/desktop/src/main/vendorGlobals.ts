@@ -5,7 +5,7 @@
  */
 
 // Kept in sync with package.json by src/main/vendorGlobals.test.ts.
-export const APP_VERSION = '1.0.3'
+export const APP_VERSION = '1.0.4'
 
 interface VendorMacro {
   VERSION: string

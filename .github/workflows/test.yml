@@ -128,6 +128,6 @@ jobs:
           set -xeuo pipefail
           desktop_tarball="$(npm pack ./apps/desktop --ignore-scripts --pack-destination "$RUNNER_TEMP" --silent)"
           npm install -g "$RUNNER_TEMP/$desktop_tarball" --allow-scripts=node-pty
-          test "$(ur-nexus-desktop --version)" = "1.0.3 (UR-Nexus Desktop)"
+          test "$(ur-nexus-desktop --version)" = "1.0.4 (UR-Nexus Desktop)"
           global_root="$(npm root -g)"
           node -e "const {createRequire}=require('node:module'); const rq=createRequire(process.argv[1]+'/ur-nexus-desktop/package.json'); if(typeof rq('node-pty').spawn!=='function') process.exit(1)" "$global_root"

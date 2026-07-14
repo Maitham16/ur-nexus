@@ -94,7 +94,7 @@
     },
     "apps/desktop": {
       "name": "ur-nexus-desktop",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "bin": {
         "ur-nexus-desktop": "bin/ur-nexus-desktop.js",
       },
@@ -131,7 +131,7 @@
     },
     "extensions/vscode-ur-inline-diffs": {
       "name": "ur-inline-diffs",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "devDependencies": {
         "@types/node": "^22.0.0",
         "@types/vscode": "^1.92.0",
@@ -142,7 +142,7 @@
     },
     "packages/agent-runtime": {
       "name": "@ur/agent-runtime",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "dependencies": {
         "diff2html": "^3.4.56",
         "sharp": "^0.35.1",
