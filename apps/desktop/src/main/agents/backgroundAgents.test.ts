@@ -63,11 +63,20 @@ afterEach(async () => {
 // Natural end-to-end completion is covered by resume.test.ts and the
 // standalone liverun/cwd checks.
 async function driveToTerminal(agentId: string): Promise<void> {
+  // A credential-free CI agent can create its real run and fail before the
+  // 50 ms poll observes the brief running state. Treat an already-terminal
+  // record as progress instead of waiting forever for a state that has passed.
   await waitFor(async () => {
     const current = await getBackgroundAgent(agentId)
-    return current !== null && current.status === 'running' && !!current.runId
+    return current !== null && (
+      (current.status === 'running' && !!current.runId) ||
+      (current.status !== 'queued' && current.status !== 'running')
+    )
   })
-  await cancelBackgroundAgent(agentId).catch(() => undefined)
+  const current = await getBackgroundAgent(agentId)
+  if (current?.status === 'queued' || current?.status === 'running') {
+    await cancelBackgroundAgent(agentId).catch(() => undefined)
+  }
   await waitFor(async () => {
     const current = await getBackgroundAgent(agentId)
     return (
