@@ -32,7 +32,6 @@ await fs.rm(stage, { recursive: true, force: true })
 await Promise.all([
   fs.mkdir(path.join(stage, 'dist'), { recursive: true }),
   fs.mkdir(path.join(stage, 'assets'), { recursive: true }),
-  fs.mkdir(path.join(stage, 'build'), { recursive: true }),
   fs.mkdir(path.join(stage, 'scripts'), { recursive: true }),
 ])
 await Promise.all([
@@ -41,8 +40,8 @@ await Promise.all([
   fs.cp(path.join(root, 'dist', 'renderer'), path.join(stage, 'dist', 'renderer'), { recursive: true }),
   fs.copyFile(path.join(root, 'assets', 'icon.icns'), path.join(stage, 'assets', 'icon.icns')),
   fs.copyFile(
-    path.join(root, 'build', 'entitlements.mac.plist'),
-    path.join(stage, 'build', 'entitlements.mac.plist'),
+    path.join(root, 'assets', 'entitlements.mac.plist'),
+    path.join(stage, 'assets', 'entitlements.mac.plist'),
   ),
   fs.copyFile(
     path.join(root, 'scripts', 'bundle-ripgrep.mjs'),

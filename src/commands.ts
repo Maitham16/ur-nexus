@@ -583,30 +583,54 @@ const getWorkflowCommands = feature('WORKFLOW_SCRIPTS')
  */
 export function meetsAvailabilityRequirement(cmd: Command): boolean {
   if (!cmd.availability) return true
-  for (const a of cmd.availability) {
-    switch (a) {
-      case 'ur-ai':
-        if (isURAISubscriber()) return true
-        break
-      case 'console':
-        // Console API key user = direct 1P API customer (not 3P, not ur.ai).
-        // Excludes 3P (Bedrock/Vertex/Foundry) who don't set URHQ_BASE_URL
-        // and gateway users who proxy through a custom base URL.
-        if (
-          !isURAISubscriber() &&
-          !isUsing3PServices() &&
-          isFirstPartyURHQBaseUrl()
-        )
-          return true
-        break
-      default: {
-        const _exhaustive: never = a
-        void _exhaustive
-        break
+  try {
+    for (const a of cmd.availability) {
+      switch (a) {
+        case 'ur-ai':
+          if (isURAISubscriber()) return true
+          break
+        case 'console':
+          // Console API key user = direct 1P API customer (not 3P, not ur.ai).
+          // Excludes 3P (Bedrock/Vertex/Foundry) who don't set URHQ_BASE_URL
+          // and gateway users who proxy through a custom base URL.
+          if (
+            !isURAISubscriber() &&
+            !isUsing3PServices() &&
+            isFirstPartyURHQBaseUrl()
+          )
+            return true
+          break
+        default: {
+          const _exhaustive: never = a
+          void _exhaustive
+          break
+        }
       }
     }
+  } catch (err) {
+    // Command discovery must work before authentication is configured. This
+    // is essential for BYOK, Ollama, first launch, and CI: an auth-gated
+    // command is simply unavailable when its auth state cannot be resolved.
+    logForDebugging(
+      `Hiding /${cmd.name}: availability check failed: ${toError(err).message}`,
+    )
+    return false
   }
   return false
+}
+
+function isCommandAvailableAndEnabled(cmd: Command): boolean {
+  if (!meetsAvailabilityRequirement(cmd)) return false
+  try {
+    return isCommandEnabled(cmd)
+  } catch (err) {
+    // isEnabled hooks may consult authentication, policy, or provider state.
+    // A command catalog must remain usable before any of those are configured.
+    logForDebugging(
+      `Hiding /${cmd.name}: enabled check failed: ${toError(err).message}`,
+    )
+    return false
+  }
 }
 
 /**
@@ -647,9 +671,7 @@ export async function getCommands(cwd: string): Promise<Command[]> {
   const dynamicSkills = getDynamicSkills()
 
   // Build base commands without dynamic skills
-  const baseCommands = allCommands.filter(
-    _ => meetsAvailabilityRequirement(_) && isCommandEnabled(_),
-  )
+  const baseCommands = allCommands.filter(isCommandAvailableAndEnabled)
 
   if (dynamicSkills.length === 0) {
     return baseCommands
@@ -660,8 +682,7 @@ export async function getCommands(cwd: string): Promise<Command[]> {
   const uniqueDynamicSkills = dynamicSkills.filter(
     s =>
       !baseCommandNames.has(s.name) &&
-      meetsAvailabilityRequirement(s) &&
-      isCommandEnabled(s),
+      isCommandAvailableAndEnabled(s),
   )
 
   if (uniqueDynamicSkills.length === 0) {

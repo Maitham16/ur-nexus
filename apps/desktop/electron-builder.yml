@@ -25,8 +25,8 @@ mac:
   artifactName: '${productName}-${version}-${arch}.${ext}'
   hardenedRuntime: true
   gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
 dmg:
   sign: false
 protocols:

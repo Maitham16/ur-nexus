@@ -2,7 +2,7 @@ import {
   init_mappers,
   localCommandOutputToSDKAssistantMessage,
   toSDKCompactMetadata
-} from "./index-68cr5n61.js";
+} from "./index-42rf7s5m.js";
 import {
   backgroundDir,
   init_backgroundRunner,
@@ -158,7 +158,7 @@ import {
   toolMatchesName,
   updateUsage,
   useAppState
-} from "./index-3xrbnz6c.js";
+} from "./index-7fe5jn6w.js";
 import {
   cloneFileStateCache,
   createFileStateCacheWithSizeLimit,
@@ -1697,11 +1697,11 @@ async function processUserInputBase(input, mode, setToolJSX, context, pastedCont
   const attachmentMessages = shouldExtractAttachments ? await toArray(getAttachmentMessages(inputString, context, ideSelection ?? null, [], messages, querySource)) : [];
   queryCheckpoint("query_attachment_loading_end");
   if (inputString !== null && mode === "bash") {
-    const { processBashCommand } = await import("./processBashCommand-qzbf5g2g.js");
+    const { processBashCommand } = await import("./processBashCommand-x4aey1rc.js");
     return addImageMetadataMessage(await processBashCommand(inputString, precedingInputBlocks, attachmentMessages, context, setToolJSX), imageMetadataTexts);
   }
   if (inputString !== null && !effectiveSkipSlash && inputString.startsWith("/")) {
-    const { processSlashCommand } = await import("./processSlashCommand-zvf82b0y.js");
+    const { processSlashCommand } = await import("./processSlashCommand-mxhgh548.js");
     const slashResult = await processSlashCommand(inputString, precedingInputBlocks, imageContentBlocks, attachmentMessages, context, setToolJSX, uuid, isAlreadyProcessing, canUseTool);
     return addImageMetadataMessage(slashResult, imageMetadataTexts);
   }

@@ -156,7 +156,7 @@ The app registers the `ur-desktop://` protocol. On launch it handles `open-url` 
 `electron-builder.yml` includes:
 
 - `hardenedRuntime: true`
-- `entitlements: build/entitlements.mac.plist`
+- `entitlements: assets/entitlements.mac.plist`
 
 electron-builder enables notarization when a complete supported Apple
 credential set is present in the environment.
