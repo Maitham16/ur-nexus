@@ -152,6 +152,43 @@ Planning defaults are safe and can be configured with:
 
 ### Install
 
+#### UR Nexus Desktop for macOS
+
+Download the correct `.dmg` for your Mac from the
+[latest GitHub release](https://github.com/Maitham16/ur-nexus/releases/latest):
+
+- `arm64` for Apple Silicon Macs (M1, M2, M3, M4, or newer)
+- `x64` for Intel Macs
+
+If you are unsure, run `uname -m` in Terminal and choose the matching build.
+
+Open the DMG and drag **UR Nexus Desktop** into **Applications**. The current
+GitHub build is not yet signed or notarized because the project does not yet
+have an Apple Developer Program subscription. Until notarized releases are
+available, macOS may incorrectly report the app as damaged. If—and only if—you
+downloaded it from the official release page above, run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/UR Nexus Desktop.app"
+open "/Applications/UR Nexus Desktop.app"
+```
+
+This removes macOS quarantine only from UR Nexus Desktop; it does not disable
+Gatekeeper system-wide. Signed and notarized installers will replace this
+temporary step after Apple Developer enrollment.
+
+You can alternatively install and start the desktop package from a terminal:
+
+```sh
+npm install --global --allow-scripts=node-pty ur-nexus-desktop
+ur-nexus-desktop
+```
+
+See the [desktop installation guide](apps/desktop/README.md#macos-install) for
+details.
+
+#### UR-Nexus terminal agent
+
 Remove old global installs first if needed:
 
 ```sh

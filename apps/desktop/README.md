@@ -64,10 +64,43 @@ The native terminal module (`node-pty`) is unpacked from the ASAR so it loads at
 
 ## macOS install
 
-Open the produced `.dmg` and drag **UR Nexus Desktop** to `/Applications`.
-It then appears in Finder, Launchpad, and Spotlight like a normal Mac app.
-On first launch the composer is ready immediately in **General chat**; choosing
-a project or attaching files is optional.
+Download the correct `.dmg` from the
+[latest official GitHub release](https://github.com/Maitham16/ur-nexus/releases/latest):
+
+- `arm64` for Apple Silicon Macs (M1, M2, M3, M4, or newer)
+- `x64` for Intel Macs
+
+If you are unsure, run `uname -m` in Terminal and choose the matching build.
+
+Open the DMG and drag **UR Nexus Desktop** to `/Applications`. It then appears
+in Finder, Launchpad, and Spotlight like a normal Mac app. On first launch the
+composer is ready immediately in **General chat**; choosing a project or
+attaching files is optional.
+
+### Temporary unsigned-build step
+
+The current GitHub build is not yet signed or notarized because the project
+does not yet have an Apple Developer Program subscription. macOS can therefore
+show “UR Nexus Desktop is damaged and can't be opened.”
+
+If—and only if—you downloaded the app from the official GitHub release linked
+above, remove quarantine from this app and open it:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/UR Nexus Desktop.app"
+open "/Applications/UR Nexus Desktop.app"
+```
+
+This command affects only the UR Nexus Desktop application bundle. It does not
+disable Gatekeeper for the rest of the Mac. Signed and notarized releases will
+remove the need for this temporary step after Apple Developer enrollment.
+
+As an alternative to the DMG, install and start the npm package from Terminal:
+
+```bash
+npm install --global --allow-scripts=node-pty ur-nexus-desktop
+ur-nexus-desktop
+```
 
 ## macOS Keychain secret storage
 
@@ -158,10 +191,10 @@ The app registers the `ur-desktop://` protocol. On launch it handles `open-url` 
 - `hardenedRuntime: true`
 - `entitlements: assets/entitlements.mac.plist`
 
-electron-builder enables notarization when a complete supported Apple
-credential set is present in the environment.
-
-To sign and notarize, set environment variables before packaging:
+`electron-builder` enables notarization when a complete supported Apple
+credential set is present in the environment. After joining the Apple
+Developer Program, configure a Developer ID Application certificate and these
+notarization variables before packaging:
 
 ```bash
 export APPLE_ID=your-apple-id@example.com
@@ -169,10 +202,10 @@ export APPLE_APP_SPECIFIC_PASSWORD=xxxx-xxxx-xxxx-xxxx
 export APPLE_TEAM_ID=ABCD123456
 ```
 
-Packaging works without these credentials for local testing. Public macOS
-distribution requires a valid Developer ID Application certificate and Apple
-notarization credentials; they are intentionally never stored in the repo or
-npm package.
+Packaging works without these credentials for local testing and the current
+temporary unsigned release. Public trusted macOS distribution requires a valid
+Developer ID Application certificate and Apple notarization credentials; they
+are intentionally never stored in the repository or npm package.
 
 ## Troubleshooting
 
@@ -181,4 +214,5 @@ npm package.
 - **Type errors**: run `bun run typecheck` from `apps/desktop`.
 - **Tests**: run `bun test` from `apps/desktop`.
 - **Packaging fails on native modules**: run `bun run build` first so `electron-builder` can locate rebuilt binaries; ensure `node-pty` has a prebuild for the target Electron ABI.
-- **Signing/notarization fails**: verify `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, and the provisioning profile path.
+- **macOS reports the app is damaged**: follow the temporary unsigned-build step above only for a download from the official release page.
+- **Signing/notarization fails**: verify `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, and the Developer ID certificate.
