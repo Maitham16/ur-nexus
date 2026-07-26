@@ -149,6 +149,9 @@ export type IpcChannel =
   | 'command:run'
   | 'command:stop'
   | 'commands:list'
+  // Interactive terminal (PTY geometry and stdin)
+  | 'terminal:resize'
+  | 'terminal:write'
   // Structured test runner
   | 'test:run'
   | 'test:rerun-failed'

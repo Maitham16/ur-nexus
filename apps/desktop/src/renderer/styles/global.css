@@ -7708,3 +7708,23 @@ html[data-theme] .nav-item.active .nav-icon {
   background: var(--surface-2);
   color: var(--text-strong);
 }
+
+/* Interactive terminal: geometry probe and input feedback */
+.terminal-cell-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.terminal-input-note {
+  margin: 0 10px 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 12px;
+}

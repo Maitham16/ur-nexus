@@ -1,6 +1,6 @@
 # CLI ↔ Desktop Capability Parity
 
-Audit date: 2026-07-26 (release update) (desktop 1.0.7, runtime bundle 1.0.4, CLI source `src/` at monorepo root).
+Audit date: 2026-07-26 (release update) (desktop 1.1.0, runtime bundle 1.0.4, CLI source `src/` at monorepo root).
 
 The desktop app is standalone: it vendors the agent runtime as a prebuilt local
 bundle (`vendor/agent-runtime`, declared as `file:./vendor/agent-runtime` in
@@ -24,7 +24,7 @@ Legend — **Status**: ✅ working end-to-end · 🟡 working with noted limits 
 | File editing | `src/tools/FileEditTool` | `proposeEdit()` (real unified diff + base hashes); `diffs.ts` per-hunk accept/reject/revert with stale detection; `patch:apply` via `git apply` | Chat diff cards (per-hunk controls), Changes page | git + runtime | ✅ | — | `unifiedDiff.test.ts`, `diffs.test.ts` (13) |
 | Glob | `src/tools/GlobTool` | `globProjectFiles()` dependency-free walker (Electron's Node 20 lacks fs.glob) | Chat tools | Node fs | ✅ | — | `glob.test.ts` (5) |
 | Grep | `src/tools/GrepTool` | `search.ts`: dependency-managed ripgrep (`@vscode/ripgrep`, asar-unpacked) + tested internal fallback; regex/fixed, case, include/exclude globs, .gitignore, structured file/line/column | Files page content search, Grep tool | ripgrep binary or internal engine | ✅ | — | `search.test.ts` (16, both engines) |
-| Terminal/Bash | `src/tools/BashTool`, `src/utils/bash` | `shellRunner.ts` (node-pty) + `terminalManager.ts` (classification: destructive/network/package/outside-workspace) | Terminal page, Chat command blocks | node-pty + safety service | ✅ | PTY resize/interactive input | covered via runtime paths |
+| Terminal/Bash | `src/tools/BashTool`, `src/utils/bash` | `shellRunner.ts` (node-pty) + `terminalManager.ts` (classification: destructive/network/package/outside-workspace); PTY geometry is measured from a monospace probe and reported over `terminal:resize` (debounced, clamped), and `terminal:write` forwards stdin verbatim including Ctrl-C/D/Z so interactive programs and prompts are answerable | Terminal page: resize-aware surface, Send mode while a command runs, control-key passthrough | node-pty + safety service | ✅ | — | `terminalSize.test.ts` (15) |
 | Test runner | `src/tools/TestRunnerTool` | `testRunner.ts`: framework detection (bun/jest/vitest/pytest/go/mocha), structured counts + failing tests, rerun-failed command synthesis, runtime-failure distinction | Terminal → Tests tab | shell runner + parsers | ✅ | — | `testRunner.test.ts` (12) |
 | Git operations | `src/tools/GitHubTool`, git utils | `explorer.ts`: `git status --porcelain`, `git diff`, `git checkout --`, `git check-ignore` | Changes page, Files page | git CLI | ✅ | Commit/push/PR flows (deliberately out of scope for review UI) | `explorer.test.ts` |
 | Worktrees | `src/tools/EnterWorktreeTool`/`ExitWorktreeTool` | `worktreeManager.ts` + `EnterWorktree`/`ExitWorktree` tool mapping + per-run isolated worktrees | Chat (worktree toggle), Projects | git worktree | ✅ | — | runtime tests |
@@ -46,26 +46,31 @@ Legend — **Status**: ✅ working end-to-end · 🟡 working with noted limits 
 
 ## Known gaps (explicit)
 
-1. **Chat tabs are not visually verified.** The strip, per-tab snapshots, and
-   IPC are implemented, typecheck clean, and the renderer bundles; the layout,
-   drag feel, and overflow behavior at many tabs have not been exercised in a
-   running app. Provider/model and permissions are intentionally window-level
-   rather than per-tab, so they do not reset when switching.
-2. **Injection screening is heuristic.** It is a rule-based pass that reports
+1. **New UI is not visually verified.** The chat tab strip and the terminal's
+   resize/Send behavior are implemented, typecheck clean, lint clean, and the
+   renderer bundles, but no one has run them in Electron: tab layout and drag
+   feel, and the measured cols/rows against real output wrapping, are unchecked.
+   Provider/model and permissions are intentionally window-level rather than
+   per-tab, so they do not reset when switching.
+2. **Interactive input requires a PTY.** Under Bun the shell runner uses the
+   child-process path with `stdin: 'ignore'` (a Bun 1.3 master-fd bug), so
+   `terminal:write` correctly refuses input there instead of dropping it
+   silently. Packaged Electron builds get the PTY and full interactivity.
+3. **Injection screening is heuristic.** It is a rule-based pass that reports
    rather than blocks, so it will miss novel phrasings and can flag prose that
    discusses injection. It raises the cost of an attack; it does not close it,
    and the prompt-layer instructions remain the primary defense.
-3. **L2 verification depends on the project defining a gate.** A project with
+4. **L2 verification depends on the project defining a gate.** A project with
    no test, typecheck, lint, or build script reports `no-gates` — deliberately
    not a pass, so the report builder can distinguish "nothing failed" from
    "nothing was checked."
-4. Resumed sessions continue in a **fresh runtime session** with replayed
+5. Resumed sessions continue in a **fresh runtime session** with replayed
    context and a completed-actions ledger; the exact in-memory engine state
    of the interrupted process is not rehydrated (it no longer exists).
-5. The interrupted **worktree** of a resumed run is preserved on disk and
+6. The interrupted **worktree** of a resumed run is preserved on disk and
    referenced in run state, but the continuation executes in the main
    workspace.
-6. **Plan generation quality is model-dependent**: the pipeline runs a real
+7. **Plan generation quality is model-dependent**: the pipeline runs a real
    model and strictly validates the response; models that fail to emit the
    JSON contract produce a clear `PlanParseError` in the UI (never a
    fabricated placeholder plan), and slow cloud models can take minutes.

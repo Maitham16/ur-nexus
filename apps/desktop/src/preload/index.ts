@@ -538,6 +538,24 @@ const api = {
   callConnectorTool: (req: CallConnectorToolRequestDto): Promise<{ ok: boolean; result?: unknown; error?: string }> =>
     ipcRenderer.invoke('connector:tool:call', req),
 
+  // Interactive terminal
+  resizeTerminal: (req: {
+    projectRoot: string
+    cols: number
+    rows: number
+    commandId?: string
+    worktreeRoot?: string
+  }): Promise<{ applied: boolean; size: { cols: number; rows: number } }> =>
+    ipcRenderer.invoke('terminal:resize', req),
+
+  writeTerminal: (req: {
+    projectRoot: string
+    commandId: string
+    data: string
+    worktreeRoot?: string
+  }): Promise<{ accepted: boolean; reason?: string }> =>
+    ipcRenderer.invoke('terminal:write', req),
+
   // Remote connector OAuth
   getConnectorOAuthStatus: (projectRoot: string, name: string): Promise<ConnectorOAuthStatusDto> =>
     ipcRenderer.invoke('connector:oauth:status', { projectRoot, name }),

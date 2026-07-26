@@ -20,6 +20,34 @@ export interface ShellRunnerOptions {
   onExit?: (id: string, command: ShellCommand) => void
 }
 
+/**
+ * Terminal geometry. Programs read this from the PTY to decide how to draw, so
+ * a wrong size produces wrapped or truncated output rather than an error.
+ */
+export interface TerminalSize {
+  cols: number
+  rows: number
+}
+
+export const DEFAULT_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 }
+
+/**
+ * Clamp geometry before handing it to node-pty. A zero or negative dimension
+ * makes `ioctl(TIOCSWINSZ)` fail, and the renderer can legitimately report 0
+ * while its container is hidden or mid-layout.
+ */
+export function normalizeTerminalSize(size: Partial<TerminalSize> | undefined): TerminalSize {
+  const clamp = (value: unknown, fallback: number, max: number): number => {
+    const numeric = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : fallback
+    if (numeric < 1) return fallback
+    return Math.min(numeric, max)
+  }
+  return {
+    cols: clamp(size?.cols, DEFAULT_TERMINAL_SIZE.cols, 1000),
+    rows: clamp(size?.rows, DEFAULT_TERMINAL_SIZE.rows, 1000),
+  }
+}
+
 let ptyModule: typeof import('node-pty') | undefined
 function getPty(): typeof import('node-pty') {
   if (!ptyModule) {
@@ -31,6 +59,17 @@ function getPty(): typeof import('node-pty') {
 const running = new Map<string, () => void>()
 const commands = new Map<string, ShellCommand>()
 
+/**
+ * Live PTY controls per command id. Only PTY-backed runs appear here: the
+ * child-process fallback has no terminal to resize and its stdin is 'ignore',
+ * so resize and write must report failure there rather than silently no-op.
+ */
+type PtyControls = {
+  resize: (size: TerminalSize) => void
+  write: (data: string) => void
+}
+const ptyControls = new Map<string, PtyControls>()
+
 const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash'
 
 function childSignalExitCode(signal: NodeJS.Signals | null): number {
@@ -40,7 +79,11 @@ function childSignalExitCode(signal: NodeJS.Signals | null): number {
 }
 
 export function createShellRunner(opts: ShellRunnerOptions) {
-  function run(command: string): Promise<ShellCommand> {
+  /** Geometry applied to new PTYs and remembered across resizes. */
+  let sessionSize: TerminalSize = { ...DEFAULT_TERMINAL_SIZE }
+
+  function run(command: string, size?: Partial<TerminalSize>): Promise<ShellCommand> {
+    if (size) sessionSize = normalizeTerminalSize(size)
     return new Promise(resolve => {
       const id = randomUUID()
       const startTime = Date.now()
@@ -128,8 +171,8 @@ export function createShellRunner(opts: ShellRunnerOptions) {
       try {
         ptyProcess = getPty().spawn(shell, args, {
           name: 'xterm-color',
-          cols: 120,
-          rows: 30,
+          cols: sessionSize.cols,
+          rows: sessionSize.rows,
           cwd: opts.cwd,
           env: environment,
         })
@@ -143,6 +186,14 @@ export function createShellRunner(opts: ShellRunnerOptions) {
         ptyProcess.kill('SIGTERM')
       })
 
+      ptyControls.set(id, {
+        resize: next => {
+          sessionSize = next
+          ptyProcess.resize(next.cols, next.rows)
+        },
+        write: data => ptyProcess.write(data),
+      })
+
       const dataHandler = ptyProcess.onData((data: string) => {
         record.stdout += data
         opts.onData?.(id, data)
@@ -152,6 +203,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
         dataHandler.dispose()
         exitHandler.dispose()
         running.delete(id)
+        ptyControls.delete(id)
         const endTime = Date.now()
         record.endTime = endTime
         record.durationMs = endTime - startTime
@@ -174,6 +226,46 @@ export function createShellRunner(opts: ShellRunnerOptions) {
     }
   }
 
+  /**
+   * Resize a running PTY, and remember the geometry for later commands so the
+   * next one starts at the size the user already chose.
+   */
+  function resize(id: string, size: Partial<TerminalSize>): boolean {
+    const normalized = normalizeTerminalSize(size)
+    sessionSize = normalized
+    const controls = ptyControls.get(id)
+    if (!controls) return false
+    try {
+      controls.resize(normalized)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Send input to a running PTY, for prompts and interactive programs. */
+  function write(id: string, data: string): boolean {
+    if (typeof data !== 'string' || data.length === 0) return false
+    const controls = ptyControls.get(id)
+    if (!controls) return false
+    try {
+      controls.write(data)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Geometry new commands will start with. */
+  function size(): TerminalSize {
+    return { ...sessionSize }
+  }
+
+  /** True when a command has a live PTY that accepts input. */
+  function isInteractive(id: string): boolean {
+    return ptyControls.has(id)
+  }
+
   function get(id: string): ShellCommand | undefined {
     return commands.get(id)
   }
@@ -182,7 +274,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
     return [...commands.values()].sort((a, b) => b.startTime - a.startTime)
   }
 
-  return { run, stop, get, list }
+  return { run, stop, resize, write, size, isInteractive, get, list }
 }
 
 export type ShellRunner = ReturnType<typeof createShellRunner>

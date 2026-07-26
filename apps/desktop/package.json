@@ -1,6 +1,6 @@
 {
   "name": "ur-nexus-desktop",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "Professional local-first desktop coding agent with BYOK cloud providers and Ollama support",
   "author": "Maitham",
   "type": "module",

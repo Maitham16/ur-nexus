@@ -129,6 +129,7 @@ import {
 import { runSearch } from './search.js'
 import { parseUnifiedDiff, applySelectedHunks } from './diffs.js'
 import { runStructuredTests, buildRerunFailedCommand } from './testRunner.js'
+import { resizeTerminal, writeTerminal } from './terminalManager.js'
 import {
   getConnectorOAuthStatus,
   authorizeConnectorOAuth,
@@ -258,6 +259,13 @@ function optionalString(value: unknown, name: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string') {
     throw new Error(`Invalid IPC argument: ${name} must be a string`)
+  }
+  return value
+}
+
+function expectNumber(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Invalid IPC argument: ${name} must be a finite number`)
   }
   return value
 }
@@ -637,6 +645,32 @@ export function registerIpcHandlers(
       // Approval state is decided in the trusted main process; the renderer
       // cannot pass a flag that bypasses it.
       return runProjectCommand(projectRoot, command, worktreeRoot, true)
+    },
+    'terminal:resize': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return resizeTerminal(
+        expectString(r.projectRoot, 'projectRoot'),
+        { cols: expectNumber(r.cols, 'cols'), rows: expectNumber(r.rows, 'rows') },
+        {
+          commandId: optionalString(r.commandId, 'commandId'),
+          worktreeRoot: optionalString(r.worktreeRoot, 'worktreeRoot'),
+        },
+      )
+    },
+    'terminal:write': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      const data = expectString(r.data, 'data')
+      // Bound a single write so a runaway renderer cannot stream unbounded
+      // input into a child process.
+      if (data.length > 8192) {
+        throw new Error('terminal input must be 8192 characters or fewer')
+      }
+      return writeTerminal(
+        expectString(r.projectRoot, 'projectRoot'),
+        expectString(r.commandId, 'commandId'),
+        data,
+        optionalString(r.worktreeRoot, 'worktreeRoot'),
+      )
     },
     'command:stop': (
       projectRoot: unknown,

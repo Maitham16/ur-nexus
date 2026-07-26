@@ -1,5 +1,5 @@
 import * as path from 'node:path'
-import { createShellRunner, ShellCommand } from './shellRunner.js'
+import { createShellRunner, ShellCommand, type TerminalSize } from './shellRunner.js'
 import { resolveWorktreePath } from './worktreeManager.js'
 import { emitToRenderer, findRunByWorktree } from './runtime.js'
 
@@ -111,7 +111,12 @@ export function classifyCommand(command: string, cwd: string) {
 export async function runTerminalCommand(
   projectRoot: string,
   command: string,
-  options?: { worktreeRoot?: string; skipApproval?: boolean },
+  options?: {
+    worktreeRoot?: string
+    skipApproval?: boolean
+    /** Terminal geometry, so the command starts at the size on screen. */
+    size?: Partial<TerminalSize>
+  },
 ): Promise<{ commandId: string; status: string; requiresApproval?: boolean }> {
   const session = getOrCreateSession(projectRoot, options?.worktreeRoot)
   const cwd = session.runner.list()[0]?.cwd ?? resolveWorktreePath(projectRoot, options?.worktreeRoot, '.')
@@ -139,7 +144,7 @@ export async function runTerminalCommand(
     })
   }
 
-  const result = await session.runner.run(command)
+  const result = await session.runner.run(command, options?.size)
 
   if (run) {
     emitToRenderer(projectRoot, {
@@ -165,6 +170,53 @@ export function stopTerminalCommand(
 ): boolean {
   const session = getOrCreateSession(projectRoot, worktreeRoot)
   return session.runner.stop(commandId)
+}
+
+/** Resize the terminal. Also sets the geometry future commands start with. */
+export function resizeTerminal(
+  projectRoot: string,
+  size: Partial<TerminalSize>,
+  options?: { commandId?: string; worktreeRoot?: string },
+): { applied: boolean; size: TerminalSize } {
+  const session = getOrCreateSession(projectRoot, options?.worktreeRoot)
+  // With no command id, resize whatever is currently running: the renderer
+  // reports container size changes without tracking which command owns the PTY.
+  const target =
+    options?.commandId ??
+    session.runner.list().find(command => command.status === 'running')?.id
+  // resize() records the geometry whether or not a live PTY matched, so an
+  // unknown id still updates what the next command will start with.
+  const applied = session.runner.resize(target ?? '', size)
+  return { applied, size: session.runner.size() }
+}
+
+/**
+ * Send input to a running command's PTY.
+ *
+ * Input is forwarded verbatim, including control characters, because that is
+ * what an interactive program expects — Ctrl-C reaches it as ETX rather than
+ * being interpreted here. The command must already have been approved to run,
+ * so this adds no new execution capability.
+ */
+export function writeTerminal(
+  projectRoot: string,
+  commandId: string,
+  data: string,
+  worktreeRoot?: string,
+): { accepted: boolean; reason?: string } {
+  const session = getOrCreateSession(projectRoot, worktreeRoot)
+  const command = session.runner.get(commandId)
+  if (!command) return { accepted: false, reason: 'Unknown command' }
+  if (command.status !== 'running') {
+    return { accepted: false, reason: `Command is ${command.status}` }
+  }
+  if (!session.runner.isInteractive(commandId)) {
+    return {
+      accepted: false,
+      reason: 'This command is not running on a PTY, so it cannot accept input',
+    }
+  }
+  return { accepted: session.runner.write(commandId, data) }
 }
 
 export function listTerminalCommands(

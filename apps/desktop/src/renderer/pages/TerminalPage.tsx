@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card } from '../components/Card.js'
 import { ApprovalCard } from '../components/ApprovalCard.js'
 import { useDesktop, useRuntimeEvents } from '../hooks/useDesktop.js'
@@ -290,6 +290,80 @@ export function TerminalPage() {
     [commands, hiddenBefore],
   )
 
+  // The command that currently owns the PTY. While one exists the composer
+  // sends stdin to it instead of starting a second command, which is what makes
+  // an interactive prompt answerable.
+  const runningCommand = useMemo(
+    () => visibleCommands.find(command => command.status === 'running'),
+    [visibleCommands],
+  )
+  const [inputRejection, setInputRejection] = useState<string | null>(null)
+  const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const cellRef = useRef<HTMLSpanElement | null>(null)
+
+  /**
+   * Report terminal geometry to the PTY whenever the surface changes size.
+   *
+   * Columns and rows come from measuring one monospace glyph rather than a
+   * hardcoded cell size, so the reported geometry stays correct across display
+   * scaling and font settings. Sends are debounced because a drag emits a
+   * continuous stream of resize events and each one is an ioctl.
+   */
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!desktop || !projectRoot || !surface) return
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let lastSent = ''
+
+    const report = (): void => {
+      const cell = cellRef.current?.getBoundingClientRect()
+      const box = surface.getBoundingClientRect()
+      if (!cell || cell.width <= 0 || cell.height <= 0) return
+      const cols = Math.max(20, Math.floor(box.width / cell.width))
+      const rows = Math.max(5, Math.floor(box.height / cell.height))
+      const key = `${cols}x${rows}`
+      if (key === lastSent) return
+      lastSent = key
+      void desktop
+        .resizeTerminal({
+          projectRoot,
+          cols,
+          rows,
+          commandId: runningCommand?.id,
+          worktreeRoot,
+        })
+        .catch(() => undefined)
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(report, 120)
+    })
+    observer.observe(surface)
+    report()
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [desktop, projectRoot, worktreeRoot, runningCommand?.id])
+
+  /** Send input to the running command's PTY. */
+  const sendInput = useCallback(
+    async (data: string): Promise<void> => {
+      if (!desktop || !projectRoot || !runningCommand) return
+      const result = await desktop.writeTerminal({
+        projectRoot,
+        commandId: runningCommand.id,
+        data,
+        worktreeRoot,
+      })
+      setInputRejection(result.accepted ? null : result.reason ?? 'Input was not accepted')
+    },
+    [desktop, projectRoot, runningCommand, worktreeRoot],
+  )
+
   return (
     <div className="page">
       <h1 className="page-title">Terminal</h1>
@@ -339,19 +413,57 @@ export function TerminalPage() {
       {tab === 'terminal' && (
         <Card title="Shell">
           <div className="terminal-input-row">
-            <span className="terminal-prompt">$</span>
+            <span className="terminal-prompt">{runningCommand ? '>' : '$'}</span>
             <input
               className="input terminal-input"
-              placeholder="Type a command and press Enter..."
+              placeholder={
+                runningCommand
+                  ? 'Send input to the running command (Ctrl-C to interrupt)…'
+                  : 'Type a command and press Enter...'
+              }
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Enter') run(input)
+                // Control keys reach the child as the bytes it expects rather
+                // than being interpreted by the UI.
+                if (runningCommand && e.ctrlKey) {
+                  const control: Record<string, string> = {
+                    c: '',
+                    d: '',
+                    z: '',
+                    '\\': '',
+                  }
+                  const sequence = control[e.key.toLowerCase()]
+                  if (sequence) {
+                    e.preventDefault()
+                    void sendInput(sequence)
+                    return
+                  }
+                }
+                if (e.key !== 'Enter') return
+                e.preventDefault()
+                if (runningCommand) {
+                  void sendInput(`${input}\n`)
+                  setInput('')
+                } else {
+                  run(input)
+                }
               }}
               disabled={!projectRoot}
             />
-            <button className="button" onClick={() => run(input)} disabled={!projectRoot || !input.trim()}>
-              Run
+            <button
+              className="button"
+              onClick={() => {
+                if (runningCommand) {
+                  void sendInput(`${input}\n`)
+                  setInput('')
+                } else {
+                  run(input)
+                }
+              }}
+              disabled={!projectRoot || (!runningCommand && !input.trim())}
+            >
+              {runningCommand ? 'Send' : 'Run'}
             </button>
             <button
               className="button button-secondary"
@@ -363,7 +475,16 @@ export function TerminalPage() {
             </button>
           </div>
 
-          <div className="command-list">
+          {inputRejection && (
+            <div className="terminal-input-note">{inputRejection}</div>
+          )}
+
+          {/* Offscreen probe: one monospace glyph, measured to derive cols/rows. */}
+          <span ref={cellRef} className="terminal-cell-probe" aria-hidden="true">
+            M
+          </span>
+
+          <div className="command-list" ref={surfaceRef}>
             {visibleCommands.length === 0 && (
               <div className="agent-log-empty">No commands yet.</div>
             )}
