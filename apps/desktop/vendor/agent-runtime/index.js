@@ -295,6 +295,7 @@ import {
 import"./index-wred0kdg.js";
 import {
   getCwd,
+  runWithCwdOverride,
   init_cwd
 } from "./index-2p1fe0x7.js";
 import"./index-9xfq6h4s.js";
@@ -2619,9 +2620,17 @@ async function createSession(project, opts = {}) {
 async function* runPrompt(session, prompt, opts = {}) {
   const model = opts.model ? parseUserSpecifiedModel(opts.model) : getMainLoopModel();
   session.engine.setModel(model ?? undefined);
-  yield* session.engine.submitMessage(prompt, {
+  const iterator = session.engine.submitMessage(prompt, {
     uuid: randomUUID6()
   });
+  while (true) {
+    const next = await runWithCwdOverride(
+      session.project.root,
+      () => iterator.next()
+    );
+    if (next.done) break;
+    yield next.value;
+  }
 }
 async function* streamRunEvents(session) {
   yield {

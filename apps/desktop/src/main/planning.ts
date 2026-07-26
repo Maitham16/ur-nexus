@@ -9,6 +9,7 @@ import {
 } from './runtime.js'
 import {
   createTask,
+  createAgent,
   startTask,
   completeTask,
   failTask,
@@ -149,7 +150,7 @@ export async function generatePlan(
   prompt: string,
 ): Promise<PlanDto> {
   await openProjectAndCache(projectRoot)
-  const { runId } = await startRun(projectRoot)
+  const { runId } = await startRun(projectRoot, { ephemeral: true })
   let responseText = ''
   let failure: string | null = null
   for await (const event of runPromptStream(runId, buildPlanningPrompt(prompt))) {
@@ -193,6 +194,13 @@ export async function executePlan(
       title: task.title,
       description: task.description,
       dependencies: task.dependencies,
+      projectRoot,
+    })
+    createAgent(plan.id, task.id, {
+      name: task.title,
+      role: task.role,
+      assignedTaskId: task.id,
+      projectRoot,
     })
     emitTaskEvent('task_created', {
       taskId: task.id,
@@ -235,7 +243,11 @@ export async function executePlan(
       const planTask = plan.tasks.find(t => t.id === scheduled.id)
       if (!planTask) throw new Error(`Unknown plan task ${scheduled.id}`)
       if (signal.aborted) throw new Error('Cancelled')
-      const { runId } = await startRun(projectRoot)
+      const { runId } = await startRun(projectRoot, {
+        useWorktree: true,
+        nativeApprovals: true,
+        ephemeral: true,
+      })
       const taskPrompt = [
         `You are executing one task of a larger plan. Original request:`,
         plan.prompt,

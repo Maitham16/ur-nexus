@@ -60,6 +60,26 @@ import type {
   FailingTestDto,
   BackgroundAgentDto,
   LaunchBackgroundAgentRequestDto,
+  SteerBackgroundAgentRequestDto,
+  BroadcastBackgroundAgentsRequestDto,
+  MissionControlSnapshotDto,
+  DesktopPlaybookDto,
+  SavePlaybookRequestDto,
+  RunPlaybookRequestDto,
+  DesktopMemoryDto,
+  SaveMemoryRequestDto,
+  CaptureFileMemoryRequestDto,
+  SideChatDto,
+  CreateSideChatRequestDto,
+  SendSideChatRequestDto,
+  DesktopWorkspaceDto,
+  SaveWorkspaceRequestDto,
+  LaunchWorkspaceRequestDto,
+  DesktopArenaDto,
+  LaunchArenaRequestDto,
+  QualityProfileDto,
+  SaveQualityProfileRequestDto,
+  QualityRunDto,
   CheckpointRequestDto,
   CheckpointDto,
   RewindPreviewDto,
@@ -283,6 +303,14 @@ const api = {
   getBackgroundAgent: (id: string): Promise<BackgroundAgentDto | null> =>
     ipcRenderer.invoke('bgagent:get', id),
 
+  steerBackgroundAgent: (
+    req: SteerBackgroundAgentRequestDto,
+  ): Promise<BackgroundAgentDto> => ipcRenderer.invoke('bgagent:steer', req),
+
+  broadcastBackgroundAgents: (
+    req: BroadcastBackgroundAgentsRequestDto,
+  ): Promise<BackgroundAgentDto[]> => ipcRenderer.invoke('bgagent:broadcast', req),
+
   cancelBackgroundAgent: (id: string): Promise<void> =>
     ipcRenderer.invoke('bgagent:cancel', id),
 
@@ -291,6 +319,85 @@ const api = {
 
   removeBackgroundAgent: (id: string): Promise<boolean> =>
     ipcRenderer.invoke('bgagent:remove', id),
+
+  // Mission control
+  getMissionControlSnapshot: (
+    projectRoot?: string,
+  ): Promise<MissionControlSnapshotDto> =>
+    ipcRenderer.invoke('mission:snapshot', projectRoot),
+
+  savePlaybook: (
+    req: SavePlaybookRequestDto,
+  ): Promise<DesktopPlaybookDto> => ipcRenderer.invoke('playbook:save', req),
+
+  deletePlaybook: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('playbook:delete', id),
+
+  runPlaybook: (
+    req: RunPlaybookRequestDto,
+  ): Promise<BackgroundAgentDto> => ipcRenderer.invoke('playbook:run', req),
+
+  saveMemory: (
+    req: SaveMemoryRequestDto,
+  ): Promise<DesktopMemoryDto> => ipcRenderer.invoke('memory:save', req),
+
+  captureFileMemory: (
+    req: CaptureFileMemoryRequestDto,
+  ): Promise<DesktopMemoryDto> => ipcRenderer.invoke('memory:capture-file', req),
+
+  deleteMemory: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('memory:delete', id),
+
+  validateMemories: (projectRoot: string): Promise<DesktopMemoryDto[]> =>
+    ipcRenderer.invoke('memory:validate', projectRoot),
+
+  createSideChat: (
+    req: CreateSideChatRequestDto,
+  ): Promise<SideChatDto> => ipcRenderer.invoke('sidechat:create', req),
+
+  getSideChat: (id: string): Promise<SideChatDto> =>
+    ipcRenderer.invoke('sidechat:get', id),
+
+  sendSideChatMessage: (
+    req: SendSideChatRequestDto,
+  ): Promise<SideChatDto> => ipcRenderer.invoke('sidechat:send', req),
+
+  renameSideChat: (id: string, title: string): Promise<SideChatDto> =>
+    ipcRenderer.invoke('sidechat:rename', id, title),
+
+  closeSideChat: (id: string): Promise<SideChatDto> =>
+    ipcRenderer.invoke('sidechat:close', id),
+
+  saveWorkspace: (
+    req: SaveWorkspaceRequestDto,
+  ): Promise<DesktopWorkspaceDto> => ipcRenderer.invoke('workspace:save', req),
+
+  deleteWorkspace: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('workspace:delete', id),
+
+  launchWorkspace: (
+    req: LaunchWorkspaceRequestDto,
+  ): Promise<BackgroundAgentDto[]> => ipcRenderer.invoke('workspace:launch', req),
+
+  launchArena: (
+    req: LaunchArenaRequestDto,
+  ): Promise<DesktopArenaDto> => ipcRenderer.invoke('arena:launch', req),
+
+  evaluateArena: (id: string): Promise<DesktopArenaDto> =>
+    ipcRenderer.invoke('arena:evaluate', id),
+
+  saveQualityProfile: (
+    req: SaveQualityProfileRequestDto,
+  ): Promise<QualityProfileDto> => ipcRenderer.invoke('quality:profile:save', req),
+
+  deleteQualityProfile: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('quality:profile:delete', id),
+
+  runQualityProfile: (id: string): Promise<QualityRunDto> =>
+    ipcRenderer.invoke('quality:run', id),
+
+  runDesktopQa: (projectRoot: string): Promise<QualityRunDto> =>
+    ipcRenderer.invoke('quality:desktop-qa', projectRoot),
 
   // Checkpoints
   createCheckpoint: (req: CheckpointRequestDto): Promise<CheckpointDto> =>

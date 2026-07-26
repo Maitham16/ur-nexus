@@ -108,9 +108,34 @@ export type IpcChannel =
   | 'bgagent:launch'
   | 'bgagent:list'
   | 'bgagent:get'
+  | 'bgagent:steer'
+  | 'bgagent:broadcast'
   | 'bgagent:cancel'
   | 'bgagent:retry'
   | 'bgagent:remove'
+  // Mission control
+  | 'mission:snapshot'
+  | 'playbook:save'
+  | 'playbook:delete'
+  | 'playbook:run'
+  | 'memory:save'
+  | 'memory:capture-file'
+  | 'memory:delete'
+  | 'memory:validate'
+  | 'sidechat:create'
+  | 'sidechat:get'
+  | 'sidechat:send'
+  | 'sidechat:rename'
+  | 'sidechat:close'
+  | 'workspace:save'
+  | 'workspace:delete'
+  | 'workspace:launch'
+  | 'arena:launch'
+  | 'arena:evaluate'
+  | 'quality:profile:save'
+  | 'quality:profile:delete'
+  | 'quality:run'
+  | 'quality:desktop-qa'
   // Checkpoints
   | 'checkpoint:create'
   | 'checkpoint:list'
@@ -474,17 +499,277 @@ export interface BackgroundAgentDto {
   worktreeRoot?: string
   retryOf?: string
   usage?: RunUsageDto
+  lastActivityAt?: string
+  currentInstructionId?: string
+  instructions: BackgroundAgentInstructionDto[]
+  turns: BackgroundAgentTurnDto[]
+  trajectory: BackgroundAgentTrajectoryDto
 }
 
 export interface LaunchBackgroundAgentRequestDto extends Record<string, unknown> {
   projectRoot: string
   prompt: string
   useWorktree?: boolean
+  memoryIds?: string[]
+}
+
+export interface BackgroundAgentInstructionDto {
+  id: string
+  content: string
+  createdAt: string
+  deliveredAt?: string
+}
+
+export interface BackgroundAgentTurnDto {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  createdAt: string
+  instructionId?: string
+}
+
+export interface BackgroundAgentTrajectoryCheckDto {
+  id: string
+  label: string
+  passed: boolean
+  detail: string
+}
+
+export interface BackgroundAgentTrajectoryDto {
+  eventCount: number
+  toolCalls: number
+  commands: number
+  approvals: number
+  verificationPassed: boolean
+  score?: number
+  grade?: 'excellent' | 'good' | 'needs-attention' | 'failed'
+  checks: BackgroundAgentTrajectoryCheckDto[]
+}
+
+export interface SteerBackgroundAgentRequestDto extends Record<string, unknown> {
+  id: string
+  content: string
+}
+
+export interface BroadcastBackgroundAgentsRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  content: string
+  agentIds?: string[]
 }
 
 export interface BackgroundAgentUpdateEvent extends BaseRuntimeEvent {
   type: 'background_agent_update'
   agent: BackgroundAgentDto
+}
+
+export type PlaybookStatus = 'approved' | 'disabled'
+
+export interface DesktopPlaybookDto {
+  id: string
+  projectRoot: string
+  name: string
+  description: string
+  prompt: string
+  tags: string[]
+  status: PlaybookStatus
+  createdAt: string
+  updatedAt: string
+  lastRunAt?: string
+  runCount: number
+  successCount: number
+  learnedFromAgentId?: string
+}
+
+export interface SavePlaybookRequestDto extends Record<string, unknown> {
+  id?: string
+  projectRoot: string
+  name: string
+  description?: string
+  prompt: string
+  tags?: string[]
+  status?: PlaybookStatus
+  learnedFromAgentId?: string
+}
+
+export interface RunPlaybookRequestDto extends Record<string, unknown> {
+  id: string
+  context?: string
+  useWorktree?: boolean
+  memoryIds?: string[]
+}
+
+export type MemoryCitationKind = 'file' | 'run' | 'user' | 'web'
+export type MemoryFreshness = 'fresh' | 'stale' | 'missing' | 'unverifiable'
+
+export interface DesktopMemoryCitationDto {
+  kind: MemoryCitationKind
+  source: string
+  capturedAt: string
+  sha256?: string
+  lineStart?: number
+  lineEnd?: number
+}
+
+export interface DesktopMemoryDto {
+  id: string
+  projectRoot: string
+  title: string
+  content: string
+  citation: DesktopMemoryCitationDto
+  freshness: MemoryFreshness
+  validationMessage: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SaveMemoryRequestDto extends Record<string, unknown> {
+  id?: string
+  projectRoot: string
+  title: string
+  content: string
+  source?: string
+}
+
+export interface CaptureFileMemoryRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  path: string
+  title?: string
+  content?: string
+  lineStart?: number
+  lineEnd?: number
+}
+
+export interface SideChatTurnDto {
+  id: string
+  role: 'user' | 'assistant' | 'error'
+  content: string
+  createdAt: string
+  runId?: string
+  usage?: RunUsageDto
+}
+
+export interface SideChatDto {
+  id: string
+  projectRoot: string
+  title: string
+  status: 'open' | 'closed'
+  createdAt: string
+  updatedAt: string
+  turns: SideChatTurnDto[]
+}
+
+export interface CreateSideChatRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  title?: string
+}
+
+export interface SendSideChatRequestDto extends Record<string, unknown> {
+  id: string
+  content: string
+}
+
+export interface DesktopWorkspaceDto {
+  id: string
+  name: string
+  repositories: Array<{ root: string; label: string }>
+  createdAt: string
+  updatedAt: string
+  lastRun?: {
+    prompt: string
+    launchedAt: string
+    agentIds: string[]
+  }
+}
+
+export interface SaveWorkspaceRequestDto extends Record<string, unknown> {
+  id?: string
+  name: string
+  repositories: Array<{ root: string; label?: string }>
+}
+
+export interface LaunchWorkspaceRequestDto extends Record<string, unknown> {
+  id: string
+  prompt: string
+  useWorktrees?: boolean
+  memoryIds?: string[]
+}
+
+export type ArenaJudgeMode = 'deterministic' | 'model' | 'hybrid'
+
+export interface DesktopArenaCandidateDto {
+  id: string
+  agentId: string
+  role: string
+  score?: number
+  rationale?: string
+}
+
+export interface DesktopArenaDto {
+  id: string
+  projectRoot: string
+  prompt: string
+  mode: ArenaJudgeMode
+  status: 'running' | 'ready' | 'evaluated' | 'failed'
+  createdAt: string
+  evaluatedAt?: string
+  candidates: DesktopArenaCandidateDto[]
+  winnerAgentId?: string
+  verdict?: string
+}
+
+export interface LaunchArenaRequestDto extends Record<string, unknown> {
+  projectRoot: string
+  prompt: string
+  candidates?: number
+  mode?: ArenaJudgeMode
+  memoryIds?: string[]
+}
+
+export interface QualityProfileDto {
+  id: string
+  projectRoot: string
+  name: string
+  command: string
+  autoFix: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface QualityRunDto {
+  id: string
+  profileId?: string
+  projectRoot: string
+  name: string
+  command?: string
+  kind: 'agentic-ci' | 'desktop-qa'
+  status: 'running' | 'passed' | 'failed'
+  startedAt: string
+  finishedAt?: string
+  durationMs?: number
+  summary?: string
+  output?: string
+  fixAgentId?: string
+  evidencePath?: string
+  checks?: Array<{ label: string; passed: boolean; detail: string }>
+}
+
+export interface SaveQualityProfileRequestDto extends Record<string, unknown> {
+  id?: string
+  projectRoot: string
+  name: string
+  command: string
+  autoFix?: boolean
+}
+
+export interface MissionControlSnapshotDto {
+  agents: BackgroundAgentDto[]
+  playbooks: DesktopPlaybookDto[]
+  memories: DesktopMemoryDto[]
+  sideChats: SideChatDto[]
+  workspaces: DesktopWorkspaceDto[]
+  arenas: DesktopArenaDto[]
+  qualityProfiles: QualityProfileDto[]
+  qualityRuns: QualityRunDto[]
 }
 
 export type TestFramework =
@@ -823,6 +1108,8 @@ export interface StartRunOptionsDto extends Record<string, unknown> {
   useWorktree?: boolean
   branch?: string
   permissions?: AgentPermissionSettingsDto
+  nativeApprovals?: boolean
+  ephemeral?: boolean
 }
 
 export interface RuntimeToolInfoDto {

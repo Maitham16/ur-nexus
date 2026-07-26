@@ -27,7 +27,7 @@ function getPty(): typeof import('node-pty') {
   return ptyModule as typeof import('node-pty')
 }
 
-const running = new Map<string, import('node-pty').IPty>()
+const running = new Map<string, () => void>()
 const commands = new Map<string, ShellCommand>()
 
 const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash'
@@ -50,7 +50,61 @@ export function createShellRunner(opts: ShellRunnerOptions) {
 
       // On Unix we pass the command as the single argument to bash -c.
       // On Windows we pass it as the single argument to powershell.
-      const args = process.platform === 'win32' ? ['-Command', command] : [command]
+      const args =
+        process.platform === 'win32'
+          ? ['-Command', command]
+          : ['-c', command]
+      const environment = Object.fromEntries(
+        Object.entries(process.env).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      )
+
+      const runWithoutPty = (): void => {
+        const { spawn } = require('node:child_process') as typeof import('node:child_process')
+        let settled = false
+        const finish = (exitCode: number, error?: string): void => {
+          if (settled) return
+          settled = true
+          running.delete(id)
+          record.endTime = Date.now()
+          record.durationMs = record.endTime - startTime
+          record.exitCode = exitCode
+          record.status = exitCode === 0 ? 'done' : 'error'
+          if (error) {
+            record.stderr += error
+            opts.onData?.(id, error)
+          }
+          opts.onExit?.(id, record)
+          resolve(record)
+        }
+        try {
+          const child = spawn(shell, args, {
+            cwd: opts.cwd,
+            env: environment,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          })
+          running.set(id, () => {
+            child.kill('SIGTERM')
+          })
+          child.stdout?.on('data', chunk => {
+            const data = chunk.toString()
+            record.stdout += data
+            opts.onData?.(id, data)
+          })
+          child.stderr?.on('data', chunk => {
+            const data = chunk.toString()
+            record.stderr += data
+            opts.onData?.(id, data)
+          })
+          child.once('error', error => finish(1, error.message))
+          child.once('close', (code, signal) => {
+            finish(code ?? (signal ? 1 : 0))
+          })
+        } catch (error) {
+          finish(1, error instanceof Error ? error.message : String(error))
+        }
+      }
 
       let ptyProcess: import('node-pty').IPty
       try {
@@ -59,18 +113,16 @@ export function createShellRunner(opts: ShellRunnerOptions) {
           cols: 120,
           rows: 30,
           cwd: opts.cwd,
-          env: process.env as { [key: string]: string | undefined },
+          env: environment,
         })
-      } catch (err) {
-        record.status = 'error'
-        record.endTime = Date.now()
-        record.durationMs = record.endTime - startTime
-        record.stdout = err instanceof Error ? err.message : String(err)
-        opts.onExit?.(id, record)
-        return resolve(record)
+      } catch {
+        runWithoutPty()
+        return
       }
 
-      running.set(id, ptyProcess)
+      running.set(id, () => {
+        ptyProcess.kill('SIGTERM')
+      })
 
       const dataHandler = ptyProcess.onData((data: string) => {
         record.stdout += data
@@ -84,7 +136,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
         const endTime = Date.now()
         record.endTime = endTime
         record.durationMs = endTime - startTime
-        record.exitCode = signal !== undefined ? 128 + signal : (exitCode ?? 0)
+        record.exitCode = signal ? 128 + signal : (exitCode ?? 0)
         record.status = record.exitCode === 0 ? 'done' : 'error'
         opts.onExit?.(id, record)
       })
@@ -95,10 +147,10 @@ export function createShellRunner(opts: ShellRunnerOptions) {
   }
 
   function stop(id: string): boolean {
-    const proc = running.get(id)
-    if (!proc) return false
+    const stopProcess = running.get(id)
+    if (!stopProcess) return false
     try {
-      proc.kill('SIGTERM')
+      stopProcess()
       return true
     } catch {
       return false

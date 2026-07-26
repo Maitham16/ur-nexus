@@ -720,11 +720,15 @@ export function ChatPage() {
 
   const handleEvent = useCallback(
     (event: RuntimeEvent) => {
-      // Events are broadcast to all windows; only render those for the
-      // active chat workspace (terminal-only events carry an empty root).
+      // Runtime events share one Electron bus. A chat must consume only its
+      // own run: project-only filtering allowed background agents, side
+      // chats, and judge runs to leak into the visible conversation.
       if (runtimeRoot && event.projectRoot && event.projectRoot !== runtimeRoot) {
         return
       }
+      if ('backgroundAgentId' in event && event.backgroundAgentId) return
+      const activeRunId = runIdRef.current
+      if (event.runId && (!activeRunId || event.runId !== activeRunId)) return
       switch (event.type) {
         case 'run_started': {
           const started = event as { worktreeRoot?: string }

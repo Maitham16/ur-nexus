@@ -20,6 +20,7 @@ import {
   openProject,
   type RuntimeProject,
 } from '@ur/agent-runtime'
+import * as path from 'node:path'
 import { redactValue } from '../utils/redactSecrets.js'
 import { evaluateConnectorToolUse } from '../safety/safetyService.js'
 import { requestStandaloneApproval } from '../runtime.js'
@@ -71,6 +72,19 @@ export interface ConnectorToolCallResult {
 
 // In-process connected clients held for the lifetime of the main process.
 const connections = new Map<string, ConnectedMCPServer | FailedMCPServer>()
+
+function connectionKey(projectRoot: string, name: string): string {
+  return `${path.resolve(projectRoot)}\u0000${name}`
+}
+
+async function invalidateConnection(projectRoot: string, name: string): Promise<void> {
+  const key = connectionKey(projectRoot, name)
+  const existing = connections.get(key)
+  connections.delete(key)
+  if (existing?.type === 'connected') {
+    await existing.cleanup().catch(() => undefined)
+  }
+}
 
 function mcpConfigToConnector(name: string, config: McpServerConfig): ConnectorConfig {
   if (config.type === 'stdio' || config.type === undefined) {
@@ -186,19 +200,17 @@ export async function listConnectors(projectRoot: string): Promise<ConnectorInfo
   const { servers: configs } = await getAllMcpConfigs()
   return Object.entries(configs).map(([name, config]) => {
     const connector = mcpConfigToConnector(name, config as McpServerConfig)
-    const status = getConnectionStatus(name)
+    const status = getConnectionStatus(projectRoot, name)
     return {
       name: connector.name,
       transport: connector.transport,
       enabled: !(config as { disabled?: boolean }).disabled,
       command: connector.command,
       args: connector.args,
-      env: connector.env,
       cwd: connector.cwd,
       url: connector.url,
-      headers: (config as { headers?: Record<string, string> }).headers,
       status,
-      error: status === 'failed' ? extractError(name) : undefined,
+      error: status === 'failed' ? extractError(projectRoot, name) : undefined,
     }
   })
 }
@@ -217,6 +229,7 @@ export async function addConnector(
     }
     return { ...prev, mcp }
   })
+  await invalidateConnection(projectRoot, connector.name)
 }
 
 export async function updateConnector(
@@ -241,6 +254,7 @@ export async function updateConnector(
     }
     return { ...prev, mcp }
   })
+  await invalidateConnection(projectRoot, name)
 }
 
 export async function removeConnector(projectRoot: string, name: string): Promise<void> {
@@ -253,7 +267,7 @@ export async function removeConnector(projectRoot: string, name: string): Promis
     }
     return { ...prev, mcp }
   })
-  connections.delete(name)
+  await invalidateConnection(projectRoot, name)
 }
 
 export async function testConnector(
@@ -326,19 +340,20 @@ async function connectConnector(
   projectRoot: string,
   name: string,
 ): Promise<ConnectedMCPServer | FailedMCPServer> {
-  const existing = connections.get(name)
+  const key = connectionKey(projectRoot, name)
+  const existing = connections.get(key)
   if (existing) return existing
   await openProjectStore(projectRoot)
   const { servers: configs } = await getAllMcpConfigs()
   const config = configs[name]
   if (!config) {
     const failed: FailedMCPServer = { name, type: 'failed', config: config as McpServerConfig, error: 'Connector not found' }
-    connections.set(name, failed)
+    connections.set(key, failed)
     return failed
   }
   if ((config as { disabled?: boolean }).disabled) {
     const failed: FailedMCPServer = { name, type: 'failed', config, error: 'Connector is disabled' }
-    connections.set(name, failed)
+    connections.set(key, failed)
     return failed
   }
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
@@ -354,7 +369,7 @@ async function connectConnector(
       config: { ...config, scope: 'local' },
       cleanup: async () => { await client.close() },
     }
-    connections.set(name, connected)
+    connections.set(key, connected)
     return connected
   } catch (error) {
     const failed: FailedMCPServer = {
@@ -363,7 +378,7 @@ async function connectConnector(
       config,
       error: error instanceof Error ? error.message : String(error),
     }
-    connections.set(name, failed)
+    connections.set(key, failed)
     return failed
   }
 }
@@ -401,15 +416,18 @@ async function createTransport(config: McpServerConfig): Promise<import('@modelc
   throw new Error(`Unsupported connector type: ${config.type}`)
 }
 
-function getConnectionStatus(name: string): ConnectorInfo['status'] {
-  const conn = connections.get(name)
+function getConnectionStatus(
+  projectRoot: string,
+  name: string,
+): ConnectorInfo['status'] {
+  const conn = connections.get(connectionKey(projectRoot, name))
   if (!conn) return 'unknown'
   if (conn.type === 'failed') return 'failed'
   return 'connected'
 }
 
-function extractError(name: string): string | undefined {
-  const conn = connections.get(name)
+function extractError(projectRoot: string, name: string): string | undefined {
+  const conn = connections.get(connectionKey(projectRoot, name))
   if (conn?.type === 'failed') return conn.error
   return undefined
 }

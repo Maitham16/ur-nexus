@@ -4,10 +4,10 @@ import { checkForUpdates, isNewerVersion } from './autoUpdate.js'
 
 describe('desktop release updates', () => {
   test('compares semantic release versions', () => {
-    expect(isNewerVersion('v1.0.6', '1.0.5')).toBe(true)
-    expect(isNewerVersion('1.0.5', '1.0.5')).toBe(false)
-    expect(isNewerVersion('1.0.4', '1.0.5')).toBe(false)
-    expect(isNewerVersion('not-a-version', '1.0.5')).toBe(false)
+    expect(isNewerVersion('v1.0.8', '1.0.7')).toBe(true)
+    expect(isNewerVersion('1.0.7', '1.0.7')).toBe(false)
+    expect(isNewerVersion('1.0.6', '1.0.7')).toBe(false)
+    expect(isNewerVersion('not-a-version', '1.0.7')).toBe(false)
   })
 
   test('checks the public GitHub release without a deprecated updater dependency', async () => {
@@ -17,8 +17,8 @@ describe('desktop release updates', () => {
       })
       return new Response(
         JSON.stringify({
-          tag_name: 'v1.0.6',
-          html_url: 'https://github.com/Maitham16/ur-nexus/releases/tag/v1.0.6',
+          tag_name: 'v1.0.8',
+          html_url: 'https://github.com/Maitham16/ur-nexus/releases/tag/v1.0.8',
         }),
         { status: 200 },
       )
@@ -26,8 +26,8 @@ describe('desktop release updates', () => {
 
     await expect(checkForUpdates(fetchMock)).resolves.toEqual({
       updateAvailable: true,
-      version: '1.0.6',
-      url: 'https://github.com/Maitham16/ur-nexus/releases/tag/v1.0.6',
+      version: '1.0.8',
+      url: 'https://github.com/Maitham16/ur-nexus/releases/tag/v1.0.8',
     })
   })
 

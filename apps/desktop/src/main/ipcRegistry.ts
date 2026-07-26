@@ -28,6 +28,18 @@ import type {
   ParseDiffRequestDto,
   TestRunRequestDto,
   LaunchBackgroundAgentRequestDto,
+  SteerBackgroundAgentRequestDto,
+  BroadcastBackgroundAgentsRequestDto,
+  SavePlaybookRequestDto,
+  RunPlaybookRequestDto,
+  SaveMemoryRequestDto,
+  CaptureFileMemoryRequestDto,
+  CreateSideChatRequestDto,
+  SendSideChatRequestDto,
+  SaveWorkspaceRequestDto,
+  LaunchWorkspaceRequestDto,
+  LaunchArenaRequestDto,
+  SaveQualityProfileRequestDto,
   CheckpointRequestDto,
   GeneratePlanRequestDto,
   ExecutePlanRequestDto,
@@ -124,6 +136,8 @@ import {
   cancelBackgroundAgent,
   retryBackgroundAgent,
   removeBackgroundAgent,
+  steerBackgroundAgent,
+  broadcastBackgroundAgentInstruction,
   setBackgroundAgentConcurrency,
   reconcileBackgroundAgents,
 } from './agents/backgroundAgents.js'
@@ -157,8 +171,68 @@ import {
   getAgentPermissionSettings,
   setAgentPermissionSettings,
 } from './permissionSettings.js'
+import {
+  missionControlSnapshot,
+  runPlaybook,
+  launchWorkspaceRun,
+  launchArena,
+  evaluateArena,
+  createDurableSideChat,
+  sendSideChatMessage,
+  runQualityProfile,
+  runDesktopSelfQa,
+} from './missionControl.js'
+import {
+  savePlaybook,
+  deletePlaybook,
+  saveUserMemory,
+  captureFileMemory,
+  deleteMemory,
+  validateMemories,
+  getSideChat,
+  renameSideChat,
+  closeSideChat,
+  saveWorkspace,
+  deleteWorkspace,
+  saveQualityProfile,
+  deleteQualityProfile,
+  buildMemoryContext,
+} from './missionControlStore.js'
 
 type Handler = (...args: unknown[]) => unknown
+
+function isTrustedRenderer(event: Electron.IpcMainInvokeEvent): boolean {
+  // Unit tests use a minimal event double without a sender. Real Electron
+  // invocations always carry one and are validated below.
+  if (!event.sender) return true
+  if (
+    event.senderFrame &&
+    event.sender.mainFrame &&
+    event.senderFrame !== event.sender.mainFrame
+  ) {
+    return false
+  }
+  const rawUrl = event.senderFrame?.url || event.sender.getURL()
+  if (!rawUrl) return false
+  try {
+    const url = new URL(rawUrl)
+    if (
+      url.protocol === 'http:' &&
+      url.hostname === 'localhost' &&
+      url.port === '5173'
+    ) {
+      return true
+    }
+    if (url.protocol !== 'file:') return false
+    const rendererPath = decodeURIComponent(url.pathname)
+    return (
+      path.basename(rendererPath) === 'index.html' &&
+      /\/(?:dist\/)?renderer\/index\.html$/u.test(rendererPath)
+    )
+  } catch {
+    return false
+  }
+}
 
 function expectString(value: unknown, name: string): string {
   if (typeof value !== 'string' || value.length === 0) {
@@ -171,6 +245,13 @@ function optionalString(value: unknown, name: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string') {
     throw new Error(`Invalid IPC argument: ${name} must be a string`)
+  }
+  return value
+}
+
+function expectFiniteNumber(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Invalid IPC argument: ${name} must be a finite number`)
   }
   return value
 }
@@ -607,23 +688,193 @@ export function registerIpcHandlers(
     },
 
     // ------ Background agents ------
-    'bgagent:launch': (req: unknown) => {
+    'bgagent:launch': async (req: unknown) => {
       const r = expectObject<LaunchBackgroundAgentRequestDto>(req, 'req')
+      const projectRoot = expectString(r.projectRoot, 'projectRoot')
+      const basePrompt = expectString(r.prompt, 'prompt')
+      const memoryIds =
+        r.memoryIds === undefined
+          ? undefined
+          : expectStringArray(r.memoryIds, 'memoryIds')
+      const memory = await buildMemoryContext(projectRoot, memoryIds)
       return launchBackgroundAgent({
-        projectRoot: expectString(r.projectRoot, 'projectRoot'),
-        prompt: expectString(r.prompt, 'prompt'),
+        projectRoot,
+        prompt: memory
+          ? `${basePrompt}\n\nCited project memory (verify stale citations before relying on them):\n${memory}`
+          : basePrompt,
         useWorktree: r.useWorktree === true,
       })
     },
     'bgagent:list': (projectRoot?: unknown) =>
       listBackgroundAgents(optionalString(projectRoot, 'projectRoot')),
     'bgagent:get': (id: unknown) => getBackgroundAgent(expectString(id, 'id')),
+    'bgagent:steer': (req: unknown) => {
+      const r = expectObject<SteerBackgroundAgentRequestDto>(req, 'req')
+      return steerBackgroundAgent(
+        expectString(r.id, 'id'),
+        expectString(r.content, 'content'),
+      )
+    },
+    'bgagent:broadcast': (req: unknown) => {
+      const r = expectObject<BroadcastBackgroundAgentsRequestDto>(req, 'req')
+      return broadcastBackgroundAgentInstruction(
+        expectString(r.projectRoot, 'projectRoot'),
+        expectString(r.content, 'content'),
+        r.agentIds === undefined
+          ? undefined
+          : expectStringArray(r.agentIds, 'agentIds'),
+      )
+    },
     'bgagent:cancel': (id: unknown) =>
       cancelBackgroundAgent(expectString(id, 'id')),
     'bgagent:retry': (id: unknown) =>
       retryBackgroundAgent(expectString(id, 'id')),
     'bgagent:remove': (id: unknown) =>
       removeBackgroundAgent(expectString(id, 'id')),
+
+    // ------ Mission control ------
+    'mission:snapshot': (projectRoot?: unknown) =>
+      missionControlSnapshot(optionalString(projectRoot, 'projectRoot')),
+    'playbook:save': (req: unknown) => {
+      const r = expectObject<SavePlaybookRequestDto>(req, 'req')
+      return savePlaybook({
+        id: optionalString(r.id, 'id'),
+        projectRoot: expectString(r.projectRoot, 'projectRoot'),
+        name: expectString(r.name, 'name'),
+        description: optionalString(r.description, 'description'),
+        prompt: expectString(r.prompt, 'prompt'),
+        tags: r.tags === undefined ? undefined : expectStringArray(r.tags, 'tags'),
+        status: r.status === 'disabled' ? 'disabled' : 'approved',
+        learnedFromAgentId: optionalString(r.learnedFromAgentId, 'learnedFromAgentId'),
+      })
+    },
+    'playbook:delete': (id: unknown) => deletePlaybook(expectString(id, 'id')),
+    'playbook:run': (req: unknown) => {
+      const r = expectObject<RunPlaybookRequestDto>(req, 'req')
+      return runPlaybook({
+        id: expectString(r.id, 'id'),
+        context: optionalString(r.context, 'context'),
+        useWorktree: r.useWorktree !== false,
+        memoryIds:
+          r.memoryIds === undefined
+            ? undefined
+            : expectStringArray(r.memoryIds, 'memoryIds'),
+      })
+    },
+    'memory:save': (req: unknown) => {
+      const r = expectObject<SaveMemoryRequestDto>(req, 'req')
+      return saveUserMemory({
+        id: optionalString(r.id, 'id'),
+        projectRoot: expectString(r.projectRoot, 'projectRoot'),
+        title: expectString(r.title, 'title'),
+        content: expectString(r.content, 'content'),
+        source: optionalString(r.source, 'source'),
+      })
+    },
+    'memory:capture-file': (req: unknown) => {
+      const r = expectObject<CaptureFileMemoryRequestDto>(req, 'req')
+      return captureFileMemory({
+        projectRoot: expectString(r.projectRoot, 'projectRoot'),
+        path: expectString(r.path, 'path'),
+        title: optionalString(r.title, 'title'),
+        content: optionalString(r.content, 'content'),
+        lineStart:
+          r.lineStart === undefined ? undefined : expectFiniteNumber(r.lineStart, 'lineStart'),
+        lineEnd:
+          r.lineEnd === undefined ? undefined : expectFiniteNumber(r.lineEnd, 'lineEnd'),
+      })
+    },
+    'memory:delete': (id: unknown) => deleteMemory(expectString(id, 'id')),
+    'memory:validate': (projectRoot: unknown) =>
+      validateMemories(expectString(projectRoot, 'projectRoot')),
+    'sidechat:create': (req: unknown) => {
+      const r = expectObject<CreateSideChatRequestDto>(req, 'req')
+      return createDurableSideChat({
+        projectRoot: expectString(r.projectRoot, 'projectRoot'),
+        title: optionalString(r.title, 'title'),
+      })
+    },
+    'sidechat:get': (id: unknown) => getSideChat(expectString(id, 'id')),
+    'sidechat:send': (req: unknown) => {
+      const r = expectObject<SendSideChatRequestDto>(req, 'req')
+      return sendSideChatMessage({
+        id: expectString(r.id, 'id'),
+        content: expectString(r.content, 'content'),
+      })
+    },
+    'sidechat:rename': (id: unknown, title: unknown) =>
+      renameSideChat(expectString(id, 'id'), expectString(title, 'title')),
+    'sidechat:close': (id: unknown) => closeSideChat(expectString(id, 'id')),
+    'workspace:save': (req: unknown) => {
+      const r = expectObject<SaveWorkspaceRequestDto>(req, 'req')
+      if (!Array.isArray(r.repositories)) {
+        throw new Error('Invalid IPC argument: repositories must be an array')
+      }
+      const repositories = r.repositories.map((repository, index) => {
+        const item = expectObject<{ root: unknown; label?: unknown }>(
+          repository,
+          `repositories[${index}]`,
+        )
+        return {
+          root: expectString(item.root, `repositories[${index}].root`),
+          label: optionalString(item.label, `repositories[${index}].label`),
+        }
+      })
+      return saveWorkspace({
+        id: optionalString(r.id, 'id'),
+        name: expectString(r.name, 'name'),
+        repositories,
+      })
+    },
+    'workspace:delete': (id: unknown) => deleteWorkspace(expectString(id, 'id')),
+    'workspace:launch': (req: unknown) => {
+      const r = expectObject<LaunchWorkspaceRequestDto>(req, 'req')
+      return launchWorkspaceRun({
+        id: expectString(r.id, 'id'),
+        prompt: expectString(r.prompt, 'prompt'),
+        useWorktrees: r.useWorktrees !== false,
+        memoryIds:
+          r.memoryIds === undefined
+            ? undefined
+            : expectStringArray(r.memoryIds, 'memoryIds'),
+      })
+    },
+    'arena:launch': (req: unknown) => {
+      const r = expectObject<LaunchArenaRequestDto>(req, 'req')
+      const mode =
+        r.mode === 'deterministic' || r.mode === 'model' || r.mode === 'hybrid'
+          ? r.mode
+          : undefined
+      return launchArena({
+        projectRoot: expectString(r.projectRoot, 'projectRoot'),
+        prompt: expectString(r.prompt, 'prompt'),
+        candidates:
+          r.candidates === undefined
+            ? undefined
+            : expectFiniteNumber(r.candidates, 'candidates'),
+        mode,
+        memoryIds:
+          r.memoryIds === undefined
+            ? undefined
+            : expectStringArray(r.memoryIds, 'memoryIds'),
+      })
+    },
+    'arena:evaluate': (id: unknown) => evaluateArena(expectString(id, 'id')),
+    'quality:profile:save': (req: unknown) => {
+      const r = expectObject<SaveQualityProfileRequestDto>(req, 'req')
+      return saveQualityProfile({
+        id: optionalString(r.id, 'id'),
+        projectRoot: expectString(r.projectRoot, 'projectRoot'),
+        name: expectString(r.name, 'name'),
+        command: expectString(r.command, 'command'),
+        autoFix: r.autoFix === true,
+      })
+    },
+    'quality:profile:delete': (id: unknown) =>
+      deleteQualityProfile(expectString(id, 'id')),
+    'quality:run': (id: unknown) => runQualityProfile(expectString(id, 'id')),
+    'quality:desktop-qa': (projectRoot: unknown) =>
+      runDesktopSelfQa(expectString(projectRoot, 'projectRoot')),
 
     // ------ Checkpoints ------
     'checkpoint:create': (req: unknown) => {
@@ -955,8 +1206,11 @@ export function registerIpcHandlers(
 
   registeredChannels = Object.keys(handlers)
   for (const [channel, handler] of Object.entries(handlers)) {
-    ipcMain.handle(channel, async (_event, ...args: unknown[]) => {
+    ipcMain.handle(channel, async (event, ...args: unknown[]) => {
       try {
+        if (!isTrustedRenderer(event)) {
+          throw new Error('Untrusted IPC sender')
+        }
         return await handler(...args)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)

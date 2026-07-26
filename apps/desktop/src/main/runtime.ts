@@ -1,7 +1,7 @@
 import './vendorGlobals.js'
 import type Electron from 'electron'
 import * as path from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import {
   openProject,
@@ -17,7 +17,6 @@ import {
   setProvider,
   applyPatch,
   readHistory,
-  setCwd,
 } from '@ur/agent-runtime'
 import type {
   RuntimeProject,
@@ -67,6 +66,7 @@ import {
 } from './terminalManager.js'
 import {
   createTask,
+  createAgent,
   startTask,
   setTaskProgress,
   completeTask,
@@ -86,6 +86,7 @@ import {
   toAgentDto,
   listAllTasks,
   listAllAgents,
+  removeRunRegistry,
 } from './taskAgentRegistry.js'
 
 export { RuntimeProject, RuntimeSession }
@@ -139,6 +140,224 @@ async function safeCheckpoint(options: CreateCheckpointOptions): Promise<void> {
     )
   }
 }
+
+interface WorkspaceBaseline {
+  root: string
+  mode: 'git' | 'filesystem'
+  states: Map<string, string>
+  gitHead?: string
+}
+
+const SNAPSHOT_SKIP_DIRECTORIES = new Set([
+  '.git',
+  '.ur',
+  'node_modules',
+])
+const MAX_FILESYSTEM_SNAPSHOT_FILES = 50_000
+const MAX_HASHED_SNAPSHOT_FILE_BYTES = 8 * 1024 * 1024
+
+function isPathInside(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate)
+  return relative === '' || (
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  )
+}
+
+async function snapshotFileState(root: string, relative: string): Promise<string> {
+  const absolute = path.resolve(root, relative)
+  if (!isPathInside(root, absolute)) return 'outside'
+  try {
+    const info = await fs.lstat(absolute)
+    if (info.isSymbolicLink()) {
+      return `link:${await fs.readlink(absolute)}`
+    }
+    if (!info.isFile()) {
+      return `${info.isDirectory() ? 'directory' : 'other'}:${info.mode}`
+    }
+    if (info.size <= MAX_HASHED_SNAPSHOT_FILE_BYTES) {
+      const digest = createHash('sha256')
+        .update(await fs.readFile(absolute))
+        .digest('hex')
+      return `file:${info.mode}:${digest}`
+    }
+    return `large-file:${info.mode}:${info.size}:${info.mtimeMs}`
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'missing'
+    throw error
+  }
+}
+
+function parsePorcelainPaths(output: string): string[] {
+  const fields = output.split('\0')
+  const paths = new Set<string>()
+  for (let index = 0; index < fields.length; index++) {
+    const entry = fields[index]
+    if (!entry || entry.length < 4) continue
+    const status = entry.slice(0, 2)
+    paths.add(entry.slice(3))
+    if (/[RC]/u.test(status)) {
+      const original = fields[index + 1]
+      if (original) paths.add(original)
+      index += 1
+    }
+  }
+  return [...paths]
+}
+
+function isRuntimeMetadataPath(relative: string): boolean {
+  return relative === '.ur' || relative.startsWith('.ur/')
+}
+
+async function gitOutput(root: string, args: string[]): Promise<string | null> {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const execFileAsync = promisify(execFile)
+  try {
+    const result = await execFileAsync(
+      'git',
+      ['-C', root, ...args],
+      {
+        encoding: 'utf-8',
+        maxBuffer: 32 * 1024 * 1024,
+        env: {
+          PATH: process.env.PATH,
+          LANG: process.env.LANG ?? 'C',
+          LC_ALL: 'C',
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_CONFIG_NOSYSTEM: '1',
+        },
+      },
+    )
+    return result.stdout
+  } catch {
+    return null
+  }
+}
+
+async function gitDirtyStates(root: string): Promise<Map<string, string> | null> {
+  const output = await gitOutput(
+    root,
+    ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+  )
+  if (output === null) return null
+  const states = new Map<string, string>()
+  for (const relative of parsePorcelainPaths(output)) {
+    if (isRuntimeMetadataPath(relative)) continue
+    states.set(relative, await snapshotFileState(root, relative))
+  }
+  return states
+}
+
+async function filesystemStates(root: string): Promise<Map<string, string>> {
+  const states = new Map<string, string>()
+  const pending = ['']
+  while (pending.length > 0) {
+    const relativeDirectory = pending.pop()!
+    const absoluteDirectory = path.join(root, relativeDirectory)
+    const entries = await fs.readdir(absoluteDirectory, { withFileTypes: true })
+    for (const entry of entries) {
+      if (
+        entry.isDirectory() &&
+        SNAPSHOT_SKIP_DIRECTORIES.has(entry.name)
+      ) {
+        continue
+      }
+      const relative = path.join(relativeDirectory, entry.name)
+      if (entry.isDirectory()) {
+        pending.push(relative)
+        continue
+      }
+      states.set(relative, await snapshotFileState(root, relative))
+      if (states.size > MAX_FILESYSTEM_SNAPSHOT_FILES) {
+        throw new Error(
+          `Non-git workspace snapshot exceeds ${MAX_FILESYSTEM_SNAPSHOT_FILES} files`,
+        )
+      }
+    }
+  }
+  return states
+}
+
+async function captureWorkspaceBaseline(root: string): Promise<WorkspaceBaseline> {
+  const normalized = await fs.realpath(root)
+  const gitStates = await gitDirtyStates(normalized)
+  if (gitStates) {
+    const gitHead = (await gitOutput(normalized, ['rev-parse', '--verify', 'HEAD']))
+      ?.trim()
+    return {
+      root: normalized,
+      mode: 'git',
+      states: gitStates,
+      gitHead: gitHead || undefined,
+    }
+  }
+  return {
+    root: normalized,
+    mode: 'filesystem',
+    states: await filesystemStates(normalized),
+  }
+}
+
+async function refreshRunChangedFiles(run: RuntimeRun): Promise<void> {
+  const baseline = run.workspaceBaseline
+  if (!baseline) return
+  try {
+    const current = baseline.mode === 'git'
+      ? await gitDirtyStates(baseline.root)
+      : await filesystemStates(baseline.root)
+    if (!current) return
+    const paths = new Set([...baseline.states.keys(), ...current.keys()])
+    for (const relative of paths) {
+      const before = baseline.states.get(relative)
+      const after = current.get(relative)
+      if (
+        (before === undefined && after !== undefined) ||
+        (before !== undefined && before !== after)
+      ) {
+        run.changedFiles.add(relative)
+      }
+    }
+    if (baseline.mode === 'git') {
+      const currentHead = (
+        await gitOutput(baseline.root, ['rev-parse', '--verify', 'HEAD'])
+      )?.trim()
+      if (currentHead && currentHead !== baseline.gitHead) {
+        const committedOutput = baseline.gitHead
+          ? await gitOutput(baseline.root, [
+              'diff',
+              '--name-only',
+              '--no-renames',
+              '-z',
+              `${baseline.gitHead}..${currentHead}`,
+              '--',
+            ])
+          : await gitOutput(baseline.root, [
+              'ls-tree',
+              '-r',
+              '--name-only',
+              '-z',
+              currentHead,
+            ])
+        for (const relative of committedOutput?.split('\0').filter(Boolean) ?? []) {
+          if (isRuntimeMetadataPath(relative)) continue
+          const before = baseline.states.get(relative)
+          if (
+            before === undefined ||
+            before !== await snapshotFileState(baseline.root, relative)
+          ) {
+            run.changedFiles.add(relative)
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(
+      `[runtime] workspace change detection failed: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
 import {
   appendRun,
   updateRun,
@@ -167,6 +386,9 @@ export interface RuntimeRun {
   __canUseTool?: import('@ur/agent-runtime').CanUseToolFn
   allowedActions: Set<string>
   permissions: AgentPermissionSettingsDto
+  nativeApprovals: boolean
+  ephemeral: boolean
+  workspaceBaseline?: WorkspaceBaseline
   usageTracker?: RunUsageTracker
 }
 
@@ -178,6 +400,26 @@ const pendingApprovals = new Map<
   string,
   { resolve: (value: { approved: boolean; scope: ApprovalScope }) => void; timeout: NodeJS.Timeout }
 >()
+const MAX_RETAINED_RUNTIME_RUNS = 100
+
+function pruneRuntimeRuns(protectedRunId?: string): void {
+  if (runs.size <= MAX_RETAINED_RUNTIME_RUNS) return
+  for (const [runId, run] of runs) {
+    if (runs.size <= MAX_RETAINED_RUNTIME_RUNS) break
+    if (
+      runId === protectedRunId ||
+      !run.ephemeral ||
+      run.status === 'running' ||
+      run.status === 'paused' ||
+      run.status === 'idle'
+    ) {
+      continue
+    }
+    runs.delete(runId)
+    sessions.delete(run.session.sessionId)
+    removeRunRegistry(runId)
+  }
+}
 
 export async function openProjectAndCache(root: string): Promise<{ root: string }> {
   const normalized = path.resolve(root)
@@ -278,13 +520,8 @@ export async function createRunWorktree(
   branch?: string,
 ): Promise<WorktreeInfoDto> {
   const project = getProject(projectRoot)
-  try {
-    const worktree = await createIsolatedWorktree(project.root, branch)
-    return { root: worktree.root, branch: worktree.branch, isMain: false }
-  } catch {
-    // Fallback: return main workspace so caller can switch to patch proposal mode.
-    return { root: project.root, branch: 'main', isMain: true }
-  }
+  const worktree = await createIsolatedWorktree(project.root, branch)
+  return { root: worktree.root, branch: worktree.branch, isMain: false }
 }
 
 export function listWorktrees(projectRoot: string): WorktreeInfoDto[] {
@@ -315,15 +552,32 @@ export async function startRun(
     status: 'idle',
     allowedActions: new Set(),
     permissions,
+    nativeApprovals: options.nativeApprovals === true,
+    ephemeral: options.ephemeral === true,
   }
   runs.set(runId, run)
 
   let worktree: Worktree | undefined
   if (options.useWorktree) {
-    worktree = await createIsolatedWorktree(project.root, options.branch).catch(
-      () => undefined,
-    )
+    // Isolation is a contract, not a preference. Never silently run in the
+    // main checkout when a worktree was requested.
+    try {
+      worktree = await createIsolatedWorktree(project.root, options.branch)
+    } catch (error) {
+      runs.delete(runId)
+      throw error
+    }
     run.worktreeRoot = worktree?.root
+  }
+
+  try {
+    run.workspaceBaseline = await captureWorkspaceBaseline(
+      run.worktreeRoot ?? project.root,
+    )
+  } catch (error) {
+    console.warn(
+      `[runtime] could not capture workspace baseline: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 
   createTask(runId, 'task-1', {
@@ -331,6 +585,13 @@ export async function startRun(
     title: 'Process user request',
     description: 'Handle the current user prompt',
     dependencies: [],
+    projectRoot,
+  })
+  createAgent(runId, 'agent-1', {
+    name: 'Primary agent',
+    role: 'coder',
+    assignedTaskId: 'task-1',
+    projectRoot,
   })
 
   const { ensureConnectorClientsConnected } = await import('./connectors/connectorService.js')
@@ -405,13 +666,15 @@ export async function startRun(
       return { behavior: 'deny', message: evaluation.reason }
     }
 
-    const approved = await requestApproval(
-      runId,
-      tool.name,
-      input as Record<string, unknown>,
-      'task-1',
-      evaluation,
-    )
+    const approved = run.nativeApprovals
+      ? await requestStandaloneApproval(run.projectRoot, evaluation, undefined, run.runId)
+      : await requestApproval(
+          runId,
+          tool.name,
+          input as Record<string, unknown>,
+          'task-1',
+          evaluation,
+        )
     return approved.approved
       ? updatedInput
         ? { behavior: 'allow', updatedInput }
@@ -419,18 +682,17 @@ export async function startRun(
       : { behavior: 'deny', message: 'User denied approval' }
   }
 
-  // The engine executes its tools relative to the runtime cwd, which is
-  // process-global in the vendored bundle. Point it at the run's workspace
-  // so model tool calls land in the opened project, not wherever the app
-  // process happened to start.
-  try {
-    setCwd(run.worktreeRoot ?? project.root)
-  } catch (err) {
-    console.warn(
-      `[runtime] setCwd failed: ${err instanceof Error ? err.message : String(err)}`,
-    )
-  }
-  const session = await createSession(project, { sessionId: runId, canUseTool })
+  // A session owns its workspace root. The vendored runtime scopes each
+  // prompt through AsyncLocalStorage, so concurrent sessions no longer race
+  // through the process-global cwd. Reuse the project's state store while
+  // pointing the session itself at its isolated worktree.
+  const sessionProject: RuntimeProject = run.worktreeRoot
+    ? { ...project, root: run.worktreeRoot }
+    : project
+  const session = await createSession(sessionProject, {
+    sessionId: runId,
+    canUseTool,
+  })
   run.session = session
   sessions.set(session.sessionId, session)
   if (worktree) {
@@ -460,6 +722,25 @@ export function resumeRunById(runId: string): void {
   const run = getRun(runId)
   run.status = 'running'
   resumeRun(run.session)
+}
+
+async function isLocalSlashPrompt(
+  workspaceRoot: string,
+  prompt: string,
+): Promise<boolean> {
+  const match = prompt.trim().match(/^\/([a-z0-9][a-z0-9-]*)(?:\s|$)/iu)
+  if (!match) return false
+  try {
+    const name = match[1]!.toLowerCase()
+    const commands = await getCommands(workspaceRoot)
+    const command = commands.find(candidate => {
+      const commandName = getCommandName(candidate).toLowerCase()
+      return commandName === name || candidate.aliases?.some(alias => alias.toLowerCase() === name)
+    })
+    return command?.type === 'local' || command?.type === 'local-jsx'
+  } catch {
+    return false
+  }
 }
 
 export async function* runPromptStream(
@@ -538,7 +819,33 @@ export async function* runPromptStream(
       currentCommand: undefined,
     })
 
-    for await (const event of runPrompt(run.session, effectivePrompt)) {
+    const localSlash = await isLocalSlashPrompt(
+      run.worktreeRoot ?? run.projectRoot,
+      prompt,
+    )
+    const runtimeEvents = runPrompt(run.session, effectivePrompt)
+    let emittedLocalOutput = false
+    while (true) {
+      const nextPromise = runtimeEvents.next()
+      const next = localSlash && emittedLocalOutput
+        ? await Promise.race([
+            nextPromise,
+            new Promise<{ done: true; value: undefined }>(resolve => {
+              setTimeout(() => resolve({ done: true, value: undefined }), 750)
+            }),
+          ])
+        : await nextPromise
+      if (next.done) {
+        if (localSlash && emittedLocalOutput) {
+          // Some legacy local commands emit their complete result but leave
+          // an idle runtime iterator open. Interrupt only that local command;
+          // model-backed slash commands retain normal streaming semantics.
+          stopRun(run.session)
+          void nextPromise.catch(() => undefined)
+        }
+        break
+      }
+      const event = next.value
       const translatedEvents = translateRuntimeEvents(run, event)
       if (translatedEvents.length === 0) {
         // Keep full fidelity in the persisted transcript even for events
@@ -558,18 +865,35 @@ export async function* runPromptStream(
               totalTokens: usage.inputTokens + usage.outputTokens,
             },
           }).catch(() => undefined)
+          const failure = runtimeResultErrorMessage(translated)
+          if (failure) throw new Error(failure)
+        }
+        if (localSlash && translated.type === 'model_stream') {
+          emittedLocalOutput = true
         }
         yield translated
       }
     }
 
+    await refreshRunChangedFiles(run)
+    for (const file of run.changedFiles) {
+      addTaskChangedFile(runId, 'task-1', file)
+    }
     completeTask(runId, 'task-1')
     finishAgent(runId, 'agent-1')
-    setTaskVerification(runId, 'task-1', {
-      passed: true,
-      level: 'l1',
-      message: 'Run completed',
-    })
+    const verification = run.changedFiles.size === 0
+      ? {
+          passed: true,
+          level: 'l1' as const,
+          message: 'Run completed with no workspace changes to verify',
+        }
+      : {
+          passed: false,
+          level: 'l1' as const,
+          message:
+            'Workspace changes are unverified until a recorded quality gate passes',
+        }
+    setTaskVerification(runId, 'task-1', verification)
 
     if (run.changedFiles.size > 0) {
       await safeCheckpoint({
@@ -594,9 +918,7 @@ export async function* runPromptStream(
     yield makeEvent(run, {
       type: 'verification_completed',
       taskId: 'task-1',
-      passed: true,
-      level: 'l1',
-      message: 'Run completed',
+      ...verification,
     })
     yield makeEvent(run, {
       type: 'run_finished',
@@ -612,7 +934,15 @@ export async function* runPromptStream(
   } catch (error) {
     run.status = 'failed'
     const message = error instanceof Error ? error.message : String(error)
-    patchRunState(runId, { status: 'failed', pendingPrompt: undefined })
+    await refreshRunChangedFiles(run)
+    for (const file of run.changedFiles) {
+      addTaskChangedFile(runId, 'task-1', file)
+    }
+    patchRunState(runId, {
+      status: 'failed',
+      pendingPrompt: undefined,
+      changedFiles: [...run.changedFiles],
+    })
     failTask(runId, 'task-1', message)
     failAgent(runId, 'agent-1', message)
     yield makeEvent(run, { type: 'task_failed', taskId: 'task-1', error: message })
@@ -621,8 +951,24 @@ export async function* runPromptStream(
       type: 'run_failed',
       error: message,
     })
+    if (run.changedFiles.size > 0) {
+      yield makeEvent(run, {
+        type: 'changed_files',
+        files: [...run.changedFiles],
+      })
+    }
     await finalizeRunRecord(run, prompt)
   }
+}
+
+export function runtimeResultErrorMessage(
+  event: import('../shared/ipc.js').RuntimeEvent,
+): string | null {
+  if (event.type !== 'run_result' || !event.isError) return null
+  return (
+    event.resultText?.trim() ||
+    'The provider reported an unsuccessful model run'
+  )
 }
 
 async function finalizeRunRecord(run: RuntimeRun, prompt: string): Promise<void> {
@@ -638,6 +984,7 @@ async function finalizeRunRecord(run: RuntimeRun, prompt: string): Promise<void>
     title,
     changedFiles: [...run.changedFiles],
   })
+  pruneRuntimeRuns(run.runId)
 }
 
 export async function readProjectFile(
@@ -752,25 +1099,42 @@ export async function runProjectCommand(
 ): Promise<{ output: string; exitCode: number; commandId?: string; requiresApproval?: boolean; denied?: boolean }> {
   const run = findRunByWorktree(projectRoot, worktreeRoot)
 
-  if (!skipApproval && run) {
+  if (!skipApproval) {
     const evaluation = evaluateShellCommand(
-      { runId: run.runId, projectRoot, worktreeRoot },
+      { runId: run?.runId ?? '', projectRoot, worktreeRoot },
       command,
     )
     if (evaluation.behavior === 'deny') {
       const reason = evaluation.reason
-      emitToRenderer(projectRoot, {
-        ...makeEvent(run, { type: 'command_finished', exitCode: -1, output: reason }),
-      })
-      return { output: reason, exitCode: -1, denied: true }
-    }
-    if (evaluation.behavior === 'ask') {
-      const approved = await requestApproval(run.runId, command, { command }, 'task-1', evaluation)
-      if (!approved.approved) {
-        const reason = 'User denied command execution'
+      if (run) {
         emitToRenderer(projectRoot, {
           ...makeEvent(run, { type: 'command_finished', exitCode: -1, output: reason }),
         })
+      }
+      return { output: reason, exitCode: -1, denied: true }
+    }
+    if (evaluation.behavior === 'ask') {
+      const approved = run && !run.nativeApprovals
+        ? await requestApproval(
+            run.runId,
+            command,
+            { command },
+            'task-1',
+            evaluation,
+          )
+        : await requestStandaloneApproval(
+            projectRoot,
+            evaluation,
+            undefined,
+            run?.runId,
+          )
+      if (!approved.approved) {
+        const reason = 'User denied command execution'
+        if (run) {
+          emitToRenderer(projectRoot, {
+            ...makeEvent(run, { type: 'command_finished', exitCode: -1, output: reason }),
+          })
+        }
         return { output: reason, exitCode: -1, denied: true }
       }
     }
@@ -786,7 +1150,8 @@ export async function runProjectCommand(
   const result = await runTerminalCommand(projectRoot, command, { worktreeRoot, skipApproval: true })
   const commandRecord = result.commandId ? getTerminalCommand(projectRoot, result.commandId, worktreeRoot) : undefined
   const output = commandRecord?.stdout ?? ''
-  const exitCode = commandRecord?.exitCode ?? 0
+  const exitCode =
+    commandRecord?.exitCode ?? (commandRecord?.status === 'error' ? 1 : 0)
 
   if (runId) {
     emitToRenderer(projectRoot, {
@@ -1216,12 +1581,20 @@ export async function requestStandaloneApproval(
   projectRoot: string,
   evaluation: SafetyEvaluation,
   parentWindow?: Electron.BrowserWindow,
+  runId?: string,
 ): Promise<{ approved: boolean; scope: ApprovalScope }> {
+  const run = runId ? runs.get(runId) : undefined
+  if (run && runAllowsAction(run, evaluation.actionType, evaluation.target)) {
+    return { approved: true, scope: 'run' }
+  }
   const requestId = randomUUID()
   const result = await showNativeApprovalDialog(projectRoot, evaluation, parentWindow)
+  if (result.approved && result.scope === 'run' && run) {
+    run.allowedActions.add(actionKey(evaluation.actionType, evaluation.target))
+  }
   await appendApprovalLog(projectRoot, {
     timestamp: new Date().toISOString(),
-    runId: '',
+    runId: runId ?? '',
     requestId,
     actionType: evaluation.actionType,
     target: evaluation.target,
@@ -1588,7 +1961,11 @@ async function executeToolLocal(
       const title = String(input.title ?? '')
       const index = Number(input.index ?? 0)
       const taskId = `task-${randomUUID().slice(0, 8)}`
-      createTask(run.runId, taskId, { index, title })
+      createTask(run.runId, taskId, {
+        index,
+        title,
+        projectRoot: run.projectRoot,
+      })
       return { taskId }
     }
     case 'ApplyPatch': {
@@ -1668,11 +2045,38 @@ export function respondApproval(
 }
 
 export function listProjectTasks(_projectRoot: string): TaskInfoDto[] {
-  return listAllTasks().map(toTaskDto)
+  const projectRoot = path.resolve(_projectRoot)
+  return listAllTasks()
+    .filter(task => path.resolve(task.projectRoot) === projectRoot)
+    .map(task => {
+      const dto = toTaskDto(task)
+      const prefix = `${task.runId}:`
+      return {
+        ...dto,
+        id: `${prefix}${dto.id}`,
+        assignedAgent: dto.assignedAgent
+          ? `${prefix}${dto.assignedAgent}`
+          : undefined,
+        dependencies: dto.dependencies.map(dependency => `${prefix}${dependency}`),
+      }
+    })
 }
 
 export function listProjectAgents(_projectRoot: string): AgentInfoDto[] {
-  return listAllAgents().map(toAgentDto)
+  const projectRoot = path.resolve(_projectRoot)
+  return listAllAgents()
+    .filter(agent => path.resolve(agent.projectRoot) === projectRoot)
+    .map(agent => {
+      const dto = toAgentDto(agent)
+      const prefix = `${agent.runId}:`
+      return {
+        ...dto,
+        id: `${prefix}${dto.id}`,
+        assignedTaskId: dto.assignedTaskId
+          ? `${prefix}${dto.assignedTaskId}`
+          : undefined,
+      }
+    })
 }
 
 export function updateMaxParallelAgents(n: number): void {

@@ -94,7 +94,7 @@
     },
     "apps/desktop": {
       "name": "ur-nexus-desktop",
-      "version": "1.0.5",
+      "version": "1.0.7",
       "bin": {
         "ur-nexus-desktop": "bin/ur-nexus-desktop.js",
       },

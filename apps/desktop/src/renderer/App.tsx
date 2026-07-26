@@ -1,20 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, Routes, Route, NavLink, useNavigate } from 'react-router-dom'
 import './styles/global.css'
-import { ChatPage } from './pages/ChatPage.js'
-import { ProjectsPage } from './pages/ProjectsPage.js'
-import { TasksPage } from './pages/TasksPage.js'
-import { AgentsPage } from './pages/AgentsPage.js'
-import { TerminalPage } from './pages/TerminalPage.js'
-import { DiffsPage } from './pages/DiffsPage.js'
-import { ExplorerPage } from './pages/ExplorerPage.js'
-import { ConnectorsPage } from './pages/ConnectorsPage.js'
-import { SettingsPage } from './pages/SettingsPage.js'
-import { HistoryPage } from './pages/HistoryPage.js'
-import { ToolsPage } from './pages/ToolsPage.js'
 import { ProjectProvider, useProject } from './state/ProjectContext.js'
 import { useDesktop } from './hooks/useDesktop.js'
 import { Icon, type IconName } from './components/Icon.js'
+
+const ChatPage = lazy(() => import('./pages/ChatPage.js').then(module => ({ default: module.ChatPage })))
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage.js').then(module => ({ default: module.ProjectsPage })))
+const TasksPage = lazy(() => import('./pages/TasksPage.js').then(module => ({ default: module.TasksPage })))
+const AgentsPage = lazy(() => import('./pages/AgentsPage.js').then(module => ({ default: module.AgentsPage })))
+const TerminalPage = lazy(() => import('./pages/TerminalPage.js').then(module => ({ default: module.TerminalPage })))
+const DiffsPage = lazy(() => import('./pages/DiffsPage.js').then(module => ({ default: module.DiffsPage })))
+const ExplorerPage = lazy(() => import('./pages/ExplorerPage.js').then(module => ({ default: module.ExplorerPage })))
+const ConnectorsPage = lazy(() => import('./pages/ConnectorsPage.js').then(module => ({ default: module.ConnectorsPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage.js').then(module => ({ default: module.SettingsPage })))
+const HistoryPage = lazy(() => import('./pages/HistoryPage.js').then(module => ({ default: module.HistoryPage })))
+const ToolsPage = lazy(() => import('./pages/ToolsPage.js').then(module => ({ default: module.ToolsPage })))
+const MissionControlPage = lazy(() => import('./pages/MissionControlPage.js').then(module => ({ default: module.MissionControlPage })))
 
 const navSections: Array<{
   title?: string
@@ -23,6 +25,7 @@ const navSections: Array<{
   {
     items: [
       { to: '/', label: 'Threads', icon: 'chat', hint: '⌘1' },
+      { to: '/mission-control', label: 'Mission Control', icon: 'command' },
       { to: '/tasks', label: 'Automations', icon: 'clock' },
       { to: '/tools', label: 'Skills', icon: 'sparkles' },
     ],
@@ -233,6 +236,13 @@ function AppShell() {
       }),
     [projectRoot, recentProjects],
   )
+
+  useEffect(() => {
+    const fixture = new URLSearchParams(window.location.search).get('visualFixture')
+    if (fixture === 'mission-control') {
+      navigate('/mission-control', { replace: true })
+    }
+  }, [navigate])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -459,20 +469,23 @@ function AppShell() {
           </div>
         </aside>
         <main className="main">
-          <Routes>
-            <Route path="/" element={<ChatPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/explorer" element={<ExplorerPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/agents" element={<AgentsPage />} />
-            <Route path="/terminal" element={<TerminalPage />} />
-            <Route path="/diffs" element={<DiffsPage />} />
-            <Route path="/connectors" element={<ConnectorsPage />} />
-            <Route path="/tools" element={<ToolsPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={<div className="route-loading"><span className="button-spinner" /> Loading workspace…</div>}>
+            <Routes>
+              <Route path="/" element={<ChatPage />} />
+              <Route path="/mission-control" element={<MissionControlPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/explorer" element={<ExplorerPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/agents" element={<AgentsPage />} />
+              <Route path="/terminal" element={<TerminalPage />} />
+              <Route path="/diffs" element={<DiffsPage />} />
+              <Route path="/connectors" element={<ConnectorsPage />} />
+              <Route path="/tools" element={<ToolsPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
       {dropActive && (

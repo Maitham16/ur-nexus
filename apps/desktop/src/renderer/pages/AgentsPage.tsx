@@ -58,6 +58,9 @@ function BackgroundAgentsSection() {
   const [detail, setDetail] = useState<BackgroundAgentDto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [launching, setLaunching] = useState(false)
+  const [steeringText, setSteeringText] = useState('')
+  const [broadcastText, setBroadcastText] = useState('')
+  const [busyAction, setBusyAction] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!desktop) return
@@ -127,6 +130,60 @@ function BackgroundAgentsSection() {
     a => a.status === 'running' || a.status === 'queued',
   ).length
 
+  const steer = async () => {
+    if (!desktop || !detail || !steeringText.trim()) return
+    setBusyAction('steer')
+    try {
+      await desktop.steerBackgroundAgent({
+        id: detail.id,
+        content: steeringText.trim(),
+      })
+      setSteeringText('')
+      await openDetail(detail.id)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const broadcast = async () => {
+    if (!desktop || !projectRoot || !broadcastText.trim()) return
+    setBusyAction('broadcast')
+    try {
+      await desktop.broadcastBackgroundAgents({
+        projectRoot,
+        content: broadcastText.trim(),
+      })
+      setBroadcastText('')
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const saveAsPlaybook = async () => {
+    if (!desktop || !detail) return
+    setBusyAction('playbook')
+    try {
+      await desktop.savePlaybook({
+        projectRoot: detail.projectRoot,
+        name: detail.title,
+        description: `Learned from ${detail.id}`,
+        prompt: detail.prompt,
+        tags: ['learned', 'agent'],
+        learnedFromAgentId: detail.id,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   return (
     <>
       <Card title={`Background agents${activeCount > 0 ? ` — ${activeCount} active` : ''}`}>
@@ -169,6 +226,27 @@ function BackgroundAgentsSection() {
             </button>
           </div>
         </div>
+
+        {activeCount > 1 && (
+          <div className="agent-broadcast-row">
+            <Icon name="agents" size={15} />
+            <input
+              value={broadcastText}
+              onChange={event => setBroadcastText(event.target.value)}
+              placeholder={`Broadcast a steering update to ${activeCount} active agents`}
+              onKeyDown={event => {
+                if (event.key === 'Enter') void broadcast()
+              }}
+            />
+            <button
+              className="button button-secondary button-small"
+              disabled={!broadcastText.trim() || busyAction === 'broadcast'}
+              onClick={() => void broadcast()}
+            >
+              Broadcast
+            </button>
+          </div>
+        )}
 
         <div className="list bg-agent-list">
           {agents.length === 0 && (
@@ -248,6 +326,29 @@ function BackgroundAgentsSection() {
                   ` · $${detail.usage.costUsd.toFixed(4)}${detail.usage.costIsEstimate ? ' est.' : ''}`}
               </div>
             )}
+            <div className="trajectory-summary">
+              <span className={`trajectory-score grade-${detail.trajectory.grade ?? 'pending'}`}>
+                {detail.trajectory.score ?? '—'}
+              </span>
+              <span>
+                <strong>Trajectory grade:</strong>{' '}
+                {detail.trajectory.grade?.replace('-', ' ') ?? 'in progress'}
+                <small>
+                  {detail.trajectory.eventCount} events · {detail.trajectory.toolCalls} tools ·{' '}
+                  {detail.trajectory.commands} commands
+                </small>
+              </span>
+            </div>
+            {detail.trajectory.checks.length > 0 && (
+              <div className="trajectory-checks">
+                {detail.trajectory.checks.map(check => (
+                  <div key={check.id} className={check.passed ? 'passed' : 'failed'}>
+                    <Icon name={check.passed ? 'check' : 'x'} size={13} />
+                    <span><strong>{check.label}</strong><small>{check.detail}</small></span>
+                  </div>
+                ))}
+              </div>
+            )}
             {detail.changedFiles.length > 0 && (
               <div className="changed-files-list">
                 {detail.changedFiles.map(file => (
@@ -266,6 +367,59 @@ function BackgroundAgentsSection() {
               <>
                 <strong>Result</strong>
                 <pre className="code-block result">{detail.resultText}</pre>
+              </>
+            )}
+            {(detail.status === 'running' || detail.status === 'queued') && (
+              <div className="agent-steer-box">
+                <div>
+                  <strong>Steer this agent</strong>
+                  <small>Delivered after its current model turn, without losing the worktree or thread.</small>
+                </div>
+                <div className="agent-steer-row">
+                  <input
+                    value={steeringText}
+                    onChange={event => setSteeringText(event.target.value)}
+                    placeholder="Change priority, add context, or correct course…"
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') void steer()
+                    }}
+                  />
+                  <button
+                    className="button button-small"
+                    disabled={!steeringText.trim() || busyAction === 'steer'}
+                    onClick={() => void steer()}
+                  >
+                    <Icon name="send" size={13} /> Steer
+                  </button>
+                </div>
+                {detail.instructions.length > 0 && (
+                  <span className="agent-steer-queue">
+                    {detail.instructions.filter(item => !item.deliveredAt).length} queued ·{' '}
+                    {detail.instructions.filter(item => item.deliveredAt).length} delivered
+                  </span>
+                )}
+              </div>
+            )}
+            {detail.turns.length > 0 && (
+              <>
+                <div className="agent-detail-heading">
+                  <strong>Conversation</strong>
+                  <button
+                    className="button button-secondary button-small"
+                    disabled={busyAction === 'playbook'}
+                    onClick={() => void saveAsPlaybook()}
+                  >
+                    <Icon name="sparkles" size={13} /> Save as playbook
+                  </button>
+                </div>
+                <div className="agent-turns">
+                  {detail.turns.map(turn => (
+                    <div key={turn.id} className={`agent-turn ${turn.role}`}>
+                      <span>{turn.role}</span>
+                      <p>{turn.content}</p>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
             <strong>Logs</strong>

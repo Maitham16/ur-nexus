@@ -20,6 +20,7 @@ export interface Task {
   startTime?: number
   elapsedMs: number
   runId: string
+  projectRoot: string
 }
 
 export interface Agent {
@@ -34,11 +35,12 @@ export interface Agent {
   status: AgentStatus
   logs: string[]
   runId: string
+  projectRoot: string
 }
 
 const tasksByRun = new Map<string, Map<string, Task>>()
 const agentsByRun = new Map<string, Map<string, Agent>>()
-const approvalToTask = new Map<string, string>()
+const approvalToTask = new Map<string, { runId: string; taskId: string }>()
 
 let maxParallelAgents = 4
 
@@ -55,6 +57,14 @@ export function ensureRun(runId: string): void {
   if (!agentsByRun.has(runId)) agentsByRun.set(runId, new Map())
 }
 
+export function removeRunRegistry(runId: string): void {
+  tasksByRun.delete(runId)
+  agentsByRun.delete(runId)
+  for (const [requestId, target] of approvalToTask) {
+    if (target.runId === runId) approvalToTask.delete(requestId)
+  }
+}
+
 export function createTask(
   runId: string,
   taskId: string,
@@ -63,6 +73,7 @@ export function createTask(
     title: string
     description?: string
     dependencies?: string[]
+    projectRoot: string
   },
 ): Task {
   ensureRun(runId)
@@ -78,6 +89,7 @@ export function createTask(
     verification: undefined,
     elapsedMs: 0,
     runId,
+    projectRoot: opts.projectRoot,
   }
   tasksByRun.get(runId)!.set(taskId, task)
   return task
@@ -156,7 +168,7 @@ export function setTaskWaitingApproval(
   if (!task) return
   task.status = 'waiting_approval'
   task.currentAction = 'Waiting for approval'
-  approvalToTask.set(requestId, taskId)
+  approvalToTask.set(requestId, { runId, taskId })
 }
 
 export function skipTask(runId: string, taskId: string): void {
@@ -170,18 +182,17 @@ export function resolveTaskApproval(
   requestId: string,
   approved: boolean,
 ): { runId: string; taskId: string } | undefined {
-  const taskId = approvalToTask.get(requestId)
-  if (!taskId) return undefined
-  for (const [runId, map] of tasksByRun) {
-    const task = map.get(taskId)
-    if (task) {
-      task.status = approved ? 'running' : 'failed'
-      task.currentAction = approved ? 'Resumed after approval' : 'Denied'
-      approvalToTask.delete(requestId)
-      return { runId, taskId }
-    }
+  const target = approvalToTask.get(requestId)
+  if (!target) return undefined
+  const task = tasksByRun.get(target.runId)?.get(target.taskId)
+  if (!task) {
+    approvalToTask.delete(requestId)
+    return undefined
   }
-  return undefined
+  task.status = approved ? 'running' : 'failed'
+  task.currentAction = approved ? 'Resumed after approval' : 'Denied'
+  approvalToTask.delete(requestId)
+  return target
 }
 
 export function addTaskChangedFile(
@@ -206,7 +217,12 @@ export function setTaskVerification(
 export function createAgent(
   runId: string,
   agentId: string,
-  opts: { name: string; role?: string; assignedTaskId?: string },
+  opts: {
+    name: string
+    role?: string
+    assignedTaskId?: string
+    projectRoot: string
+  },
 ): Agent {
   ensureRun(runId)
   const agent: Agent = {
@@ -221,6 +237,7 @@ export function createAgent(
     status: 'idle',
     logs: [],
     runId,
+    projectRoot: opts.projectRoot,
   }
   agentsByRun.get(runId)!.set(agentId, agent)
   return agent

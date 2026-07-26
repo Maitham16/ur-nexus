@@ -135,7 +135,10 @@ describe('interrupted-session resume', () => {
     await expect(prepareResume(runId)).rejects.toThrow(/only interrupted runs/)
   }, 90000)
 
-  it('completes the resumed run end-to-end with a live provider, without repeating the Write', async () => {
+  const liveResumeTest =
+    process.env.UR_RUN_LIVE_RESUME_TEST === '1' ? it : it.skip
+
+  liveResumeTest('completes the resumed run end-to-end with a live provider, without repeating the Write', async () => {
     if (!(await ollamaAvailable())) {
       console.warn('Ollama unavailable; skipping live resume completion test')
       return
@@ -153,13 +156,21 @@ describe('interrupted-session resume', () => {
     const budgetMs = 180000
     const deadline = Date.now() + budgetMs
     let timedOut = false
-    for await (const event of runPromptStream(newRunId, resumePrompt)) {
-      types.push(event.type)
-      if (Date.now() > deadline) {
-        timedOut = true
-        stopRunById(newRunId)
-        break
+    const timer = setTimeout(() => {
+      timedOut = true
+      stopRunById(newRunId)
+    }, budgetMs)
+    try {
+      for await (const event of runPromptStream(newRunId, resumePrompt)) {
+        types.push(event.type)
+        if (Date.now() > deadline) {
+          timedOut = true
+          stopRunById(newRunId)
+          break
+        }
       }
+    } finally {
+      clearTimeout(timer)
     }
     if (timedOut) {
       console.warn(

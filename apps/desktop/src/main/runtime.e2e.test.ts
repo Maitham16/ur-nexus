@@ -18,6 +18,7 @@ import {
   readProjectFile,
   exportProjectReport,
   listProjectRuns,
+  runtimeResultErrorMessage,
 } from './runtime.js'
 import { gitStatus } from './explorer.js'
 
@@ -58,6 +59,25 @@ afterEach(() => {
 })
 
 describe('desktop runtime end-to-end (no window)', () => {
+  it('treats provider error results as terminal failures', () => {
+    expect(runtimeResultErrorMessage({
+      type: 'run_result',
+      runId: 'run',
+      sessionId: 'session',
+      projectRoot: repo,
+      timestamp: Date.now(),
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestCount: 1,
+        estimated: true,
+      },
+      isError: true,
+      resultText: 'Provider failed',
+    })).toBe('Provider failed')
+  })
+
   it('starts a sandboxed general chat without a user-selected project', async () => {
     const chat = await openChatWorkspace()
     expect(chat.root).toBe(path.join(dataDir, 'chat-workspace'))
@@ -128,7 +148,37 @@ describe('desktop runtime end-to-end (no window)', () => {
       .map(event => String((event as { delta?: string }).delta ?? ''))
       .join('')
     expect(output).toContain(repo)
-  })
+  }, 15000)
+
+  it('keeps concurrent runtime sessions in their own workspace', async () => {
+    const secondRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'ur-e2e-parallel-'))
+    try {
+      fs.writeFileSync(path.join(secondRepo, 'SECOND.md'), 'parallel workspace\n')
+      await openProjectAndCache(secondRepo)
+      const [first, second] = await Promise.all([
+        startRun(repo),
+        startRun(secondRepo),
+      ])
+      const collect = async (runId: string): Promise<string> => {
+        const chunks: string[] = []
+        for await (const event of runPromptStream(runId, '/workspace')) {
+          if (event.type === 'model_stream') chunks.push(event.delta)
+        }
+        return chunks.join('')
+      }
+      const [firstOutput, secondOutput] = await Promise.all([
+        collect(first.runId),
+        collect(second.runId),
+      ])
+      expect(firstOutput).toContain(repo)
+      expect(firstOutput).not.toContain(secondRepo)
+      expect(secondOutput).toContain(secondRepo)
+      expect(secondOutput).not.toContain(repo)
+    } finally {
+      closeProject(secondRepo)
+      fs.rmSync(secondRepo, { recursive: true, force: true })
+    }
+  }, 15000)
 
   it('proposes a real unified diff and applies it via git apply', async () => {
     await startRun(repo)
@@ -144,6 +194,62 @@ describe('desktop runtime end-to-end (no window)', () => {
 
     const status = await gitStatus(repo)
     expect(status.find(s => s.relPath === 'README.md')?.status).toBe('modified')
+  })
+
+  it('separates inherited dirty state from agent-authored workspace changes', async () => {
+    fs.writeFileSync(path.join(repo, 'README.md'), '# user draft\n')
+    const { runId } = await startRun(repo)
+    const events = []
+    for await (const event of runPromptStream(runId, '/workspace')) {
+      events.push(event)
+    }
+    const verification = events.find(event => event.type === 'verification_completed') as
+      | { passed?: boolean }
+      | undefined
+    expect(verification?.passed).toBe(true)
+    expect(events.some(event => event.type === 'changed_files')).toBe(false)
+  })
+
+  it('detects files changed by runtime shell tools before verification', async () => {
+    const { runId } = await startRun(repo)
+    const result = await executeTool(runId, 'Bash', {
+      command: "printf 'agent output\\n' > runtime-output.txt",
+    }) as { exitCode?: number }
+    expect(result.exitCode).toBe(0)
+    expect(fs.existsSync(path.join(repo, 'runtime-output.txt'))).toBe(true)
+
+    const events = []
+    for await (const event of runPromptStream(runId, '/workspace')) {
+      events.push(event)
+    }
+    const changed = events.find(event => event.type === 'changed_files') as
+      | { files?: string[] }
+      | undefined
+    const verification = events.find(event => event.type === 'verification_completed') as
+      | { passed?: boolean }
+      | undefined
+    expect(changed?.files).toContain('runtime-output.txt')
+    expect(verification?.passed).toBe(false)
+  })
+
+  it('detects agent changes even when the agent commits them', async () => {
+    const { runId } = await startRun(repo)
+    fs.writeFileSync(path.join(repo, 'committed-output.txt'), 'committed by agent\n')
+    execFileSync('git', ['add', 'committed-output.txt'], { cwd: repo })
+    execFileSync('git', ['commit', '-q', '-m', 'agent change'], { cwd: repo })
+
+    const events = []
+    for await (const event of runPromptStream(runId, '/workspace')) {
+      events.push(event)
+    }
+    const changed = events.find(event => event.type === 'changed_files') as
+      | { files?: string[] }
+      | undefined
+    const verification = events.find(event => event.type === 'verification_completed') as
+      | { passed?: boolean }
+      | undefined
+    expect(changed?.files).toContain('committed-output.txt')
+    expect(verification?.passed).toBe(false)
   })
 
   it('records runs and exports a real report built from the transcript', async () => {

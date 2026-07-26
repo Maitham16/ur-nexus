@@ -133,6 +133,41 @@ describe('requestStandaloneApproval', () => {
       clearElectronModule()
     }
   })
+
+  it('reuses a native run-scoped approval without prompting twice', async () => {
+    let prompts = 0
+    setElectronModule({
+      dialog: {
+        showMessageBox: async () => {
+          prompts += 1
+          return { response: 1, checkboxChecked: false }
+        },
+      },
+      BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
+    } as unknown as typeof import('electron'))
+
+    try {
+      const { runId } = await startRun(tmpProject, { nativeApprovals: true })
+      const evaluation = {
+        behavior: 'ask' as const,
+        riskLevel: 'medium' as const,
+        actionType: 'file-write' as const,
+        target: 'x.txt',
+        reason: 'Write test',
+      }
+      expect(
+        (await requestStandaloneApproval(tmpProject, evaluation, undefined, runId))
+          .approved,
+      ).toBe(true)
+      expect(
+        (await requestStandaloneApproval(tmpProject, evaluation, undefined, runId))
+          .approved,
+      ).toBe(true)
+      expect(prompts).toBe(1)
+    } finally {
+      clearElectronModule()
+    }
+  })
 })
 
 describe('run-scope caching', () => {

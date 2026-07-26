@@ -6,6 +6,8 @@ import {
   launchBackgroundAgent,
   listBackgroundAgents,
   getBackgroundAgent,
+  steerBackgroundAgent,
+  broadcastBackgroundAgentInstruction,
   cancelBackgroundAgent,
   retryBackgroundAgent,
   removeBackgroundAgent,
@@ -107,6 +109,22 @@ describe('background agents', () => {
     expect(settled!.logs.length).toBeGreaterThan(0)
   }, 90000)
 
+  it('settles startup failures instead of leaving a phantom running agent', async () => {
+    const agent = await launchBackgroundAgent({
+      projectRoot: projectDir,
+      prompt: 'Inspect this project.',
+      useWorktree: true,
+    })
+    await waitFor(async () => {
+      const current = await getBackgroundAgent(agent.id)
+      return current?.status === 'failed'
+    })
+    const failed = await getBackgroundAgent(agent.id)
+    expect(failed?.runId).toBeUndefined()
+    expect(failed?.error).toContain('git repository')
+    expect(await removeBackgroundAgent(agent.id)).toBe(true)
+  })
+
   it('persists records and marks active agents interrupted after restart', async () => {
     const agent = await launchBackgroundAgent({
       projectRoot: projectDir,
@@ -132,6 +150,17 @@ describe('background agents', () => {
     expect(restored!.status).toBe('interrupted')
     expect(restored!.error).toContain('no longer exists')
   }, 150000)
+
+  it('quarantines a corrupt agent ledger instead of silently losing it', async () => {
+    await resetBackgroundAgentsForTests()
+    fs.writeFileSync(path.join(dataDir, 'background-agents.json'), '{broken')
+    expect(await listBackgroundAgents()).toEqual([])
+    expect(
+      fs.readdirSync(dataDir).some(name =>
+        name.startsWith('background-agents.corrupt-') && name.endsWith('.json'),
+      ),
+    ).toBe(true)
+  })
 
   it('cancels a queued agent and supports retry with lineage', async () => {
     // Fill the queue so the second agent stays queued long enough to cancel.
@@ -193,4 +222,35 @@ describe('background agents', () => {
       fs.rmSync(otherProject, { recursive: true, force: true })
     }
   }, 90000)
+
+  it('queues durable steering and broadcasts to active project agents', async () => {
+    const first = await launchBackgroundAgent({
+      projectRoot: projectDir,
+      prompt: 'Inspect the project and wait for follow-up context.',
+    })
+    const second = await launchBackgroundAgent({
+      projectRoot: projectDir,
+      prompt: 'Review the project independently.',
+    })
+
+    const steered = await steerBackgroundAgent(
+      first.id,
+      'Prioritize correctness and cite the verification evidence.',
+    )
+    expect(steered.instructions).toHaveLength(1)
+    expect(steered.instructions[0]?.content).toContain('verification evidence')
+
+    const broadcast = await broadcastBackgroundAgentInstruction(
+      projectDir,
+      'Also identify any cross-cutting regression risk.',
+      [first.id, second.id],
+    )
+    expect(broadcast).toHaveLength(2)
+    expect(
+      (await getBackgroundAgent(first.id))?.turns[0]?.role,
+    ).toBe('user')
+
+    await driveToTerminal(first.id)
+    await driveToTerminal(second.id)
+  }, 120000)
 })

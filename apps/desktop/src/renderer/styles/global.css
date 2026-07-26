@@ -4358,6 +4358,17 @@ kbd {
   animation: orbit-spin 0.7s linear infinite;
 }
 
+.route-loading {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .composer-footer {
   min-height: 27px;
   padding: 2px 4px 0;
@@ -4555,6 +4566,921 @@ html[data-theme='light'] .command-center {
   .chat-header {
     justify-content: flex-end;
   }
+}
+
+/* ==========================================================================
+ * Mission Control — orchestration, cited knowledge, quality, and side chats
+ * ======================================================================== */
+.mission-page {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding-bottom: 72px;
+}
+
+.mission-header,
+.mission-panel-heading,
+.mission-launch-footer,
+.knowledge-card header,
+.knowledge-card footer,
+.workspace-card header,
+.workspace-card footer,
+.quality-run-card header,
+.quality-run-card footer,
+.sidechat-conversation > header,
+.sidechat-conversation > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mission-header {
+  margin-bottom: 20px;
+}
+
+.mission-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.mission-kicker i,
+.sidechat-thinking i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 4px var(--ok-bg);
+}
+
+.mission-error {
+  margin-bottom: 16px;
+}
+
+.mission-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mission-metric {
+  position: relative;
+  overflow: hidden;
+  min-height: 108px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, var(--surface), var(--surface-2));
+  box-shadow: var(--shadow-sm);
+}
+
+.mission-metric::after {
+  position: absolute;
+  right: -22px;
+  bottom: -36px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  content: '';
+  filter: blur(8px);
+  opacity: .65;
+}
+
+.mission-metric.tone-danger::after { background: var(--danger-bg); }
+.mission-metric.tone-success::after { background: var(--ok-bg); }
+.mission-metric.tone-active::after { background: var(--info-bg); }
+
+.mission-metric > span,
+.mission-metric > small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.mission-metric > span {
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.mission-metric > strong {
+  display: block;
+  margin: 5px 0 2px;
+  color: var(--text-strong);
+  font-size: 32px;
+  font-weight: 680;
+  line-height: 1;
+}
+
+.mission-tabs {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+
+.mission-tabs button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.mission-tabs button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.mission-tabs button.active {
+  color: var(--text-strong);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-sm);
+}
+
+.mission-tabs button > span {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  font-size: 10px;
+}
+
+.mission-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, .82fr) minmax(420px, 1.18fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.mission-operations {
+  grid-template-columns: minmax(380px, .95fr) minmax(420px, 1.05fr);
+}
+
+.mission-panel {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.mission-span {
+  grid-column: 1 / -1;
+}
+
+.mission-panel-heading {
+  margin-bottom: 15px;
+}
+
+.mission-panel-heading > div > span,
+.sidechat-conversation > header span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.mission-panel-heading h2,
+.sidechat-conversation h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 670;
+}
+
+.mission-panel-heading > small,
+.mission-panel-heading > strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.mission-project-pill,
+.mission-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.mission-badge.tone-success {
+  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.mission-badge.tone-danger {
+  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.mission-badge.tone-active {
+  border-color: color-mix(in srgb, var(--info) 28%, transparent);
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+.mission-segmented {
+  display: flex;
+  width: fit-content;
+  gap: 3px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.mission-segmented button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.mission-segmented.compact button { padding: 5px 10px; }
+
+.mission-segmented button.active {
+  color: var(--text-strong);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-sm);
+}
+
+.mission-prompt,
+.mission-form input,
+.mission-form textarea,
+.knowledge-card input,
+.workspace-card textarea,
+.sidechat-conversation textarea,
+.agent-steer-row input,
+.agent-broadcast-row input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: 0;
+  color: var(--text-strong);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.mission-prompt,
+.mission-form textarea,
+.workspace-card textarea,
+.sidechat-conversation textarea {
+  padding: 11px 12px;
+  line-height: 1.55;
+}
+
+.mission-form input,
+.knowledge-card input,
+.agent-steer-row input,
+.agent-broadcast-row input {
+  height: 36px;
+  padding: 0 10px;
+}
+
+.mission-prompt:focus,
+.mission-form input:focus,
+.mission-form textarea:focus,
+.knowledge-card input:focus,
+.workspace-card textarea:focus,
+.sidechat-conversation textarea:focus,
+.agent-steer-row input:focus,
+.agent-broadcast-row input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.mission-prompt:disabled { opacity: .55; }
+
+.mission-launch-footer {
+  margin-top: 10px;
+}
+
+.mission-launch-footer > label,
+.mission-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.mission-inline-fields {
+  display: flex;
+  gap: 8px;
+}
+
+.mission-inline-fields label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.mission-inline-fields select {
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 10px;
+}
+
+.mission-agent-feed,
+.mission-stack,
+.quality-profiles {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mission-agent-feed {
+  max-height: 356px;
+  overflow: auto;
+}
+
+.mission-agent-item {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto 34px;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.mission-agent-item:hover { border-color: var(--border-strong); }
+
+.mission-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.mission-status-dot.tone-success { background: var(--ok); }
+.mission-status-dot.tone-danger { background: var(--danger-solid); }
+.mission-status-dot.tone-active {
+  background: var(--info);
+  box-shadow: 0 0 0 3px var(--info-bg);
+}
+
+.mission-agent-item > div {
+  min-width: 0;
+}
+
+.mission-agent-item strong,
+.mission-agent-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-agent-item strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.mission-agent-item small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.mission-score {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+}
+
+.mission-card-grid,
+.quality-run-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 9px;
+}
+
+.mission-record-card,
+.quality-run-card,
+.knowledge-card,
+.workspace-card {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.mission-record-card header,
+.mission-record-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mission-record-card h3,
+.quality-run-card h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 11px 0 8px;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 620;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mission-record-card p,
+.quality-run-card p,
+.knowledge-card p {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.mission-record-card footer {
+  margin-top: 10px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.arena-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.arena-candidates span,
+.workspace-repos span {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.arena-candidates span.winner {
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.mission-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.mission-form > small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.mission-form .button { align-self: flex-end; }
+
+.knowledge-card header > div,
+.workspace-card header > div {
+  min-width: 0;
+}
+
+.knowledge-card header strong,
+.knowledge-card header small,
+.workspace-card header strong,
+.workspace-card header small {
+  display: block;
+}
+
+.knowledge-card header strong,
+.workspace-card header strong {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.knowledge-card header small,
+.workspace-card header small,
+.knowledge-card > small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.knowledge-card header > span {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.knowledge-card footer {
+  margin-top: 9px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.link-button.danger { color: var(--danger); }
+
+.memory-card p {
+  max-height: 82px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.mission-workspace-list {
+  max-height: min(720px, calc(100vh - 300px));
+  overflow: auto;
+}
+
+.workspace-card + .workspace-card { margin-top: 8px; }
+
+.workspace-repos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 0;
+}
+
+.workspace-repos span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+}
+
+.workspace-card footer {
+  margin-top: 8px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.quality-profiles article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.quality-profiles article > div {
+  min-width: 0;
+}
+
+.quality-profiles strong,
+.quality-profiles code,
+.quality-profiles small {
+  display: block;
+}
+
+.quality-profiles strong {
+  color: var(--text-strong);
+  font-size: 11px;
+}
+
+.quality-profiles code {
+  overflow: hidden;
+  margin: 3px 0;
+  color: var(--accent-text);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quality-profiles small { color: var(--text-tertiary); font-size: 9px; }
+.quality-profiles article > span { display: flex; align-items: center; gap: 5px; }
+
+.desktop-qa-panel {
+  background:
+    radial-gradient(circle at 88% 8%, var(--accent-soft), transparent 35%),
+    var(--surface);
+}
+
+.desktop-qa-panel > p {
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.quality-run-card header,
+.quality-run-card footer {
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.quality-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 9px 0;
+}
+
+.quality-checks span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  font-size: 9px;
+}
+
+.quality-checks .passed { color: var(--ok); background: var(--ok-bg); }
+.quality-checks .failed { color: var(--danger); background: var(--danger-bg); }
+
+.mission-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+  width: 100%;
+  padding: 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 9px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.sidechat-shell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: min(680px, calc(100vh - 330px));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidechat-shell > aside {
+  padding: 10px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.sidechat-new { width: 100%; justify-content: center; margin-bottom: 9px; }
+
+.sidechat-shell > aside > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sidechat-shell > aside > div > button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidechat-shell > aside > div > button:hover,
+.sidechat-shell > aside > div > button.active {
+  border-color: var(--border);
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.sidechat-shell > aside button span { min-width: 0; }
+.sidechat-shell > aside button strong,
+.sidechat-shell > aside button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidechat-shell > aside button strong { font-size: 10px; }
+.sidechat-shell > aside button small { margin-top: 2px; color: var(--text-tertiary); font-size: 8px; }
+.sidechat-shell > aside button i { color: var(--text-tertiary); font-size: 8px; font-style: normal; }
+
+.sidechat-conversation {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.sidechat-conversation > header {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidechat-turns {
+  overflow: auto;
+  padding: 16px;
+}
+
+.sidechat-turns article {
+  max-width: 82%;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.sidechat-turns article.user {
+  margin-left: auto;
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: var(--accent-soft);
+}
+
+.sidechat-turns article.error { border-color: var(--danger); background: var(--danger-bg); }
+.sidechat-turns article > span { color: var(--text-tertiary); font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.sidechat-turns article p { margin: 5px 0; color: var(--text); font-size: 11px; line-height: 1.55; white-space: pre-wrap; }
+.sidechat-turns article small { color: var(--text-tertiary); font-size: 8px; }
+
+.sidechat-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.sidechat-conversation > footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.sidechat-conversation > footer textarea { resize: none; }
+
+/* Background-agent steering and trajectory evidence */
+.agent-broadcast-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.trajectory-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.trajectory-score {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: var(--text-strong);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.trajectory-score.grade-excellent,
+.trajectory-score.grade-good { color: var(--ok); background: var(--ok-bg); }
+.trajectory-score.grade-failed { color: var(--danger); background: var(--danger-bg); }
+.trajectory-summary > span:last-child { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.trajectory-summary small { color: var(--text-tertiary); font-size: 9px; }
+
+.trajectory-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.trajectory-checks > div {
+  display: flex;
+  gap: 6px;
+  padding: 7px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+}
+
+.trajectory-checks > div.passed > svg { color: var(--ok); }
+.trajectory-checks > div.failed > svg { color: var(--danger); }
+.trajectory-checks span { display: flex; flex-direction: column; gap: 2px; font-size: 10px; }
+.trajectory-checks small { color: var(--text-tertiary); font-size: 8px; }
+
+.agent-steer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 9px;
+  background: var(--accent-soft);
+}
+
+.agent-steer-box > div:first-child { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.agent-steer-box small,
+.agent-steer-queue { color: var(--text-secondary); font-size: 9px; }
+.agent-steer-row { display: flex; gap: 7px; }
+
+.agent-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-turns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.agent-turn {
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.agent-turn.user { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); }
+.agent-turn > span { color: var(--text-tertiary); font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.agent-turn > p { margin: 4px 0 0; color: var(--text); font-size: 10px; line-height: 1.5; white-space: pre-wrap; }
+
+@media (max-width: 1050px) {
+  .mission-metrics { grid-template-columns: repeat(2, 1fr); }
+  .mission-layout,
+  .mission-operations { grid-template-columns: 1fr; }
+  .mission-span { grid-column: auto; }
+}
+
+@media (max-width: 760px) {
+  .mission-tabs { overflow-x: auto; }
+  .mission-tabs button { min-width: 105px; }
+  .mission-metrics { grid-template-columns: 1fr 1fr; }
+  .sidechat-shell { grid-template-columns: 1fr; }
+  .sidechat-shell > aside { border-right: 0; border-bottom: 1px solid var(--border); }
+  .trajectory-checks { grid-template-columns: 1fr; }
 }
 
 /* Recent-project management */

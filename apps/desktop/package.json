@@ -1,6 +1,6 @@
 {
   "name": "ur-nexus-desktop",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "description": "Professional local-first desktop coding agent with BYOK cloud providers and Ollama support",
   "author": "Maitham",
   "type": "module",
@@ -51,7 +51,7 @@
     "check:standalone": "bun test test/standalone.test.mjs",
     "verify:single-instance": "node scripts/verify-packaged-app.mjs single-instance",
     "prepack": "bun run build && bun run clean:generated-duplicates",
-    "package:check": "bun run clean:generated-duplicates && npm pack --dry-run --json --ignore-scripts",
+    "package:check": "bun run clean:generated-duplicates && node scripts/package-dry-run.mjs",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "test": "bun test",
     "lint": "eslint src --ext .ts,.tsx"
