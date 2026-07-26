@@ -50,7 +50,15 @@ import {
   removeRecentProject as removeStoredRecentProject,
 } from './projectStore.js'
 import { inspectProject } from './projectDetector.js'
-import type { ProjectInfoDto, WorktreeInfoDto, TaskInfoDto, AgentInfoDto } from '../shared/ipc.js'
+import type {
+  ProjectInfoDto,
+  WorktreeInfoDto,
+  TaskInfoDto,
+  AgentInfoDto,
+  VerificationResultDto,
+} from '../shared/ipc.js'
+import { runDeepVerification } from './verification.js'
+import { screenToolResult } from './safety/screenToolResult.js'
 import {
   createIsolatedWorktree,
   setWorktree,
@@ -881,18 +889,27 @@ export async function* runPromptStream(
     }
     completeTask(runId, 'task-1')
     finishAgent(runId, 'agent-1')
-    const verification = run.changedFiles.size === 0
+    // No changes means nothing to verify, and running the project's gates
+    // would only report on pre-existing state. Once files changed, L2 runs the
+    // real gates instead of L1's "changed therefore unverified" placeholder.
+    const verification: VerificationResultDto = run.changedFiles.size === 0
       ? {
           passed: true,
-          level: 'l1' as const,
+          level: 'l1',
           message: 'Run completed with no workspace changes to verify',
         }
-      : {
+      : await runDeepVerification({
+          projectRoot: run.projectRoot,
+          worktreeRoot: run.worktreeRoot,
+        }).catch(error => ({
           passed: false,
-          level: 'l1' as const,
-          message:
-            'Workspace changes are unverified until a recorded quality gate passes',
-        }
+          level: 'l2' as const,
+          outcome: 'error' as const,
+          message: `Deep verification could not complete: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          gates: [],
+        }))
     setTaskVerification(runId, 'task-1', verification)
 
     if (run.changedFiles.size > 0) {
@@ -2285,11 +2302,13 @@ function translateRuntimeEvents(
         message: `Tool result: ${toolName}`,
         currentTool: undefined,
       })
+      const result = (event as { result?: unknown }).result
       return [
         asEvent({
           type: 'tool_call_finished',
           toolName,
-          result: (event as { result?: unknown }).result,
+          result,
+          injection: screenToolResult(toolName, result),
         }),
       ]
     }

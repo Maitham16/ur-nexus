@@ -8,6 +8,7 @@ import type {
   ConnectorTransport,
   AddConnectorRequestDto,
   UpdateConnectorRequestDto,
+  ConnectorOAuthStatusDto,
 } from '../../shared/ipc.js'
 
 const TRANSPORT_LABELS: Record<ConnectorTransport, string> = {
@@ -30,6 +31,15 @@ const EMPTY_FORM: AddConnectorRequestDto = {
   enabled: true,
 }
 
+/** Badge summarizing a remote connector's OAuth state, or nothing when N/A. */
+function oauthBadge(status: ConnectorOAuthStatusDto | undefined) {
+  if (!status?.supported) return null
+  if (status.staticHeader) return <span className="badge">static auth</span>
+  if (status.expired) return <span className="badge badge-danger">token expired</span>
+  if (status.authorized) return <span className="badge badge-active">authorized</span>
+  return <span className="badge">not authorized</span>
+}
+
 export function ConnectorsPage() {
   const desktop = useDesktop()
   const { projectRoot } = useProject()
@@ -41,6 +51,9 @@ export function ConnectorsPage() {
   const [error, setError] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<{ name: string; ok: boolean; error?: string; tools?: RuntimeConnectorToolDto[] } | null>(null)
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
+  const [oauth, setOauth] = useState<Record<string, ConnectorOAuthStatusDto>>({})
+  const [oauthError, setOauthError] = useState<Record<string, string>>({})
+  const [authorizing, setAuthorizing] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!desktop || !projectRoot) return
@@ -56,9 +69,85 @@ export function ConnectorsPage() {
     }
   }, [desktop, projectRoot])
 
+  /**
+   * Load OAuth status for every connector. Failures are swallowed per
+   * connector: a server that cannot report status should not blank the page,
+   * it should simply offer no Authorize button.
+   */
+  const refreshOAuth = useCallback(
+    async (names: string[]) => {
+      if (!desktop || !projectRoot || names.length === 0) return
+      const entries = await Promise.all(
+        names.map(async name => {
+          try {
+            return [name, await desktop.getConnectorOAuthStatus(projectRoot, name)] as const
+          } catch {
+            return null
+          }
+        }),
+      )
+      setOauth(current => {
+        const next = { ...current }
+        for (const entry of entries) if (entry) next[entry[0]] = entry[1]
+        return next
+      })
+    },
+    [desktop, projectRoot],
+  )
+
+  const handleAuthorize = useCallback(
+    async (name: string) => {
+      if (!desktop || !projectRoot) return
+      setAuthorizing(name)
+      setOauthError(current => ({ ...current, [name]: '' }))
+      try {
+        const result = await desktop.authorizeConnectorOAuth(projectRoot, name)
+        if (!result.ok) {
+          setOauthError(current => ({
+            ...current,
+            [name]: result.error ?? 'Authorization failed',
+          }))
+        }
+        await refreshOAuth([name])
+        // The transport is rebuilt with the new bearer token, so re-read status.
+        await refresh()
+      } catch (err) {
+        setOauthError(current => ({
+          ...current,
+          [name]: err instanceof Error ? err.message : String(err),
+        }))
+      } finally {
+        setAuthorizing(null)
+      }
+    },
+    [desktop, projectRoot, refresh, refreshOAuth],
+  )
+
+  const handleOAuthSignOut = useCallback(
+    async (name: string) => {
+      if (!desktop || !projectRoot) return
+      try {
+        await desktop.signOutConnectorOAuth(projectRoot, name)
+        setOauthError(current => ({ ...current, [name]: '' }))
+        await refreshOAuth([name])
+        await refresh()
+      } catch (err) {
+        setOauthError(current => ({
+          ...current,
+          [name]: err instanceof Error ? err.message : String(err),
+        }))
+      }
+    },
+    [desktop, projectRoot, refresh, refreshOAuth],
+  )
+
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    void refreshOAuth(connectors.map(connector => connector.name))
+  }, [connectors, refreshOAuth])
 
   const resetForm = useCallback(() => {
     setForm({ ...EMPTY_FORM, projectRoot: projectRoot ?? '' })
@@ -226,8 +315,12 @@ export function ConnectorsPage() {
                     </span>
                     {c.status === 'connected' && <span className="badge badge-active">connected</span>}
                     {c.status === 'failed' && <span className="badge badge-danger">failed</span>}
+                    {oauthBadge(oauth[c.name])}
                   </div>
                   {c.error && <div style={{ fontSize: 12, color: '#fca5a5' }}>{c.error}</div>}
+                  {oauthError[c.name] && (
+                    <div style={{ fontSize: 12, color: '#fca5a5' }}>{oauthError[c.name]}</div>
+                  )}
                   {expandedTools.has(c.name) && c.tools && c.tools.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
                       {c.tools.map(t => (
@@ -260,6 +353,32 @@ export function ConnectorsPage() {
                   >
                     {expandedTools.has(c.name) ? 'Hide tools' : 'Tools'}
                   </button>
+                  {oauth[c.name]?.supported && !oauth[c.name]?.staticHeader && (
+                    <button
+                      className="button button-secondary button-small"
+                      onClick={() =>
+                        oauth[c.name]?.authorized && !oauth[c.name]?.expired
+                          ? handleOAuthSignOut(c.name)
+                          : handleAuthorize(c.name)
+                      }
+                      disabled={loading || authorizing === c.name}
+                      title={
+                        oauth[c.name]?.authorized
+                          ? oauth[c.name]?.scope
+                            ? `Granted scopes: ${oauth[c.name]?.scope}`
+                            : 'Authorized'
+                          : 'Authorize this server in your browser'
+                      }
+                    >
+                      {authorizing === c.name
+                        ? 'Waiting for browser…'
+                        : oauth[c.name]?.expired
+                          ? 'Re-authorize'
+                          : oauth[c.name]?.authorized
+                            ? 'Sign out'
+                            : 'Authorize'}
+                    </button>
+                  )}
                   <button
                     className="button button-danger button-small"
                     onClick={() => handleRemove(c.name)}

@@ -5,6 +5,7 @@ import type {
   AgentStatus,
   VerificationResultDto,
 } from '../shared/ipc.js'
+import { saveTasks } from './taskStore.js'
 
 export interface Task {
   index: number
@@ -147,6 +148,7 @@ export function completeTask(runId: string, taskId: string): void {
   if (task.startTime) {
     task.elapsedMs = Date.now() - task.startTime
   }
+  checkpointTask(task)
 }
 
 export function failTask(runId: string, taskId: string, error: string): void {
@@ -157,6 +159,17 @@ export function failTask(runId: string, taskId: string, error: string): void {
   if (task.startTime) {
     task.elapsedMs = Date.now() - task.startTime
   }
+  checkpointTask(task)
+}
+
+/**
+ * Persist a task at a terminal or otherwise durable transition. Fire-and-forget
+ * on purpose: the registry is synchronous and consulted on the event path, so a
+ * slow or failed disk write must never stall or break a run. Losing one
+ * checkpoint costs a stale Tasks page, not a broken session.
+ */
+function checkpointTask(task: Task): void {
+  void saveTasks([task]).catch(() => undefined)
 }
 
 export function setTaskWaitingApproval(
@@ -212,6 +225,9 @@ export function setTaskVerification(
   const task = getTask(runId, taskId)
   if (!task) return
   task.verification = result
+  // Verification is the last thing to land on a task, so re-checkpoint to keep
+  // the persisted verdict rather than the pre-verification snapshot.
+  checkpointTask(task)
 }
 
 export function createAgent(

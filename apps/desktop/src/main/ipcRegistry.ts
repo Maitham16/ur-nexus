@@ -130,6 +130,19 @@ import { runSearch } from './search.js'
 import { parseUnifiedDiff, applySelectedHunks } from './diffs.js'
 import { runStructuredTests, buildRerunFailedCommand } from './testRunner.js'
 import {
+  getConnectorOAuthStatus,
+  authorizeConnectorOAuth,
+  signOutConnectorOAuth,
+} from './connectors/connectorService.js'
+import {
+  archiveChatSession,
+  bindChatSessionRun,
+  createChatSession,
+  listChatSessions,
+  renameChatSession,
+  reorderChatSessions,
+} from './sessions/chatSessions.js'
+import {
   launchBackgroundAgent,
   listBackgroundAgents,
   getBackgroundAgent,
@@ -1115,6 +1128,66 @@ export function registerIpcHandlers(
         expectString(r.serverName, 'serverName'),
         expectString(r.toolName, 'toolName'),
         expectObject(r.input ?? {}, 'input'),
+      )
+    },
+    'connector:oauth:status': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return getConnectorOAuthStatus(
+        expectString(r.projectRoot, 'projectRoot'),
+        expectString(r.name, 'name'),
+      )
+    },
+    'connector:oauth:authorize': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return authorizeConnectorOAuth(
+        expectString(r.projectRoot, 'projectRoot'),
+        expectString(r.name, 'name'),
+        r.scopes === undefined ? undefined : expectStringArray(r.scopes, 'scopes'),
+      )
+    },
+    'connector:oauth:sign-out': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return signOutConnectorOAuth(
+        expectString(r.projectRoot, 'projectRoot'),
+        expectString(r.name, 'name'),
+      )
+    },
+    'chat-session:list': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return listChatSessions(
+        expectString(r.projectRoot, 'projectRoot'),
+        r.includeArchived === true,
+      )
+    },
+    'chat-session:create': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return createChatSession(
+        expectString(r.projectRoot, 'projectRoot'),
+        r.title === undefined ? undefined : expectString(r.title, 'title'),
+      )
+    },
+    'chat-session:rename': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return renameChatSession(expectString(r.id, 'id'), expectString(r.title, 'title'))
+    },
+    'chat-session:archive': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return archiveChatSession(expectString(r.id, 'id'))
+    },
+    'chat-session:reorder': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return reorderChatSessions(
+        expectString(r.projectRoot, 'projectRoot'),
+        expectStringArray(r.orderedIds, 'orderedIds'),
+      )
+    },
+    'chat-session:bind': (req: unknown) => {
+      const r = expectObject(req, 'req')
+      return bindChatSessionRun(
+        expectString(r.id, 'id'),
+        r.runId === undefined || r.runId === null
+          ? undefined
+          : expectString(r.runId, 'runId'),
       )
     },
 

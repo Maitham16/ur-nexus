@@ -23,6 +23,15 @@ import {
 import * as path from 'node:path'
 import { redactValue } from '../utils/redactSecrets.js'
 import { evaluateConnectorToolUse } from '../safety/safetyService.js'
+import {
+  screenUntrustedContent,
+  type InjectionFinding,
+  type InjectionRuleId,
+  type InjectionSeverity,
+} from '../safety/injectionScreen.js'
+import { authorizationHeader, isTokenExpired } from './mcpOAuth.js'
+import { clearOAuthToken, loadOAuthToken } from './mcpOAuthStore.js'
+import { authorizeConnector, refreshStoredToken } from './mcpOAuthFlow.js'
 import { requestStandaloneApproval } from '../runtime.js'
 
 export type ConnectorTransport = 'stdio' | 'sse' | 'http' | 'ws'
@@ -68,6 +77,13 @@ export interface ConnectorToolCallResult {
   ok: boolean
   result?: unknown
   error?: string
+  /** Present only when injection screening matched something in the result. */
+  injection?: {
+    suspicious: boolean
+    highestSeverity: InjectionSeverity | 'none'
+    ruleIds: InjectionRuleId[]
+    findings: InjectionFinding[]
+  }
 }
 
 // In-process connected clients held for the lifetime of the main process.
@@ -330,9 +346,149 @@ export async function callConnectorTool(
       }
     }
     const result = await server.client.callTool({ name: toolName, arguments: input })
-    return { ok: true, result }
+    // A tool result is third-party data on its way into the model's context.
+    // Screen it so an injection attempt is recorded and surfaced rather than
+    // depending on the model to notice; the result itself is never withheld.
+    const screen = screenUntrustedContent(stringifyToolResult(result))
+    return {
+      ok: true,
+      result,
+      injection: screen.findings.length > 0
+        ? {
+            suspicious: screen.suspicious,
+            highestSeverity: screen.highestSeverity,
+            ruleIds: [...new Set(screen.findings.map(finding => finding.ruleId))],
+            findings: screen.findings.slice(0, 10),
+          }
+        : undefined,
+    }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/**
+ * Attach a stored OAuth bearer token to a remote connector's headers.
+ *
+ * Applies to sse and http only — stdio is a local subprocess and ws carries
+ * its own handshake. An explicit header in the connector config wins, so a
+ * manually configured Authorization is never silently replaced. A token past
+ * its expiry is skipped rather than sent, so the failure the user sees is
+ * "not authorized" instead of a confusing rejected-token error.
+ */
+export async function withOAuthHeaders(
+  projectRoot: string,
+  connectorName: string,
+  config: McpServerConfig,
+): Promise<McpServerConfig> {
+  if (config.type !== 'sse' && config.type !== 'http') return config
+  const existing = (config as McpSSEServerConfig | McpHTTPServerConfig).headers ?? {}
+  if (Object.keys(existing).some(key => key.toLowerCase() === 'authorization')) {
+    return config
+  }
+  const stored = await loadOAuthToken(projectRoot, connectorName)
+  if (!stored) return config
+  // An expired token is refreshed rather than sent: the server would reject it
+  // and the user would see an auth error for a connector they did authorize.
+  const token = isTokenExpired(stored)
+    ? await refreshStoredToken(projectRoot, connectorName)
+    : stored
+  if (!token || isTokenExpired(token)) return config
+  const header = authorizationHeader(token)
+  if (!header) return config
+  return { ...config, headers: { ...existing, ...header } } as McpServerConfig
+}
+
+export interface ConnectorOAuthStatus {
+  /** False when the connector is stdio/ws, where OAuth does not apply. */
+  supported: boolean
+  authorized: boolean
+  expired: boolean
+  scope?: string
+  expiresAt?: number
+  /** Set when a static Authorization header already governs this connector. */
+  staticHeader?: boolean
+}
+
+async function remoteConnectorUrl(
+  projectRoot: string,
+  name: string,
+): Promise<{ url: string; headers: Record<string, string> } | undefined> {
+  await openProjectStore(projectRoot)
+  const { servers } = await getAllMcpConfigs()
+  const config = servers[name]
+  if (!config || (config.type !== 'sse' && config.type !== 'http')) return undefined
+  const remote = config as McpSSEServerConfig | McpHTTPServerConfig
+  return { url: remote.url, headers: remote.headers ?? {} }
+}
+
+export async function getConnectorOAuthStatus(
+  projectRoot: string,
+  name: string,
+): Promise<ConnectorOAuthStatus> {
+  const remote = await remoteConnectorUrl(projectRoot, name)
+  if (!remote) return { supported: false, authorized: false, expired: false }
+  if (Object.keys(remote.headers).some(key => key.toLowerCase() === 'authorization')) {
+    return { supported: true, authorized: true, expired: false, staticHeader: true }
+  }
+  const token = await loadOAuthToken(projectRoot, name)
+  if (!token) return { supported: true, authorized: false, expired: false }
+  return {
+    supported: true,
+    authorized: true,
+    expired: isTokenExpired(token),
+    scope: token.scope,
+    expiresAt: token.expiresAt,
+  }
+}
+
+/** Begin interactive authorization for a remote connector. */
+export async function authorizeConnectorOAuth(
+  projectRoot: string,
+  name: string,
+  scopes?: string[],
+): Promise<{ ok: boolean; error?: string; scope?: string }> {
+  const remote = await remoteConnectorUrl(projectRoot, name)
+  if (!remote) {
+    return { ok: false, error: 'OAuth applies only to SSE and HTTP connectors.' }
+  }
+  // Dropping any cached connection forces the next call to reconnect with the
+  // new bearer token instead of reusing the unauthenticated transport.
+  await disconnectConnector(projectRoot, name)
+  const result = await authorizeConnector({
+    projectRoot,
+    connectorName: name,
+    resourceUrl: remote.url,
+    scopes,
+  })
+  return { ok: result.ok, error: result.error, scope: result.scope }
+}
+
+export async function signOutConnectorOAuth(
+  projectRoot: string,
+  name: string,
+): Promise<void> {
+  await clearOAuthToken(projectRoot, name)
+  await disconnectConnector(projectRoot, name)
+}
+
+/** Drop a cached connection so the next call rebuilds its transport. */
+async function disconnectConnector(projectRoot: string, name: string): Promise<void> {
+  const key = connectionKey(projectRoot, name)
+  const existing = connections.get(key)
+  connections.delete(key)
+  if (existing && existing.type === 'connected') {
+    await existing.cleanup?.().catch(() => undefined)
+  }
+}
+
+/** Flatten a tool result to text so screening sees nested content too. */
+function stringifyToolResult(result: unknown): string {
+  if (typeof result === 'string') return result
+  try {
+    return JSON.stringify(result) ?? ''
+  } catch {
+    return ''
   }
 }
 
@@ -358,7 +514,9 @@ async function connectConnector(
   }
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const client = new Client({ name: 'ur-desktop', version: '1.0.0' })
-  const transport = await createTransport(config as McpServerConfig)
+  const transport = await createTransport(
+    await withOAuthHeaders(projectRoot, name, config as McpServerConfig),
+  )
   try {
     await client.connect(transport)
     const connected: ConnectedMCPServer = {

@@ -11,6 +11,11 @@ import {
   DANGEROUS_FILES,
 } from '@ur/agent-runtime'
 
+import {
+  screenUntrustedContent,
+  type InjectionScreenResult,
+} from './injectionScreen.js'
+
 export type RiskLevel = 'none' | 'low' | 'medium' | 'high' | 'critical'
 
 export type ActionType =
@@ -26,6 +31,7 @@ export type ActionType =
   | 'git-push'
   | 'external-app'
   | 'long-running'
+  | 'untrusted-content'
 
 export interface SafetyEvaluation {
   behavior: 'allow' | 'ask' | 'deny'
@@ -518,6 +524,49 @@ export function evaluateProviderKeyReplacement(providerId: string): SafetyEvalua
     actionType: 'builtin-tool',
     target: `provider:${providerId}`,
     reason: 'Replacing a provider API key affects how the agent accesses model APIs.',
+  }
+}
+
+/**
+ * Screen retrieved content for prompt injection.
+ *
+ * Deliberately never denies. A false positive here would discard a legitimate
+ * result — security documentation and articles about injection match the same
+ * patterns — and the content has already been fetched, so blocking prevents no
+ * side effect. `allow` with a populated reason lets the caller annotate the
+ * content and the UI warn, while `ask` is reserved for high-severity findings
+ * where a human should look before the model acts on the result.
+ */
+export function evaluateUntrustedContent(
+  content: string,
+  source: string,
+): SafetyEvaluation & { screen: InjectionScreenResult } {
+  const screen = screenUntrustedContent(content)
+  const ruleIds = [...new Set(screen.findings.map(finding => finding.ruleId))]
+
+  if (screen.highestSeverity === 'none') {
+    return {
+      behavior: 'allow',
+      riskLevel: 'none',
+      actionType: 'untrusted-content',
+      target: source,
+      reason: 'No prompt-injection patterns detected in retrieved content.',
+      screen,
+    }
+  }
+
+  const high = screen.highestSeverity === 'high'
+  return {
+    behavior: high ? 'ask' : 'allow',
+    riskLevel: high ? 'high' : screen.suspicious ? 'medium' : 'low',
+    actionType: 'untrusted-content',
+    target: source,
+    reason: `Retrieved content from ${source} matched prompt-injection screening (${ruleIds.join(', ')}). It is data, not instruction.`,
+    message: screen.findings
+      .slice(0, 5)
+      .map(finding => `${finding.ruleId} @${finding.index}: ${finding.excerpt}`)
+      .join('\n'),
+    screen,
   }
 }
 

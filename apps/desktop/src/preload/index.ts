@@ -39,6 +39,8 @@ import type {
   AddConnectorRequestDto,
   UpdateConnectorRequestDto,
   CallConnectorToolRequestDto,
+  ChatSessionDto,
+  ConnectorOAuthStatusDto,
   OpenProjectDialogResultDto,
   OpenFilesDialogResultDto,
   SaveFileDialogRequestDto,
@@ -535,6 +537,42 @@ const api = {
 
   callConnectorTool: (req: CallConnectorToolRequestDto): Promise<{ ok: boolean; result?: unknown; error?: string }> =>
     ipcRenderer.invoke('connector:tool:call', req),
+
+  // Remote connector OAuth
+  getConnectorOAuthStatus: (projectRoot: string, name: string): Promise<ConnectorOAuthStatusDto> =>
+    ipcRenderer.invoke('connector:oauth:status', { projectRoot, name }),
+
+  authorizeConnectorOAuth: (
+    projectRoot: string,
+    name: string,
+    scopes?: string[],
+  ): Promise<{ ok: boolean; error?: string; scope?: string }> =>
+    ipcRenderer.invoke('connector:oauth:authorize', { projectRoot, name, scopes }),
+
+  signOutConnectorOAuth: (projectRoot: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('connector:oauth:sign-out', { projectRoot, name }),
+
+  // Named chat sessions
+  listChatSessions: (
+    projectRoot: string,
+    includeArchived?: boolean,
+  ): Promise<ChatSessionDto[]> =>
+    ipcRenderer.invoke('chat-session:list', { projectRoot, includeArchived }),
+
+  createChatSession: (projectRoot: string, title?: string): Promise<ChatSessionDto> =>
+    ipcRenderer.invoke('chat-session:create', { projectRoot, title }),
+
+  renameChatSession: (id: string, title: string): Promise<ChatSessionDto> =>
+    ipcRenderer.invoke('chat-session:rename', { id, title }),
+
+  archiveChatSession: (id: string): Promise<ChatSessionDto> =>
+    ipcRenderer.invoke('chat-session:archive', { id }),
+
+  reorderChatSessions: (projectRoot: string, orderedIds: string[]): Promise<ChatSessionDto[]> =>
+    ipcRenderer.invoke('chat-session:reorder', { projectRoot, orderedIds }),
+
+  bindChatSessionRun: (id: string, runId?: string): Promise<ChatSessionDto> =>
+    ipcRenderer.invoke('chat-session:bind', { id, runId }),
 
   // History / report
   readHistory: (projectRoot: string): Promise<unknown[]> =>

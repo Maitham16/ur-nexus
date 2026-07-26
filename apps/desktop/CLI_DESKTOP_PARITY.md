@@ -14,9 +14,9 @@ Legend — **Status**: ✅ working end-to-end · 🟡 working with noted limits 
 |---|---|---|---|---|---|---|---|
 | Prompt execution | `src/QueryEngine.ts`, `src/query.ts` | `runtime.ts → runPromptStream()` consumes vendored `runPrompt()`; events streamed over `runtime:event` | Chat | `@ur/agent-runtime` `createSession`/`runPrompt` | ✅ | — | `ipcRegistry.test.ts`, `runtime.approval.test.ts` |
 | Slash commands and skills | `src/commands.ts`, project/plugin/workflow registries | Runtime sessions receive `getCommands(projectRoot)` and the renderer loads the same live catalog over `slash-commands:list`; desktop-native routes override CLI-only TUI dialogs | Chat `/` palette | shared command registry + `QueryEngine` slash processing | ✅ | — | `slashCommands.test.ts`, `runtime.e2e.test.ts` |
-| Chat sessions | `src/screens/repl`, session store | `startRun()` creates a runtime session per chat; follow-up messages reuse the session | Chat | `createSession(project, {sessionId, canUseTool})` | ✅ | Named multi-chat tabs (single active session per window) | smoke + registry tests |
+| Chat sessions | `src/screens/repl`, session store | `startRun()` creates a runtime session per chat; `sessions/chatSessions.ts` adds named, ordered, persisted sessions with one-run-per-session binding; `ChatTabs` + `useChatSessions` give a tab strip with create, switch, inline rename, close-to-archive, drag reorder, and per-tab conversation snapshots | Chat tab strip | `createSession(project, {sessionId, canUseTool})` + chat session store + `chat-session:*` IPC | ✅ | — | `chatSessions.test.ts` (24) |
 | Planning | `src/services/promptPlanning` | `planning.ts`: shouldPlan heuristic, structured plan generation via real model run, placeholder-plan rejection, editable review, scheduler-driven execution | Chat Plan mode (review/edit/start), live task board | real model run + TaskScheduler | ✅ | — | `planning.test.ts` (12) |
-| Task creation/updates | `src/tasks.ts`, `src/tools/TaskCreateTool…TaskUpdateTool` | `taskAgentRegistry.ts` + `executeToolLocal` TaskCreate/TaskUpdate/TaskList mapping | Tasks page, Chat context | local registry + tool events | ✅ | Cross-session task persistence | registry tests |
+| Task creation/updates | `src/tasks.ts`, `src/tools/TaskCreateTool…TaskUpdateTool` | `taskAgentRegistry.ts` + `executeToolLocal` TaskCreate/TaskUpdate/TaskList mapping; `taskStore.ts` checkpoints tasks at terminal transitions and on verification, reconciling abandoned `running` records to `interrupted` on load | Tasks page, Chat context | local registry + tool events + task store | ✅ | — | registry tests, `taskStore.test.ts` (15) |
 | Multi-agent execution | `src/services/agents`, `src/coordinator` | `agents/scheduler.ts`: dependency-aware, concurrency-capped, file-target locks, FIFO fairness, retries, cancellation propagation, deterministic transitions | Agents page, plan execution, task board | TaskScheduler + real agent runs | ✅ | — | `scheduler.test.ts` (11 incl. stress) |
 | Background agents | `src/commands/bg`, background tasks | `agents/backgroundAgents.ts`: queued/running real runs detached from chat, unique ids, lifecycle events, logs/results/changed files, cancel/retry, persistence + startup interruption reconcile | Agents page (launch, list, detail, cancel, retry) | scheduler + real runtime runs | ✅ | Records survive restart; live processes do not (marked interrupted) | `backgroundAgents.test.ts` (5, live model) |
 | File reading | `src/tools/FileReadTool` | `file:read` IPC → `readProjectFile()` (worktree-scoped, safety-evaluated in tool path) | Chat tools, Files preview | Node fs + safety service | ✅ | — | registry validation tests |
@@ -29,13 +29,14 @@ Legend — **Status**: ✅ working end-to-end · 🟡 working with noted limits 
 | Git operations | `src/tools/GitHubTool`, git utils | `explorer.ts`: `git status --porcelain`, `git diff`, `git checkout --`, `git check-ignore` | Changes page, Files page | git CLI | ✅ | Commit/push/PR flows (deliberately out of scope for review UI) | `explorer.test.ts` |
 | Worktrees | `src/tools/EnterWorktreeTool`/`ExitWorktreeTool` | `worktreeManager.ts` + `EnterWorktree`/`ExitWorktree` tool mapping + per-run isolated worktrees | Chat (worktree toggle), Projects | git worktree | ✅ | — | runtime tests |
 | Project instructions | `UR.md`/`UR.local.md` loading in `src/context.ts` | Vendored `openProject()` loads project instructions into the session | Chat (implicit), Projects page shows presence | `@ur/agent-runtime` | ✅ | — | — |
-| Permissions | `src/services/safety`, `src/security` | `safetyService.ts` (526 lines: tool/shell/file/network/long-running/sensitive-path evaluation) + vendored policy helpers | Approval cards, Settings policy editor | local + `loadProjectSafetyPolicy` | ✅ | — | `safetyService.test.ts` |
+| Permissions | `src/services/safety`, `src/security` | `safetyService.ts` (tool/shell/file/network/long-running/sensitive-path evaluation) + vendored policy helpers | Approval cards, Settings policy editor | local + `loadProjectSafetyPolicy` | ✅ | — | `safetyService.test.ts` |
+| Prompt-injection screening | prompt-layer wording in `src/tools/WebFetchTool`, `WebSearchTool` | `safety/injectionScreen.ts`: rule-based detection of instruction override, system-prompt probing, credential exfiltration, tool directives, false authority, hidden-unicode and bidi obfuscation; `screenToolResult.ts` screens every WebFetch/WebSearch/browser/`mcp__*` result on the `tool_result` path and attaches findings to `tool_call_finished`; workspace tools are excluded so the user's own repo cannot flag itself | Approval cards (high severity), tool result events | local screening | ✅ | — | `injectionScreen.test.ts` (25), `screenToolResult.test.ts` (7) |
 | Approval requests | permission prompts in REPL | `requestApproval()` (run-scoped, cached scopes, 5-min timeout) + native dialog for standalone ops + approval log | Chat approval cards, Terminal approvals tab | IPC events + Electron dialog | ✅ | — | `runtime.approval.test.ts` |
 | Safety rules | `src/services/guardrails`, policy files | `.ur/safety-policy.json` read/write (`safety:policy:get/set`), deny/ask rules, macOS sensitive dirs | Settings | safety service | ✅ | — | `safetyService.test.ts` |
-| Verification | `src/services/verifier` | Verification events per task (`verification_completed`, L1) plus plan-task verification steps defined and shown per task | Tasks page, Chat, Plan cards | task registry + plans | 🟡 | L2 deep verification pipeline | — |
+| Verification | `src/services/verifier` | L1 events per task plus `verification.ts`: gate discovery (node scripts, go, pytest), real gate execution through the safety layer, fail-fast, and adjudication that separates `verified` / `failed` / `no-gates` / `denied` | Tasks page, Chat, Plan cards | task registry + plans + project gates | ✅ | — | `verification.test.ts` (16) |
 | Provider/model selection | `src/services/providers` | `providerService.ts`: 7 provider kinds, Keychain-backed keys, model discovery, connection tests, activation. Config is **global** (works with no project open); Settings + Chat auto-discover the live model list on load | Settings, Chat header | vendored provider registry | ✅ | — | `globalProviders.test.ts`, registry tests |
 | Streaming responses | `src/QueryEngine.ts` streaming | `model_stream` deltas over `runtime:event` broadcast | Chat | runtime events | ✅ | — | — |
-| MCP | `src/services/mcp`, MCP tools | `connectorService.ts` (stdio/sse/http/ws, test, tools listing, tool calls) + `mcp:*` channels | MCP page | `@modelcontextprotocol/sdk` | ✅ | OAuth-authenticated remote servers | — |
+| MCP | `src/services/mcp`, MCP tools | `connectorService.ts` (stdio/sse/http/ws, test, tools listing, tool calls) + `mcp:*` channels; `mcpOAuth.ts` (metadata discovery, PKCE S256, code exchange, refresh, constant-time state check) and `mcpOAuthStore.ts` (safeStorage-encrypted tokens); `mcpOAuthFlow.ts` runs the RFC 8252 loopback flow — one-shot 127.0.0.1 listener, system browser, RFC 7591 dynamic registration, RFC 8707 resource binding — with bearer injection and refresh-on-expiry at connect | MCP page: Authorize / Re-authorize / Sign out with status badges | `@modelcontextprotocol/sdk` + OAuth 2.1 | ✅ | — | `mcpOAuth.test.ts` (37), `mcpOAuthFlow.test.ts` (17) |
 | Session history | `src/history.ts` | `historyStore.ts` (run records + JSONL transcripts in Application Support) | History page | local store | ✅ | — | via history flows |
 | Checkpoints | `src/commands/rewind`, file history | `checkpoints.ts`: snapshots at before-tool/before-edit/after-edit/task-completed/before-agent/manual boundaries with session/task/git metadata; preview, approval-gated rewind, safety checkpoint (branched timeline), audit log | Checkpoints panel (History + Chat button) | local snapshot store | ✅ | — | `checkpoints.test.ts` (6 incl. rewind round-trip) |
 | Cancel/pause/resume | REPL controls | `run:stop/pause/resume` + `sessions/runState.ts` incremental persistence, startup interruption reconcile, `sessions/resume.ts` continuation without repeating completed side-effect tools | Chat Stop/Pause/Resume + interrupted-run banner (Resume / Mark failed / Archive) | runtime + persisted state | ✅ | Resume starts a fresh session at a safe boundary with replayed context | `resume.test.ts` (5 incl. live end-to-end) |
@@ -45,15 +46,26 @@ Legend — **Status**: ✅ working end-to-end · 🟡 working with noted limits 
 
 ## Known gaps (explicit)
 
-1. **L2 deep verification** is not implemented; verification remains L1
-   (per-task result events) plus plan-defined verification steps.
-2. Resumed sessions continue in a **fresh runtime session** with replayed
+1. **Chat tabs are not visually verified.** The strip, per-tab snapshots, and
+   IPC are implemented, typecheck clean, and the renderer bundles; the layout,
+   drag feel, and overflow behavior at many tabs have not been exercised in a
+   running app. Provider/model and permissions are intentionally window-level
+   rather than per-tab, so they do not reset when switching.
+2. **Injection screening is heuristic.** It is a rule-based pass that reports
+   rather than blocks, so it will miss novel phrasings and can flag prose that
+   discusses injection. It raises the cost of an attack; it does not close it,
+   and the prompt-layer instructions remain the primary defense.
+3. **L2 verification depends on the project defining a gate.** A project with
+   no test, typecheck, lint, or build script reports `no-gates` — deliberately
+   not a pass, so the report builder can distinguish "nothing failed" from
+   "nothing was checked."
+4. Resumed sessions continue in a **fresh runtime session** with replayed
    context and a completed-actions ledger; the exact in-memory engine state
    of the interrupted process is not rehydrated (it no longer exists).
-3. The interrupted **worktree** of a resumed run is preserved on disk and
+5. The interrupted **worktree** of a resumed run is preserved on disk and
    referenced in run state, but the continuation executes in the main
    workspace.
-4. **Plan generation quality is model-dependent**: the pipeline runs a real
+6. **Plan generation quality is model-dependent**: the pipeline runs a real
    model and strictly validates the response; models that fail to emit the
    JSON contract produce a clear `PlanParseError` in the UI (never a
    fabricated placeholder plan), and slow cloud models can take minutes.

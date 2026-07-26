@@ -8,8 +8,10 @@ import {
 import { marked } from 'marked'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useDesktop, useRuntimeEvents } from '../hooks/useDesktop.js'
+import { useChatSessions } from '../hooks/useChatSessions.js'
 import { useProject } from '../state/ProjectContext.js'
 import { Icon, type IconName } from '../components/Icon.js'
+import { ChatTabs } from '../components/ChatTabs.js'
 import {
   DESKTOP_SLASH_COMMANDS,
   expandSlashPrompt,
@@ -325,6 +327,35 @@ type ChatMessage =
   | ErrorMessage
   | FinalReportMessage
 
+type ChatStatus = 'idle' | 'starting' | 'running' | 'paused' | 'waiting_approval'
+
+/** Per-tab conversation state, swapped when the active chat tab changes. */
+type ChatSnapshot = {
+  messages: ChatMessage[]
+  runId: string | null
+  worktreeRoot: string | undefined
+  status: ChatStatus
+  changedFiles: string[]
+  usage: RunUsageDto | null
+  lastUserPrompt: string | null
+  startTime: number | null
+  sendError: string | null
+}
+
+function emptyChatSnapshot(): ChatSnapshot {
+  return {
+    messages: createInitialMessages(),
+    runId: null,
+    worktreeRoot: undefined,
+    status: 'idle',
+    changedFiles: [],
+    usage: null,
+    lastUserPrompt: null,
+    startTime: null,
+    sendError: null,
+  }
+}
+
 function createInitialMessages(): ChatMessage[] {
   const fixture = new URLSearchParams(window.location.search).get('visualFixture')
   if (fixture !== 'conversation') return []
@@ -449,9 +480,7 @@ export function ChatPage() {
   const [worktreeRoot, setWorktreeRoot] = useState<string | undefined>(undefined)
   const [useWorktree, setUseWorktree] = useState(false)
   const [permissions, setPermissions] = useState<AgentPermissionSettingsDto>(DEFAULT_PERMISSIONS)
-  const [status, setStatus] = useState<
-    'idle' | 'starting' | 'running' | 'paused' | 'waiting_approval'
-  >('idle')
+  const [status, setStatus] = useState<ChatStatus>('idle')
   const [startTime, setStartTime] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [changedFiles, setChangedFiles] = useState<string[]>([])
@@ -543,6 +572,87 @@ export function ChatPage() {
   const runIdRef = useRef<string | null>(null)
   const previousRuntimeRootRef = useRef<string | null>(null)
   runIdRef.current = runId
+
+  // Everything a chat tab owns. Provider/model and permissions are excluded on
+  // purpose: those are window-level preferences the user expects to persist
+  // across tabs rather than reset when switching.
+  const captureSnapshot = useCallback(
+    (): ChatSnapshot => ({
+      messages,
+      runId,
+      worktreeRoot,
+      status,
+      changedFiles,
+      usage,
+      lastUserPrompt,
+      startTime,
+      sendError,
+    }),
+    [
+      messages,
+      runId,
+      worktreeRoot,
+      status,
+      changedFiles,
+      usage,
+      lastUserPrompt,
+      startTime,
+      sendError,
+    ],
+  )
+
+  const applySnapshot = useCallback((snapshot: ChatSnapshot): void => {
+    setMessages(snapshot.messages)
+    setRunId(snapshot.runId)
+    runIdRef.current = snapshot.runId
+    setWorktreeRoot(snapshot.worktreeRoot)
+    setStatus(snapshot.status)
+    setChangedFiles(snapshot.changedFiles)
+    setUsage(snapshot.usage)
+    setLastUserPrompt(snapshot.lastUserPrompt)
+    setStartTime(snapshot.startTime)
+    setSendError(snapshot.sendError)
+  }, [])
+
+  const chatSessions = useChatSessions<ChatSnapshot>(runtimeRoot, emptyChatSnapshot)
+
+  const switchToSession = useCallback(
+    (id: string): void => {
+      chatSessions.capture(captureSnapshot())
+      const restored = chatSessions.select(id)
+      if (restored) applySnapshot(restored)
+    },
+    [chatSessions, captureSnapshot, applySnapshot],
+  )
+
+  const newChatSession = useCallback((): void => {
+    chatSessions.capture(captureSnapshot())
+    void chatSessions.create().then(created => {
+      if (created) applySnapshot(emptyChatSnapshot())
+    })
+  }, [chatSessions, captureSnapshot, applySnapshot])
+
+  const closeChatSession = useCallback(
+    (id: string): void => {
+      if (id === chatSessions.activeId) chatSessions.capture(captureSnapshot())
+      void chatSessions.close(id).then(restored => {
+        if (restored) applySnapshot(restored)
+      })
+    },
+    [chatSessions, captureSnapshot, applySnapshot],
+  )
+
+  // Read through a ref so the effect below depends only on the run id. The
+  // hook returns a fresh object every render, so depending on it directly would
+  // re-bind on every keystroke.
+  const bindRunRef = useRef(chatSessions.bindRun)
+  bindRunRef.current = chatSessions.bindRun
+
+  // Keep the active tab pointing at whatever run it owns, so a reopened window
+  // can tell which conversation was mid-flight.
+  useEffect(() => {
+    void bindRunRef.current(runId ?? undefined)
+  }, [runId])
 
   // General conversations run inside an app-owned private directory. This
   // preserves a real sandbox/cwd without forcing the user to choose a project.
@@ -1617,6 +1727,16 @@ export function ChatPage() {
 
   return (
     <div className="page chat-page workspace-page">
+      <ChatTabs
+        sessions={chatSessions.sessions}
+        activeId={chatSessions.activeId}
+        busyRunIds={runId && status !== 'idle' ? [runId] : []}
+        onSelect={switchToSession}
+        onCreate={newChatSession}
+        onRename={chatSessions.rename}
+        onClose={closeChatSession}
+        onReorder={chatSessions.reorder}
+      />
       <header className="chat-header">
         <div className="chat-header-left">
           <div className="chat-project">{projectRoot ? projectName : 'New chat'}</div>

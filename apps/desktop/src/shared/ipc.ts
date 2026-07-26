@@ -45,7 +45,59 @@ export interface VerificationResultDto {
   passed: boolean
   level: 'l1' | 'l2'
   message?: string
+  /** L2 only: the quality gates that were actually executed. */
+  gates?: VerificationGateDto[]
+  /**
+   * L2 only. Distinguishes "gates ran and passed" from "no gate exists to
+   * run" — the second is not a pass, and collapsing them into `passed` would
+   * let an unverifiable project report itself as verified.
+   */
+  outcome?: VerificationOutcome
   [key: string]: unknown
+}
+
+/** A named chat tab. Mirrors the main-process ChatSession record. */
+export interface ChatSessionDto {
+  id: string
+  projectRoot: string
+  title: string
+  runId?: string
+  createdAt: number
+  updatedAt: number
+  archived: boolean
+  order: number
+}
+
+export interface ConnectorOAuthStatusDto {
+  supported: boolean
+  authorized: boolean
+  expired: boolean
+  scope?: string
+  expiresAt?: number
+  staticHeader?: boolean
+}
+
+export type VerificationOutcome =
+  | 'verified'
+  | 'failed'
+  | 'no-gates'
+  | 'denied'
+  | 'error'
+
+export type VerificationGateKind = 'tests' | 'typecheck' | 'lint' | 'build'
+
+export interface VerificationGateDto {
+  kind: VerificationGateKind
+  command: string
+  passed: boolean
+  /** null when the gate was never executed (denied or errored before spawn). */
+  exitCode: number | null
+  durationMs: number
+  /** Blocked by the safety layer rather than executed. */
+  denied?: boolean
+  summary: string
+  /** Populated for the tests gate so failures are actionable. */
+  failingTests?: FailingTestDto[]
 }
 
 // Channels exposed by the main process for renderer invocation.
@@ -180,6 +232,17 @@ export type IpcChannel =
   | 'connector:test'
   | 'connector:tools'
   | 'connector:tool:call'
+  // Remote connector OAuth
+  | 'connector:oauth:status'
+  | 'connector:oauth:authorize'
+  | 'connector:oauth:sign-out'
+  // Named chat sessions (tab strip)
+  | 'chat-session:list'
+  | 'chat-session:create'
+  | 'chat-session:rename'
+  | 'chat-session:archive'
+  | 'chat-session:reorder'
+  | 'chat-session:bind'
   // History / export
   | 'history:read'
   | 'report:export'
@@ -951,6 +1014,19 @@ export interface ToolCallFinishedEvent extends BaseRuntimeEvent {
   type: 'tool_call_finished'
   toolName: string
   result: unknown
+  /**
+   * Present only when injection screening matched something in a
+   * content-retrieving tool's result. Absent means either a clean result or a
+   * tool whose output is not third-party content.
+   */
+  injection?: InjectionScreenSummaryDto
+}
+
+export interface InjectionScreenSummaryDto {
+  suspicious: boolean
+  highestSeverity: 'none' | 'low' | 'medium' | 'high'
+  ruleIds: string[]
+  findings: { ruleId: string; severity: string; excerpt: string; index: number }[]
 }
 
 export interface CommandStartedEvent extends BaseRuntimeEvent {

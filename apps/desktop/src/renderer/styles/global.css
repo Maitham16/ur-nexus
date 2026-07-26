@@ -7602,3 +7602,109 @@ html[data-theme] .nav-item.active .nav-icon {
     display: none !important;
   }
 }
+
+/* Chat tab strip (multi-session chat) */
+.chat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chat-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.chat-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
+}
+
+.chat-tab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.chat-tab-active {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+.chat-tab-dragging {
+  opacity: 0.5;
+}
+
+.chat-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-tab-busy {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.chat-tab-rename {
+  width: 130px;
+  padding: 1px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-app);
+  color: var(--text-strong);
+  font-size: 12.5px;
+  font-family: inherit;
+}
+
+.chat-tab-close,
+.chat-tab-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.chat-tab-close:hover {
+  background: var(--danger-bg, rgba(239, 68, 68, 0.14));
+  color: var(--danger);
+}
+
+.chat-tab-new {
+  margin-left: 2px;
+  color: var(--text-secondary);
+}
+
+.chat-tab-new:hover {
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
