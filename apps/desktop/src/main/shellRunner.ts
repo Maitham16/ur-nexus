@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { constants as osConstants } from 'node:os'
 
 export interface ShellCommand {
   id: string
@@ -32,6 +33,12 @@ const commands = new Map<string, ShellCommand>()
 
 const shell = process.platform === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash'
 
+function childSignalExitCode(signal: NodeJS.Signals | null): number {
+  if (!signal) return 0
+  const signalNumber = (osConstants.signals as Record<string, number>)[signal]
+  return signalNumber ? 128 + signalNumber : 1
+}
+
 export function createShellRunner(opts: ShellRunnerOptions) {
   function run(command: string): Promise<ShellCommand> {
     return new Promise(resolve => {
@@ -59,6 +66,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
           (entry): entry is [string, string] => typeof entry[1] === 'string',
         ),
       )
+      let stopRequested = false
 
       const runWithoutPty = (): void => {
         const { spawn } = require('node:child_process') as typeof import('node:child_process')
@@ -70,7 +78,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
           record.endTime = Date.now()
           record.durationMs = record.endTime - startTime
           record.exitCode = exitCode
-          record.status = exitCode === 0 ? 'done' : 'error'
+          record.status = stopRequested ? 'stopped' : exitCode === 0 ? 'done' : 'error'
           if (error) {
             record.stderr += error
             opts.onData?.(id, error)
@@ -85,6 +93,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
             stdio: ['ignore', 'pipe', 'pipe'],
           })
           running.set(id, () => {
+            stopRequested = true
             child.kill('SIGTERM')
           })
           child.stdout?.on('data', chunk => {
@@ -99,11 +108,20 @@ export function createShellRunner(opts: ShellRunnerOptions) {
           })
           child.once('error', error => finish(1, error.message))
           child.once('close', (code, signal) => {
-            finish(code ?? (signal ? 1 : 0))
+            finish(code ?? childSignalExitCode(signal))
           })
         } catch (error) {
           finish(1, error instanceof Error ? error.message : String(error))
         }
+      }
+
+      // Bun 1.3.x can close node-pty's caller-owned master fd on Linux,
+      // delivering SIGHUP before output and the real shell status are read.
+      // This runner is non-interactive, so Bun uses the reliable child-process
+      // path; packaged Electron/Node builds retain PTY behavior.
+      if (process.versions.bun) {
+        runWithoutPty()
+        return
       }
 
       let ptyProcess: import('node-pty').IPty
@@ -121,6 +139,7 @@ export function createShellRunner(opts: ShellRunnerOptions) {
       }
 
       running.set(id, () => {
+        stopRequested = true
         ptyProcess.kill('SIGTERM')
       })
 
@@ -137,12 +156,10 @@ export function createShellRunner(opts: ShellRunnerOptions) {
         record.endTime = endTime
         record.durationMs = endTime - startTime
         record.exitCode = signal ? 128 + signal : (exitCode ?? 0)
-        record.status = record.exitCode === 0 ? 'done' : 'error'
+        record.status = stopRequested ? 'stopped' : record.exitCode === 0 ? 'done' : 'error'
         opts.onExit?.(id, record)
+        resolve(record)
       })
-
-      // Safety net: resolve the promise when process exits.
-      ptyProcess.onExit(() => resolve(record))
     })
   }
 
