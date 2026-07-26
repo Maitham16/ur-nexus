@@ -19,6 +19,7 @@ import {
   failAgent,
 } from './taskAgentRegistry.js'
 import { TaskScheduler } from './agents/scheduler.js'
+import { isGitRepository } from './worktreeManager.js'
 
 /**
  * Decide whether a prompt warrants a planning pass. Simple questions and
@@ -243,8 +244,13 @@ export async function executePlan(
       const planTask = plan.tasks.find(t => t.id === scheduled.id)
       if (!planTask) throw new Error(`Unknown plan task ${scheduled.id}`)
       if (signal.aborted) throw new Error('Cancelled')
+      // Plan tasks run in an isolated worktree so concurrent tasks cannot
+      // collide on the same files. That requires a git repository, and a plain
+      // directory is a legitimate project here — so fall back to the workspace
+      // instead of failing the task. The scheduler's file-target locks still
+      // serialize tasks that declare overlapping files.
       const { runId } = await startRun(projectRoot, {
-        useWorktree: true,
+        useWorktree: await isGitRepository(projectRoot),
         nativeApprovals: true,
         ephemeral: true,
       })

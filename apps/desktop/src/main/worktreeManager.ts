@@ -141,13 +141,32 @@ async function copyDirtyState(
   }
 }
 
+/**
+ * Whether a directory is inside a git work tree.
+ *
+ * Non-throwing on purpose: "this is not a repository" is an ordinary answer,
+ * not a failure. Letting git's own stderr escape here surfaced
+ * `fatal: not a git repository` as a plan task error, which told the user
+ * nothing about what the app had actually tried to do.
+ */
+export async function isGitRepository(projectRoot: string): Promise<boolean> {
+  try {
+    const root = await fs.realpath(path.resolve(projectRoot))
+    const inside = await git(root, ['rev-parse', '--is-inside-work-tree'])
+    return inside.stdout.trim() === 'true'
+  } catch {
+    return false
+  }
+}
+
 export async function createIsolatedWorktree(
   projectRoot: string,
   branch?: string,
 ): Promise<Worktree> {
   const root = await fs.realpath(path.resolve(projectRoot))
-  const inside = (await git(root, ['rev-parse', '--is-inside-work-tree'])).stdout.trim()
-  if (inside !== 'true') throw new Error('Worktree mode requires a git repository')
+  if (!(await isGitRepository(root))) {
+    throw new Error('Worktree mode requires a git repository')
+  }
 
   const safeBranch = validateBranchName(
     branch || `ur/${new Date().toISOString().slice(0, 10)}/${randomUUID().slice(0, 8)}`,
