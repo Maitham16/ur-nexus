@@ -9,7 +9,12 @@ const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
 describe('desktop npm package contract', () => {
   test('publishes the requested public identity', () => {
     expect(pkg.name).toBe('ur-nexus-desktop')
-    expect(pkg.version).toBe('1.0.7')
+    // Asserted as a shape, not a literal. Pinning the exact version here made
+    // this test fail on every release even though nothing about the package
+    // contract had changed; src/main/vendorGlobals.test.ts is what keeps the
+    // version honest by requiring APP_VERSION to match this field.
+    expect(pkg.version).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
+    expect(pkg.version).not.toBe('0.0.0')
     expect(pkg.private).not.toBe(true)
     expect(pkg.publishConfig).toEqual({ access: 'public' })
     expect(pkg.repository.url).toContain('Maitham16/ur-nexus')
